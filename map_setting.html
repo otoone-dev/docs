@@ -13,7 +13,7 @@
       <option value="on">On</option>
     </select>
     <br>
-    <input type="text" name="location" size="40" maxlength="20">
+    <input type="text" name="location" size="40" maxlength="20" id="location_select">
     </p>
  
     <p>
@@ -25,10 +25,11 @@
 <script>
   //Setup to allow easy adding more options later
   function saveOptions() {
-    var invertSelect = document.getElementById("invert_select");
- 
+    //var invertSelect = document.getElementById("invert_select");
+    locationSelect = document.getElementById("location_select");
     var options = {
-      "invert": invertSelect.options[invertSelect.selectedIndex].value
+      //"invert": invertSelect.options[invertSelect.selectedIndex].value
+      "locationtext": locationSelect.innerText
     }
      
     return options;
