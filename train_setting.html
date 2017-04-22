@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>TrainTime Setting Page</title>
+  </head>
+  <body>
+    <h1>TrainTime Setting Page</h1>
+<p>フォーマットここから<br>
+---------<br>
+駅名<br>
+<br>
+A:行先1<br>
+B:行先2<br>
+<br>
+[MON][TUE][WED][THU][FRI][SAT][SUN]<br>
+5:A10 A40<br>
+8:A20 B40 A59<br>
+17:A30<br>
+24:B51<br>
+---------<br>
+ここまで<br>
+</p> 
+    <button id="save_button">Save</button><br>
+    <textarea id="seturl_select" name="seturl" cols="80" rows="100" maxlength="2048" placeholder="上記フォーマットのテキストを入力してください"></textarea>
+<br> 
+    <p>default page
+    <br>https://otoone-dev.github.io/docs/pebble.html
+    <br>
+    </p>
+   </body>
+</html>
+
+<script>
+  //Setup to allow easy adding more options later
+  function saveOptions() {
+    seturlSelect = document.getElementById("seturl_select");
+    var options = {
+      "seturltext": seturlSelect.value
+    }
+     
+    return options;
+  };
+ 
+  var submitButton = document.getElementById("save_button");
+  submitButton.addEventListener("click", 
+    function() {
+      console.log("Submit");
+ 
+      var options = saveOptions();
+      var location = "pebblejs://close#" + encodeURIComponent(JSON.stringify(options));
+       
+      document.location = location;
+    }, 
+  false);
+</script>
