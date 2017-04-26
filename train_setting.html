@@ -5,24 +5,28 @@
   </head>
   <body>
     <h1>TrainTime Setting Page</h1>
-<br>
 ---------<br>
 <a href="train_setting_sample.html">Sample is here</a><br>
 ---------<br>
 <br>
-<br> 
-    <button id="save_button">Save</button><br>
-    <textarea id="seturl_select" name="seturl" cols="80" rows="20" maxlength="4096" placeholder="Input time table data"></textarea>
-<br> 
+    <input type="radio" name="radio-group" id="radio1" value="0" checked="checked">Bank1
+    <input type="radio" name="radio-group" id="radio2" value="1">Bank2
+    <input type="submit" value="Save" id="save_button"><br>
+    <textarea id="timetable" name="seturl" cols="40" rows="10" maxlength="6144" placeholder="Input time table data"></textarea>
+    <button id="save_button1">Save1</button><br>
+<br>
    </body>
 </html>
 
 <script>
   //Setup to allow easy adding more options later
   function saveOptions() {
-    seturlSelect = document.getElementById("seturl_select");
+    
+    timeTable = document.getElementById("timetable");
+    bank = document.getElementById("radio2");
     var options = {
-      "seturltext": seturlSelect.value
+      "time_table": timeTable.value
+      "bank": bank.checked
     }
      
     return options;
