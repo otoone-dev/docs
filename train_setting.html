@@ -12,6 +12,14 @@
 <br>
     <input type="radio" name="radio-group" id="radio1" value="0" checked="checked">Bank1
     <input type="radio" name="radio-group" id="radio2" value="1">Bank2
+    <select name="color-select" id="color">
+<option value="00FF00">Green</option>
+<option value="FFAA55">Rajah</option>
+<option value="00FFFF">Cyan</option>
+<option value="FFFF00">Yellow</option>
+<option value="FF00FF">Magenta</option>
+<option value="AAAAAA">LightGray</option>
+</select><br>
     <button id="save_button">Save</button><br>
     <textarea id="timetable" cols="40" rows="10" maxlength="6144" placeholder="Input time table data"></textarea>
 <br>
@@ -25,9 +33,11 @@
     
     timeTable = document.getElementById("timetable");
     bank = document.getElementById("radio2");
+    color = document.getElementById("color");
     var options = {
       "time_table": timeTable.value,
-      "bank": bank.checked
+      "bank": bank.checked,
+      "color": color.value
     }
      
     return options;
