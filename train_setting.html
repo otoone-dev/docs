@@ -6,7 +6,7 @@
   <body>
     <h1>TrainTime Setting Page</h1>
     
-    sorry... App is under constructing. please wait few days...
+    sorry... App is under constructing. please wait few days...<br>
 ---------<br>
 <a href="train_setting_sample.html">Sample is here</a><br>
 ---------<br>
@@ -14,6 +14,15 @@
 <br>
     <input type="radio" name="radio-group" id="radio1" value="0" checked="checked">Station1
     <input type="radio" name="radio-group" id="radio2" value="1">Station2
+<br>
+    <select name="type-select" id="type">
+<option value="0">Train</option>
+<option value="1">Train7</option>
+<option value="2">Train15</option>
+<option value="3">Bus</option>
+<option value="4">Ship</option>
+<option value="5">Plane</option>
+</select><br>
     <select name="color-select" id="color">
 <option value="00FF00">Green</option>
 <option value="FF0000">Red</option>
@@ -22,14 +31,6 @@
 <option value="FFFF00">Yellow</option>
 <option value="FF00FF">Magenta</option>
 <option value="AAAAAA">LightGray</option>
-</select><br>
-    <select name="type-select" id="type">
-<option value="0">Train</option>
-<option value="1">Train7</option>
-<option value="2">Train15</option>
-<option value="3">Bus</option>
-<option value="4">Ship</option>
-<option value="5">Plane</option>
 </select><br>
     <button id="save_button">Save</button><br>
     <textarea id="timetable" cols="30" rows="10" maxlength="6144" wrap="off" placeholder="Input time table data"></textarea>
