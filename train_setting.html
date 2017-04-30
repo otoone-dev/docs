@@ -21,6 +21,14 @@
 <option value="FF00FF">Magenta</option>
 <option value="AAAAAA">LightGray</option>
 </select><br>
+    <select name="type-select" id="type">
+<option value="0">Train</option>
+<option value="1">Train7</option>
+<option value="2">Train15</option>
+<option value="3">Bus</option>
+<option value="4">Ship</option>
+<option value="5">Plane</option>
+</select><br>
     <button id="save_button">Save</button><br>
     <textarea id="timetable" cols="30" rows="10" maxlength="6144" wrap="off" placeholder="Input time table data"></textarea>
 <br>
@@ -35,10 +43,12 @@
     timeTable = document.getElementById("timetable");
     bank = document.getElementById("radio2");
     color = document.getElementById("color");
+    type = document.getElementById("type");
     var options = {
       "time_table": timeTable.value,
       "bank": bank.checked,
-      "color": color.value
+      "color": color.value,
+      "type": type.value
     }
      
     return options;
