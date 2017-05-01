@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
+	<meta charset="UTF-8">
     <title>TrainTime Setting Page</title>
   </head>
   <body>
@@ -42,9 +43,9 @@ Color
 </html>
 
 <script>
-//tt = document.getElementById("timetable");
-//v = localstorage.directData1;
-//if (v) tt.value = v;
+tt = document.getElementById("timetable");
+v = localStorage.directData;
+if (v) tt.value = v;
 
   //Setup to allow easy adding more options later
   function saveOptions() {
