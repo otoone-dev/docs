@@ -42,7 +42,39 @@ Color
    </body>
 </html>
 
+
 <script>
+	function GetCookie( name )
+	{
+	    var result = null;
+
+	    var cookieName = name + '=';
+	    var allcookies = document.cookie;
+
+	    var position = allcookies.indexOf( cookieName );
+	    if( position != -1 )
+	    {
+	        var startIndex = position + cookieName.length;
+
+	        var endIndex = allcookies.indexOf( ';', startIndex );
+	        if( endIndex == -1 )
+	        {
+	            endIndex = allcookies.length;
+	        }
+
+	        result = decodeURIComponent(
+	            allcookies.substring( startIndex, endIndex ) );
+	    }
+
+	    return result;
+	}
+	
+	var op = GetCookie("data");
+	if (op) {
+		var opj = JSON.parse(decodeURIComponent(op));
+		tt.value = opj.time_table;
+	}
+	
   //Setup to allow easy adding more options later
   function saveOptions() {
     
@@ -56,7 +88,8 @@ Color
       "color": color.value,
       "type": type.value
     }
-     
+    var age = 60*60*24*365;
+    document.cookie = "data="+encodeURIComponent(JSON.stringify(options))+" max-age=" +age;
     return options;
   };
  
