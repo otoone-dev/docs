@@ -7,7 +7,6 @@
   <body>
     <h1>TrainTime Setting Page</h1>
     
-    sorry... App is under constructing. please wait few days...<br>
 ---------<br>
 <a href="train_setting_sample.html">Sample is here</a><br>
 ---------<br>
@@ -19,7 +18,6 @@
 IconType
 <select name="type-select" id="type">
 <option value="0">Train</option>
-<option value="1">Train7</option>
 <option value="2">Train15</option>
 <option value="3">Bus</option>
 <option value="4">Ship</option>
@@ -44,38 +42,6 @@ Color
 
 
 <script>
-	function GetCookie( name )
-	{
-	    var result = null;
-
-	    var cookieName = name + '=';
-	    var allcookies = document.cookie;
-
-	    var position = allcookies.indexOf( cookieName );
-	    if( position != -1 )
-	    {
-	        var startIndex = position + cookieName.length;
-
-	        var endIndex = allcookies.indexOf( ';', startIndex );
-	        if( endIndex == -1 )
-	        {
-	            endIndex = allcookies.length;
-	        }
-
-	        result = decodeURIComponent(
-	            allcookies.substring( startIndex, endIndex ) );
-	    }
-
-	    return result;
-	}
-	
-	var op = GetCookie("data");
-	if (op) {
-		tt.value = "hoge";
-		//var opj = JSON.parse(decodeURIComponent(op));
-		//tt.value = opj.time_table;
-	}
-	
   //Setup to allow easy adding more options later
   function saveOptions() {
     
@@ -89,8 +55,6 @@ Color
       "color": color.value,
       "type": type.value
     }
-    var age = 60*60*24*365;
-    document.cookie = "data="+encodeURIComponent(JSON.stringify(options))+" max-age=" +age;
     return options;
   };
  
