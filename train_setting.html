@@ -43,15 +43,10 @@ Color
 </html>
 
 <script>
-tt = document.getElementById("timetable");
-v = localStorage.directDataTest;
-if (v) tt.value = v;
-
   //Setup to allow easy adding more options later
   function saveOptions() {
     
     timeTable = document.getElementById("timetable");
-	localStorage.directDataTest = timeTable;
     bank = document.getElementById("radio2");
     color = document.getElementById("color");
     type = document.getElementById("type");
