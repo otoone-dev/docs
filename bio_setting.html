@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Biorhythm for pebble</title>
+  </head>
+  <body>
+    <h1>Biorhythm for pebble</h1>
+    <p>Input your birthday</p>
+ 
+    <p>ex) 1987/5/29
+    <br>
+    <input type="text" name="btday" size="40" maxlength="16" id="btday_select">
+    </p>
+ 
+    <p>
+    <button id="save_button">Set</button>
+    </p>
+  </body>
+</html>
+
+<script>
+  //Setup to allow easy adding more options later
+  function saveOptions() {
+    btdaySelect = document.getElementById("btday_select");
+    var options = {
+      "birthdaytext": btdaySelect.value
+    }
+     
+    return options;
+  };
+ 
+  var submitButton = document.getElementById("save_button");
+  submitButton.addEventListener("click", 
+    function() {
+      console.log("Submit");
+ 
+      var options = saveOptions();
+      var birthday = "pebblejs://close#" + encodeURIComponent(JSON.stringify(options));
+       
+      document.birthday = birthday;
+    }, 
+  false);
+</script>
