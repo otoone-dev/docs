@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+  <head>
+	<meta charset="UTF-8">
+    <title>WatchFace Create Page</title>
+  </head>
+  <body>
+    <h1>WatchFace Create Page</h1>
+    
+---------<br>
+<p>
+Background image (address for png file)<br>
+<textarea id="bgimage" cols="30" rows="1" maxlength="1000" wrap="off" placeholder="(default)"></textarea><br>
+<br>
+Draw script (Sample is <a href="watchface_creating_sample.html">here</a>)<br>
+<textarea id="script" cols="30" rows="10" maxlength="1000" wrap="off" placeholder="Input draw scripts"></textarea><br>
+<br>
+    <button id="save_button">Save</button><br>
+</p>
+   </body>
+</html>
+
+
+<script>
+  //Setup to allow easy adding more options later
+  function saveOptions() {
+    
+    bgimage = document.getElementById("bgimage");
+    script = document.getElementById("script");
+    var options = {
+      "bgimage": bgimage.value,
+      "script": script.value,
+    }
+    return options;
+  };
+ 
+  var submitButton = document.getElementById("save_button");
+  submitButton.addEventListener("click", 
+    function() {
+      console.log("Submit");
+ 
+      var options = saveOptions();
+      var location = "pebblejs://close#" + encodeURIComponent(JSON.stringify(options));
+       
+      document.location = location;
+    }, 
+  false);
+</script>
