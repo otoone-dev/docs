@@ -10,6 +10,18 @@
 3,1,234,7,7,150,90,3
 1,1,192,1,5,8,40,0
 1,1,192,2,5,8,70,0
+
+
+--------
+    uint8_t cmd;	// 00:End, 01:Line, 02:Circle, 03:Text
+    uint8_t cond;	// 01:Always, 02:IfLowBattery, 03:IfHighBattery, 04:IfNoNetwork, 05:IfEnableNetwork
+    uint8_t colorIndex;	// GColor(UInt8)
+    uint8_t param1;	// Line,Circle(00:Hour,01:Minute,02:Second,03:24h,09:XY), Text(01:Time, 02:Hour, 03:Minute, 04:Date, 05:Month, 06:Day, 07:DOW, 08:Batt)
+    uint8_t param2;	// Line(Width), Circle(Radius) Text(FontIndex)
+    uint8_t param3;	// Line(StartLength), Circle(X, Length), Text(X)
+    uint8_t param4;	// Line(EndLength), Circle(Y), Text(Y)
+    uint8_t param5;	// Text(Align)
+
 </pre>
 
 </body>
