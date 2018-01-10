@@ -12,8 +12,8 @@
 ---------<br>
 <p>
 <br>
-    <input type="radio" name="radio-group" id="radio1" value="0" checked="checked" onclick="radio1Click">Station1
-    <input type="radio" name="radio-group" id="radio2" value="1" onclick="radio2Click">Station2
+    <input type="radio" name="radio-group" id="radio1" value="0" checked="checked" onclick="radio1Click()">Station1
+    <input type="radio" name="radio-group" id="radio2" value="1" onclick="radio2Click()">Station2
 <br>
 IconType
 <select name="type-select" id="type">
@@ -43,73 +43,58 @@ Color
 
 <script>
   //Setup to allow easy adding more options later
-    var timetable1 = "";
-    var timetable2 = "";
-    var color1 = 0;
-    var color2 = 0;
-    var type1 = 0;
-    var type2 = 0;
-    var restored1 = false;
-    var restored2 = false;
+  var timeTable = document.getElementById("timetable");
+  var color = document.getElementById("color");
+  var type = document.getElementById("type");
 
   window.onload = function() {
     if (localStorage.watchTimeTable1 != null) {
-      timetable1 = localStorage.watchTimeTable1;
-      color1 = localStorage.watchTimeColor1;
-      type1 = localStorage.watchTimeType1;
-      restored1 = true;
+      timeTable.value = localStorage.watchTimeTable1;
+      color.value = localStorage.watchTimeColor1;
+      type.value = localStorage.watchTimeType1;
     }
-    if (localStorage.watchTimeTable2 != null) {
-      timetable2 = localStorage.watchTimeTable2;
-      color2 = localStorage.watchTimeColor2;
-      type2 = localStorage.watchTimeType2;
-      restored2 = true;
+  }
+  var viewingBank = 1;
+
+  function storeCurrentTable() {
+    if (viewingBank == 1) {
+      localStorage.watchTimeTable1 = timeTable.value;
+      localStorage.watchTimeColor1 = color.value;
+      localStorage.watchTimeType1 = type.value;
+    } else {
+      localStorage.watchTimeTable2 = timeTable.value;
+      localStorage.watchTimeColor2 = color.value;
+      localStorage.watchTimeType2 = type.value;
     }
   }
 
   function radio1Click() {
-    if (restored1) {
-      timeTable = document.getElementById("timetable");
-      color = document.getElementById("color");
-      type = document.getElementById("type");
-      
-      timeTable.value = timetable1;
-      color.value = color1;
-      type.value = type1;
+    storeCurrentTable();
+    if (localStorage.watchTimeTable1 != null) {
+      timeTable.value = localStorage.watchTimeTable1;
+      color.value = localStorage.watchTimeColor1;
+      type.value = localStorage.watchTimeType1;
     }
+    viewingBank = 1;
   }
   function radio2Click() {
-    if (restored2) {
-      timeTable = document.getElementById("timetable");
-      color = document.getElementById("color");
-      type = document.getElementById("type");
-      
-      timeTable.value = timetable2;
-      color.value = color2;
-      type.value = type2;
+    storeCurrentTable();
+    if (localStorage.watchTimeTable2 != null) {
+      timeTable.value = localStorage.watchTimeTable2;
+      color.value = localStorage.watchTimeColor2;
+      type.value = localStorage.watchTimeType2;
     }
+    viewingBank = 2;
   }
 
   function saveOptions() {
-    
-    timeTable = document.getElementById("timetable");
+    storeCurrentTable();
     bank = document.getElementById("radio2");
-    color = document.getElementById("color");
-    type = document.getElementById("type");
     var options = {
       "time_table": timeTable.value,
       "bank": bank.checked,
       "color": color.value,
       "type": type.value
-    }
-    if (bank.checked == "checked") {
-      localStorage.watchTimeTable2 = timetable2;
-      localStorage.watchTimeColor2 = color2;
-      localStorage.watchTimeType2 = type2;
-    } else {
-      localStorage.watchTimeTable1 = timetable1;
-      localStorage.watchTimeColor1 = color1;
-      localStorage.watchTimeType1 = type1;
     }
     return options;
   };
