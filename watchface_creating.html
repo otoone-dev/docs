@@ -17,16 +17,28 @@ Draw script (Sample is <a href="watchface_creating_sample.html">here</a>)<br>
 <br>
     <button id="save_button">Save</button><br>
 </p>
+
    </body>
 </html>
 
-
 <script>
   //Setup to allow easy adding more options later
+  window.onload = function() {
+    if (localStorage.watchCreateImageAddr != null) {
+      bgimage = document.getElementById("bgimage");
+      bgimage.value = localStorage.watchCreateImageAddr;
+    }
+    if (localStorage.watchCreateScript != null) {
+      script = document.getElementById("script");
+      script.value = localStorage.watchCreateScript;
+    }
+  }
+  
   function saveOptions() {
-    
     bgimage = document.getElementById("bgimage");
     script = document.getElementById("script");
+    localStorage.watchCreateImageAddr = bgimage.value;
+    localStorage.watchCreateScript = script.value;
     var options = {
       "bgimage": bgimage.value,
       "script": script.value,
@@ -37,8 +49,6 @@ Draw script (Sample is <a href="watchface_creating_sample.html">here</a>)<br>
   var submitButton = document.getElementById("save_button");
   submitButton.addEventListener("click", 
     function() {
-      console.log("Submit");
- 
       var options = saveOptions();
       var location = "pebblejs://close#" + encodeURIComponent(JSON.stringify(options));
        
