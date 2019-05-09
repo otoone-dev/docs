@@ -1,0 +1,884 @@
+EESchema Schematic File Version 2
+LIBS:power
+LIBS:device
+LIBS:transistors
+LIBS:conn
+LIBS:linear
+LIBS:regul
+LIBS:74xx
+LIBS:cmos4000
+LIBS:adc-dac
+LIBS:memory
+LIBS:xilinx
+LIBS:microcontrollers
+LIBS:dsp
+LIBS:microchip
+LIBS:analog_switches
+LIBS:motorola
+LIBS:texas
+LIBS:intel
+LIBS:audio
+LIBS:interface
+LIBS:digital-audio
+LIBS:philips
+LIBS:display
+LIBS:cypress
+LIBS:siliconi
+LIBS:opto
+LIBS:atmel
+LIBS:contrib
+LIBS:valves
+LIBS:test-cache
+EELAYER 25 0
+EELAYER END
+$Descr A4 11693 8268
+encoding utf-8
+Sheet 1 1
+Title ""
+Date ""
+Rev ""
+Comp ""
+Comment1 ""
+Comment2 ""
+Comment3 ""
+Comment4 ""
+$EndDescr
+$Comp
+L CONN_02X03 ISP1
+U 1 1 5BBCC3ED
+P 5100 2600
+F 0 "ISP1" H 5100 2800 50  0000 C CNN
+F 1 "ISP" H 5100 2400 50  0000 C CNN
+F 2 "Pin_Headers:Pin_Header_Straight_2x03_Pitch2.54mm" H 5100 1400 50  0001 C CNN
+F 3 "" H 5100 1400 50  0000 C CNN
+	1    5100 2600
+	1    0    0    -1  
+$EndComp
+$Comp
+L LED STATUS1
+U 1 1 5BBCC601
+P 2650 4950
+F 0 "STATUS1" H 2650 5050 50  0000 C CNN
+F 1 "LED" H 2650 4850 50  0000 C CNN
+F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" H 2650 4950 50  0001 C CNN
+F 3 "" H 2650 4950 50  0000 C CNN
+	1    2650 4950
+	1    0    0    -1  
+$EndComp
+$Comp
+L R R1
+U 1 1 5BC0A0A8
+P 3100 4950
+F 0 "R1" V 3180 4950 50  0000 C CNN
+F 1 "R" V 3100 4950 50  0000 C CNN
+F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" V 3030 4950 50  0001 C CNN
+F 3 "" H 3100 4950 50  0000 C CNN
+	1    3100 4950
+	0    1    1    0   
+$EndComp
+$Comp
+L CONN_01X03 CLK1
+U 1 1 5BC0A37F
+P 4100 1600
+F 0 "CLK1" H 4100 1800 50  0000 C CNN
+F 1 "CLOCK" V 4200 1600 50  0000 C CNN
+F 2 "Pin_Headers:Pin_Header_Straight_1x03_Pitch2.54mm" H 4100 1600 50  0001 C CNN
+F 3 "" H 4100 1600 50  0000 C CNN
+	1    4100 1600
+	0    -1   -1   0   
+$EndComp
+NoConn ~ 3850 3250
+$Comp
+L PWR_FLAG #FLG01
+U 1 1 5BC0A977
+P 700 1700
+F 0 "#FLG01" H 700 1795 50  0001 C CNN
+F 1 "PWR_FLAG" H 700 1880 50  0000 C CNN
+F 2 "" H 700 1700 50  0000 C CNN
+F 3 "" H 700 1700 50  0000 C CNN
+	1    700  1700
+	1    0    0    -1  
+$EndComp
+$Comp
+L PWR_FLAG #FLG02
+U 1 1 5BC0A997
+P 1050 4500
+F 0 "#FLG02" H 1050 4595 50  0001 C CNN
+F 1 "PWR_FLAG" H 1050 4680 50  0000 C CNN
+F 2 "" H 1050 4500 50  0000 C CNN
+F 3 "" H 1050 4500 50  0000 C CNN
+	1    1050 4500
+	1    0    0    -1  
+$EndComp
+NoConn ~ 1950 2700
+$Comp
+L CheeyMX-Switch KeyLowC1
+U 1 1 5BC15CC6
+P 6800 3850
+F 0 "KeyLowC1" H 6800 3550 60  0000 C CNN
+F 1 "KeyLowC" H 6800 3650 60  0000 C CNN
+F 2 "CherryMX-Switch:CherryMX-Switch" H 6800 3850 60  0001 C CNN
+F 3 "" H 6800 3850 60  0000 C CNN
+	1    6800 3850
+	1    0    0    -1  
+$EndComp
+$Comp
+L CheeyMX-Switch KeyEb1
+U 1 1 5BC15D05
+P 6800 4250
+F 0 "KeyEb1" H 6800 3950 60  0000 C CNN
+F 1 "KeyEb" H 6800 4050 60  0000 C CNN
+F 2 "CherryMX-Switch:CherryMX-Switch" H 6800 4250 60  0001 C CNN
+F 3 "" H 6800 4250 60  0000 C CNN
+	1    6800 4250
+	1    0    0    -1  
+$EndComp
+$Comp
+L ATMEGA328-P IC1
+U 1 1 5BC193E6
+P 2850 3200
+F 0 "IC1" H 2100 4450 50  0000 L BNN
+F 1 "ATMEGA328-P" H 3250 1800 50  0000 L BNN
+F 2 "Housings_DIP:DIP-28_W7.62mm" H 2850 3200 50  0000 C CIN
+F 3 "" H 2850 3200 50  0000 C CNN
+	1    2850 3200
+	1    0    0    -1  
+$EndComp
+$Comp
+L CheeyMX-Switch KeyD1
+U 1 1 5BC19781
+P 6800 4650
+F 0 "KeyD1" H 6800 4350 60  0000 C CNN
+F 1 "KeyD" H 6800 4450 60  0000 C CNN
+F 2 "CherryMX-Switch:CherryMX-Switch" H 6800 4650 60  0001 C CNN
+F 3 "" H 6800 4650 60  0000 C CNN
+	1    6800 4650
+	1    0    0    -1  
+$EndComp
+$Comp
+L CheeyMX-Switch KeyE1
+U 1 1 5BC197D0
+P 6800 5050
+F 0 "KeyE1" H 6800 4750 60  0000 C CNN
+F 1 "KeyE" H 6800 4850 60  0000 C CNN
+F 2 "CherryMX-Switch:CherryMX-Switch" H 6800 5050 60  0001 C CNN
+F 3 "" H 6800 5050 60  0000 C CNN
+	1    6800 5050
+	1    0    0    -1  
+$EndComp
+$Comp
+L CheeyMX-Switch KeyF1
+U 1 1 5BC19813
+P 6800 5450
+F 0 "KeyF1" H 6800 5150 60  0000 C CNN
+F 1 "KeyF" H 6800 5250 60  0000 C CNN
+F 2 "CherryMX-Switch:CherryMX-Switch" H 6800 5450 60  0001 C CNN
+F 3 "" H 6800 5450 60  0000 C CNN
+	1    6800 5450
+	1    0    0    -1  
+$EndComp
+$Comp
+L CheeyMX-Switch KeyLowC#1
+U 1 1 5BC19858
+P 6800 1700
+F 0 "KeyLowC#1" H 6800 1400 60  0000 C CNN
+F 1 "KeyLowC#" H 6800 1500 60  0000 C CNN
+F 2 "CherryMX-Switch:CherryMX-Switch" H 6800 1700 60  0001 C CNN
+F 3 "" H 6800 1700 60  0000 C CNN
+	1    6800 1700
+	1    0    0    -1  
+$EndComp
+$Comp
+L CheeyMX-Switch KeyG#1
+U 1 1 5BC198A1
+P 6800 2100
+F 0 "KeyG#1" H 6800 1800 60  0000 C CNN
+F 1 "KeyG#" H 6800 1900 60  0000 C CNN
+F 2 "CherryMX-Switch:CherryMX-Switch" H 6800 2100 60  0001 C CNN
+F 3 "" H 6800 2100 60  0000 C CNN
+	1    6800 2100
+	1    0    0    -1  
+$EndComp
+$Comp
+L CheeyMX-Switch KeyG1
+U 1 1 5BC198EA
+P 6800 2500
+F 0 "KeyG1" H 6800 2200 60  0000 C CNN
+F 1 "KeyG" H 6800 2300 60  0000 C CNN
+F 2 "CherryMX-Switch:CherryMX-Switch" H 6800 2500 60  0001 C CNN
+F 3 "" H 6800 2500 60  0000 C CNN
+	1    6800 2500
+	1    0    0    -1  
+$EndComp
+$Comp
+L CheeyMX-Switch KeyA1
+U 1 1 5BC1993D
+P 6800 2900
+F 0 "KeyA1" H 6800 2600 60  0000 C CNN
+F 1 "KeyA" H 6800 2700 60  0000 C CNN
+F 2 "CherryMX-Switch:CherryMX-Switch" H 6800 2900 60  0001 C CNN
+F 3 "" H 6800 2900 60  0000 C CNN
+	1    6800 2900
+	1    0    0    -1  
+$EndComp
+$Comp
+L CheeyMX-Switch KeyDown1
+U 1 1 5BC1AB7B
+P 4850 5200
+F 0 "KeyDown1" H 4850 4900 60  0000 C CNN
+F 1 "KeyOctDown" H 4850 5000 60  0000 C CNN
+F 2 "CherryMX-Switch:CherryMX-Switch" H 4850 5200 60  0001 C CNN
+F 3 "" H 4850 5200 60  0000 C CNN
+	1    4850 5200
+	1    0    0    -1  
+$EndComp
+$Comp
+L CheeyMX-Switch KeyUp1
+U 1 1 5BC1AB82
+P 4850 5600
+F 0 "KeyUp1" H 4850 5300 60  0000 C CNN
+F 1 "KeyOctUp" H 4850 5400 60  0000 C CNN
+F 2 "CherryMX-Switch:CherryMX-Switch" H 4850 5600 60  0001 C CNN
+F 3 "" H 4850 5600 60  0000 C CNN
+	1    4850 5600
+	1    0    0    -1  
+$EndComp
+$Comp
+L CheeyMX-Switch KeyB1
+U 1 1 5BC1B9ED
+P 6800 3300
+F 0 "KeyB1" H 6800 3000 60  0000 C CNN
+F 1 "KeyB" H 6800 3100 60  0000 C CNN
+F 2 "CherryMX-Switch:CherryMX-Switch" H 6800 3300 60  0001 C CNN
+F 3 "" H 6800 3300 60  0000 C CNN
+	1    6800 3300
+	1    0    0    -1  
+$EndComp
+$Comp
+L CONN_01X04 SENSOR1
+U 1 1 5BC1D0E0
+P 5400 3600
+F 0 "SENSOR1" H 5400 3850 50  0000 C CNN
+F 1 "BMP180" V 5500 3600 50  0000 C CNN
+F 2 "Pin_Headers:Pin_Header_Straight_1x04_Pitch2.54mm" H 5400 3600 50  0001 C CNN
+F 3 "" H 5400 3600 50  0000 C CNN
+	1    5400 3600
+	1    0    0    -1  
+$EndComp
+$Comp
+L LED POWER1
+U 1 1 5BC1D5FE
+P 1350 3400
+F 0 "POWER1" H 1350 3500 50  0000 C CNN
+F 1 "LED" H 1350 3300 50  0000 C CNN
+F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" H 1350 3400 50  0001 C CNN
+F 3 "" H 1350 3400 50  0000 C CNN
+	1    1350 3400
+	0    -1   -1   0   
+$EndComp
+$Comp
+L R R2
+U 1 1 5BC1D605
+P 1350 2950
+F 0 "R2" V 1430 2950 50  0000 C CNN
+F 1 "R" V 1350 2950 50  0000 C CNN
+F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" V 1280 2950 50  0001 C CNN
+F 3 "" H 1350 2950 50  0000 C CNN
+	1    1350 2950
+	1    0    0    -1  
+$EndComp
+$Comp
+L CONN_01X02 SPOUT1
+U 1 1 5BC354E4
+P 10050 3450
+F 0 "SPOUT1" H 10050 3600 50  0000 C CNN
+F 1 "SPOUT" V 10150 3450 50  0000 C CNN
+F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" H 10050 3450 50  0001 C CNN
+F 3 "" H 10050 3450 50  0000 C CNN
+	1    10050 3450
+	1    0    0    -1  
+$EndComp
+$Comp
+L GND #PWR03
+U 1 1 5BC3734F
+P 1650 4800
+F 0 "#PWR03" H 1650 4550 50  0001 C CNN
+F 1 "GND" H 1650 4650 50  0000 C CNN
+F 2 "" H 1650 4800 50  0000 C CNN
+F 3 "" H 1650 4800 50  0000 C CNN
+	1    1650 4800
+	1    0    0    -1  
+$EndComp
+$Comp
+L +5V #PWR04
+U 1 1 5BC8A862
+P 2400 1300
+F 0 "#PWR04" H 2400 1150 50  0001 C CNN
+F 1 "+5V" H 2400 1440 50  0000 C CNN
+F 2 "" H 2400 1300 50  0000 C CNN
+F 3 "" H 2400 1300 50  0000 C CNN
+	1    2400 1300
+	1    0    0    -1  
+$EndComp
+$Comp
+L GNDD #PWR05
+U 1 1 5BC8AB70
+P 4100 5100
+F 0 "#PWR05" H 4100 4850 50  0001 C CNN
+F 1 "GNDD" H 4100 4950 50  0000 C CNN
+F 2 "" H 4100 5100 50  0000 C CNN
+F 3 "" H 4100 5100 50  0000 C CNN
+	1    4100 5100
+	1    0    0    -1  
+$EndComp
+$Comp
+L GNDA #PWR06
+U 1 1 5BC8AC1A
+P 7950 3900
+F 0 "#PWR06" H 7950 3650 50  0001 C CNN
+F 1 "GNDA" H 7950 3750 50  0000 C CNN
+F 2 "" H 7950 3900 50  0000 C CNN
+F 3 "" H 7950 3900 50  0000 C CNN
+	1    7950 3900
+	1    0    0    -1  
+$EndComp
+$Comp
+L GNDA #PWR07
+U 1 1 5BC8B38E
+P 1900 4800
+F 0 "#PWR07" H 1900 4550 50  0001 C CNN
+F 1 "GNDA" H 1900 4650 50  0000 C CNN
+F 2 "" H 1900 4800 50  0000 C CNN
+F 3 "" H 1900 4800 50  0000 C CNN
+	1    1900 4800
+	1    0    0    -1  
+$EndComp
+$Comp
+L GNDD #PWR08
+U 1 1 5BC8B3D4
+P 2100 4800
+F 0 "#PWR08" H 2100 4550 50  0001 C CNN
+F 1 "GNDD" H 2100 4650 50  0000 C CNN
+F 2 "" H 2100 4800 50  0000 C CNN
+F 3 "" H 2100 4800 50  0000 C CNN
+	1    2100 4800
+	1    0    0    -1  
+$EndComp
+$Comp
+L C C1
+U 1 1 5BC8B609
+P 1700 3150
+F 0 "C1" H 1725 3250 50  0000 L CNN
+F 1 "C" H 1725 3050 50  0000 L CNN
+F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" H 1738 3000 50  0001 C CNN
+F 3 "" H 1700 3150 50  0000 C CNN
+	1    1700 3150
+	1    0    0    -1  
+$EndComp
+$Comp
+L GND #PWR09
+U 1 1 5BFD6150
+P 8000 2200
+F 0 "#PWR09" H 8000 1950 50  0001 C CNN
+F 1 "GND" H 8000 2050 50  0000 C CNN
+F 2 "" H 8000 2200 50  0000 C CNN
+F 3 "" H 8000 2200 50  0000 C CNN
+	1    8000 2200
+	1    0    0    -1  
+$EndComp
+$Comp
+L LM386 U1
+U 1 1 5BFD6294
+P 8000 1450
+F 0 "U1" H 8050 1750 50  0000 L CNN
+F 1 "LM386" H 8050 1650 50  0000 L CNN
+F 2 "Housings_DIP:DIP-8_W7.62mm" H 8100 1550 50  0001 C CNN
+F 3 "" H 8200 1650 50  0000 C CNN
+	1    8000 1450
+	1    0    0    -1  
+$EndComp
+$Comp
+L +5V #PWR010
+U 1 1 5BFD6A2C
+P 8000 950
+F 0 "#PWR010" H 8000 800 50  0001 C CNN
+F 1 "+5V" H 8000 1090 50  0000 C CNN
+F 2 "" H 8000 950 50  0000 C CNN
+F 3 "" H 8000 950 50  0000 C CNN
+	1    8000 950 
+	1    0    0    -1  
+$EndComp
+$Comp
+L CP1 C4
+U 1 1 5BFD913D
+P 8550 2800
+F 0 "C4" H 8575 2900 50  0000 L CNN
+F 1 "CP1" H 8575 2700 50  0000 L CNN
+F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" H 8550 2800 50  0001 C CNN
+F 3 "" H 8550 2800 50  0000 C CNN
+	1    8550 2800
+	1    0    0    -1  
+$EndComp
+$Comp
+L C C3
+U 1 1 5BFD9530
+P 8250 2100
+F 0 "C3" H 8275 2200 50  0000 L CNN
+F 1 "C" H 8275 2000 50  0000 L CNN
+F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" H 8288 1950 50  0001 C CNN
+F 3 "" H 8250 2100 50  0000 C CNN
+	1    8250 2100
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	3850 2500 4850 2500
+Wire Wire Line
+	3850 2600 4850 2600
+Wire Wire Line
+	5850 2400 5850 2600
+Wire Wire Line
+	5850 2600 5350 2600
+Wire Wire Line
+	5350 2700 5550 2700
+Wire Wire Line
+	5550 2700 5550 5900
+Wire Wire Line
+	1350 4700 5550 4700
+Wire Wire Line
+	2950 4950 2850 4950
+Wire Wire Line
+	1700 2400 1950 2400
+Wire Wire Line
+	1350 4300 1950 4300
+Connection ~ 1350 4300
+Wire Wire Line
+	1350 4400 1950 4400
+Connection ~ 1350 4400
+Wire Wire Line
+	1050 4500 1050 4600
+Wire Wire Line
+	1050 4600 1350 4600
+Wire Wire Line
+	5350 2500 5450 2500
+Wire Wire Line
+	3850 2700 4000 2700
+Wire Wire Line
+	4000 2700 4000 1800
+Wire Wire Line
+	3850 2800 4200 2800
+Wire Wire Line
+	4200 2800 4200 1800
+Wire Wire Line
+	3850 3550 4800 3550
+Wire Wire Line
+	4800 3550 4800 2700
+Wire Wire Line
+	4800 2700 4850 2700
+Wire Wire Line
+	6250 5050 6500 5050
+Wire Wire Line
+	5900 5450 6500 5450
+Wire Wire Line
+	4400 1700 4400 2900
+Wire Wire Line
+	4400 1700 6500 1700
+Wire Wire Line
+	6000 2500 6500 2500
+Wire Wire Line
+	5850 2900 6500 2900
+Wire Wire Line
+	4300 2600 4300 4950
+Wire Wire Line
+	4300 4950 3250 4950
+Connection ~ 4300 2600
+Wire Wire Line
+	2450 4950 2300 4950
+Wire Wire Line
+	2300 4950 2300 4700
+Connection ~ 2300 4700
+Wire Wire Line
+	4500 5200 4550 5200
+Wire Wire Line
+	4400 5600 4550 5600
+Wire Wire Line
+	5550 5200 5150 5200
+Connection ~ 5550 4700
+Wire Wire Line
+	5550 5600 5150 5600
+Connection ~ 5550 5200
+Wire Wire Line
+	5550 5900 7200 5900
+Wire Wire Line
+	7200 5900 7200 1700
+Wire Wire Line
+	7200 1700 7100 1700
+Connection ~ 5550 5600
+Wire Wire Line
+	7100 2100 7200 2100
+Connection ~ 7200 2100
+Wire Wire Line
+	7100 2500 7200 2500
+Connection ~ 7200 2500
+Wire Wire Line
+	7100 2900 7200 2900
+Connection ~ 7200 2900
+Wire Wire Line
+	7100 3300 7200 3300
+Connection ~ 7200 3300
+Wire Wire Line
+	7100 3850 7200 3850
+Connection ~ 7200 3850
+Wire Wire Line
+	7100 4250 7200 4250
+Connection ~ 7200 4250
+Wire Wire Line
+	7100 4650 7200 4650
+Connection ~ 7200 4650
+Wire Wire Line
+	7100 5050 7200 5050
+Connection ~ 7200 5050
+Wire Wire Line
+	7100 5450 7200 5450
+Connection ~ 7200 5450
+Wire Wire Line
+	5100 3200 5100 3450
+Wire Wire Line
+	5100 3450 5200 3450
+Wire Wire Line
+	5200 3550 5050 3550
+Wire Wire Line
+	5050 3550 5050 3100
+Wire Wire Line
+	5050 3100 5550 3100
+Connection ~ 5550 3100
+Wire Wire Line
+	3850 3450 5000 3450
+Wire Wire Line
+	5000 3450 5000 3650
+Wire Wire Line
+	5000 3650 5200 3650
+Wire Wire Line
+	3850 3350 4950 3350
+Wire Wire Line
+	4950 3350 4950 3750
+Wire Wire Line
+	4950 3750 5200 3750
+Wire Wire Line
+	1350 3100 1350 3200
+Wire Wire Line
+	1350 3600 1350 4700
+Connection ~ 700  2100
+Wire Wire Line
+	5700 4000 3850 4000
+Wire Wire Line
+	1650 4800 1650 4700
+Connection ~ 1650 4700
+Wire Wire Line
+	700  1850 1700 1850
+Connection ~ 700  1850
+Wire Wire Line
+	1700 1800 1700 3000
+Wire Wire Line
+	5700 3200 5100 3200
+Wire Wire Line
+	5450 2500 5450 1400
+Wire Wire Line
+	2000 1400 5700 1400
+Wire Wire Line
+	2000 1400 2000 1800
+Wire Wire Line
+	2000 1800 1700 1800
+Connection ~ 1700 1850
+Wire Wire Line
+	1950 2100 1900 2100
+Wire Wire Line
+	1900 2100 1900 2400
+Connection ~ 1900 2400
+Wire Wire Line
+	2400 1300 2400 1400
+Connection ~ 2400 1400
+Wire Wire Line
+	4100 5100 4100 1800
+Wire Wire Line
+	1900 4800 1900 4700
+Connection ~ 1900 4700
+Wire Wire Line
+	2100 4800 2100 4700
+Connection ~ 2100 4700
+Connection ~ 1700 2400
+Wire Wire Line
+	1700 3300 1700 4700
+Connection ~ 1700 4700
+Wire Wire Line
+	7950 3850 7950 3900
+Wire Wire Line
+	8000 1750 8000 2200
+Wire Wire Line
+	8000 950  8000 1150
+Wire Wire Line
+	7700 1550 7700 1900
+Wire Wire Line
+	7700 1900 8000 1900
+Connection ~ 8000 1900
+Connection ~ 7950 3850
+Wire Wire Line
+	8550 1450 8550 2650
+Wire Wire Line
+	8550 1450 8400 1450
+Wire Wire Line
+	8200 1750 8200 1950
+Wire Wire Line
+	8200 1950 8250 1950
+Wire Wire Line
+	8250 2250 8100 2250
+Wire Wire Line
+	8100 2250 8100 1750
+Wire Wire Line
+	3850 3700 4200 3700
+Wire Wire Line
+	4200 3700 4200 2900
+Wire Wire Line
+	4200 2900 4400 2900
+Wire Wire Line
+	3850 3800 4700 3800
+Wire Wire Line
+	4700 3800 4700 2100
+Wire Wire Line
+	4700 2100 6500 2100
+Wire Wire Line
+	3850 2400 5850 2400
+Wire Wire Line
+	3850 3900 4600 3900
+Wire Wire Line
+	4600 3900 4600 2850
+Wire Wire Line
+	4600 2850 6000 2850
+Wire Wire Line
+	6000 2850 6000 2500
+Wire Wire Line
+	3850 4100 5850 4100
+Wire Wire Line
+	5850 4100 5850 2900
+Wire Wire Line
+	3850 4200 5950 4200
+Wire Wire Line
+	5950 4200 5950 3300
+Wire Wire Line
+	5950 3300 6500 3300
+Wire Wire Line
+	4500 5200 4500 4300
+Wire Wire Line
+	4500 4300 3850 4300
+Wire Wire Line
+	3850 4400 4400 4400
+Wire Wire Line
+	4400 4400 4400 5600
+Wire Wire Line
+	3850 2200 4500 2200
+Wire Wire Line
+	4500 2200 4500 4250
+Wire Wire Line
+	4500 4250 5900 4250
+Wire Wire Line
+	5900 4250 5900 5450
+Wire Wire Line
+	3850 2300 6250 2300
+Wire Wire Line
+	6250 2300 6250 5050
+Wire Wire Line
+	3850 2950 6350 2950
+Wire Wire Line
+	6350 2950 6350 4650
+Wire Wire Line
+	6350 4650 6500 4650
+Wire Wire Line
+	3850 3050 6450 3050
+Wire Wire Line
+	6450 3050 6450 4250
+Wire Wire Line
+	6450 4250 6500 4250
+Wire Wire Line
+	3850 3150 4850 3150
+Wire Wire Line
+	4850 3150 4850 4400
+Wire Wire Line
+	4850 4400 6050 4400
+Wire Wire Line
+	6050 4400 6050 3850
+Wire Wire Line
+	6050 3850 6500 3850
+NoConn ~ 3850 2100
+Connection ~ 1600 4700
+Connection ~ 1350 4600
+$Comp
+L CONN_01X07 USB1
+U 1 1 5C0010D4
+P 1250 850
+F 0 "USB1" H 1250 1250 50  0000 C CNN
+F 1 "miniUSB" V 1350 850 50  0000 C CNN
+F 2 "MiniUSB_B:miniUSB(USB32BJ)" H 1250 850 50  0001 C CNN
+F 3 "" H 1250 850 50  0000 C CNN
+	1    1250 850 
+	0    -1   -1   0   
+$EndComp
+NoConn ~ 1050 1050
+NoConn ~ 1150 1050
+NoConn ~ 1250 1050
+NoConn ~ 1450 1050
+NoConn ~ 1550 1050
+$Comp
+L POT RV1
+U 1 1 5C4EFCA8
+P 7700 2750
+F 0 "RV1" H 7700 2650 50  0000 C CNN
+F 1 "POT" H 7700 2750 50  0000 C CNN
+F 2 "Potentiometers:Potentiometer_Trimmer_Bourns_3339P_Horizontal" H 7700 2750 50  0001 C CNN
+F 3 "" H 7700 2750 50  0000 C CNN
+	1    7700 2750
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	7700 2600 7700 2300
+Wire Wire Line
+	7700 2300 7600 2300
+Wire Wire Line
+	7600 2300 7600 1350
+Wire Wire Line
+	7600 1350 7700 1350
+Wire Wire Line
+	7700 3700 5700 3700
+Wire Wire Line
+	5700 3700 5700 4000
+Wire Wire Line
+	7450 2750 7450 3850
+Wire Wire Line
+	7450 3850 9250 3850
+Wire Wire Line
+	1350 2800 1350 2700
+Wire Wire Line
+	1350 2700 600  2700
+Wire Wire Line
+	600  2700 600  2300
+Wire Wire Line
+	600  2300 700  2300
+Wire Wire Line
+	700  2300 700  1700
+Wire Wire Line
+	950  1050 950  1850
+Connection ~ 950  1850
+Wire Wire Line
+	1350 1050 1350 1600
+Wire Wire Line
+	1350 1600 1600 1600
+Wire Wire Line
+	1600 1600 1600 4700
+$Comp
+L C C6
+U 1 1 5C950288
+P 8100 2900
+F 0 "C6" H 8125 3000 50  0000 L CNN
+F 1 "C" H 8125 2800 50  0000 L CNN
+F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" H 8138 2750 50  0001 C CNN
+F 3 "" H 8100 2900 50  0000 C CNN
+	1    8100 2900
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	7950 2750 8100 2750
+Wire Wire Line
+	7700 3700 7700 3100
+Wire Wire Line
+	7700 3100 8100 3100
+Wire Wire Line
+	8100 3100 8100 3050
+$Comp
+L C C5
+U 1 1 5C951971
+P 8900 2800
+F 0 "C5" H 8925 2900 50  0000 L CNN
+F 1 "C" H 8925 2700 50  0000 L CNN
+F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" H 8938 2650 50  0001 C CNN
+F 3 "" H 8900 2800 50  0000 C CNN
+	1    8900 2800
+	1    0    0    -1  
+$EndComp
+$Comp
+L R R3
+U 1 1 5C9519CA
+P 8900 3250
+F 0 "R3" V 8980 3250 50  0000 C CNN
+F 1 "R" V 8900 3250 50  0000 C CNN
+F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" V 8830 3250 50  0001 C CNN
+F 3 "" H 8900 3250 50  0000 C CNN
+	1    8900 3250
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	8550 2450 8900 2450
+Wire Wire Line
+	8900 2450 8900 2650
+Connection ~ 8550 2450
+Wire Wire Line
+	8900 2950 8900 3100
+Wire Wire Line
+	8900 3850 8900 3400
+$Comp
+L CP1 C2
+U 1 1 5C95365B
+P 9150 2100
+F 0 "C2" H 9175 2200 50  0000 L CNN
+F 1 "CP1" H 9175 2000 50  0000 L CNN
+F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" H 9150 2100 50  0001 C CNN
+F 3 "" H 9150 2100 50  0000 C CNN
+	1    9150 2100
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	9150 3850 9150 2250
+Connection ~ 8900 3850
+Wire Wire Line
+	9150 1950 9150 1100
+Wire Wire Line
+	9150 1100 8000 1100
+Connection ~ 8000 1100
+Wire Wire Line
+	5700 1400 5700 3200
+Connection ~ 5450 1400
+$Comp
+L CONN_01X05 HPOUT1
+U 1 1 5CAA00F5
+P 10050 2800
+F 0 "HPOUT1" H 10050 3100 50  0000 C CNN
+F 1 "HPOUT" V 10150 2800 50  0000 C CNN
+F 2 "HPJack_PJ307:PJ-307 AudioJack" H 10050 2800 50  0001 C CNN
+F 3 "" H 10050 2800 50  0000 C CNN
+	1    10050 2800
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	9850 2600 9250 2600
+Wire Wire Line
+	9250 2600 9250 3850
+Connection ~ 9150 3850
+Wire Wire Line
+	9850 2800 9750 2800
+Wire Wire Line
+	9750 2800 9750 3400
+Wire Wire Line
+	9750 3400 9850 3400
+Wire Wire Line
+	9850 3500 9250 3500
+Connection ~ 9250 3500
+Wire Wire Line
+	9850 2900 9750 2900
+Connection ~ 9750 2900
+Wire Wire Line
+	8550 2950 8550 3000
+Wire Wire Line
+	8550 3000 9850 3000
+Wire Wire Line
+	9850 2700 9550 2700
+Wire Wire Line
+	9550 2700 9550 3000
+Connection ~ 9550 3000
+$EndSCHEMATC
