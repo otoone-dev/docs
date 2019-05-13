@@ -25,10 +25,12 @@ static uint32_t defPressure = 0;
 static uint32_t defTemperature = 0;
 
 #define fs (78125.0f / 2.0f)
-static float fstd = 0.0f;
+static float ftt = 0.0f;
 volatile float fst = 0.0f;
+volatile float fst2 = 0.0f;
 
 volatile float phase = 0.0f;
+volatile float phase2 = 0.0f;
 volatile uint16_t volReq = 0x00;
 static float vol = 0.0f;
 static float pitch = 0.0f;
@@ -37,6 +39,10 @@ static float currentNote = 60.0f;
 static int baseNote = 0;
 static byte toneNo = 0;
 
+#define MINI_VERSION (0)
+
+#if !MINI_VERSION
+//----------------
 #define KeyLowC (1<<2) // PC2
 #define KeyEb   (1<<1) // PC1
 #define KeyD    (1<<0) // PC0
@@ -53,6 +59,26 @@ static byte toneNo = 0;
 #define KeyB    (1<<5) // PD5
 #define KeyDown (1<<6) // PD6
 #define KeyUp   (1<<7) // PD7
+#else
+//----------------
+#define KeyLowC (1<<2) // PC2
+//#define KeyEb   (1<<1) // PC1
+#define KeyD    (1<<1) // PC0
+
+#define StatusLED (1<<5) // PB5
+#define KeyE    (1<<3) // PB2
+#define KeyF    (1<<2) // PB1
+
+#define KeyLowCs (1<<0) // PD0
+//#define KeyGs   (1<<1) // PD1
+#define KeyG    (1<<1) // PD2
+#define SpOut   (1<<2) // PD3
+#define KeyA    (1<<3) // PD4
+#define KeyB    (1<<4) // PD5
+//#define KeyDown (1<<6) // PD6
+#define KeyUp   (1<<6) // PD7
+#endif
+//----------------
 
 //---------------------------------
 char readBytes(unsigned char *values, char length)
@@ -219,16 +245,28 @@ void SetupBMP180() {
 //---------------------------------
 int getNoteNumber() {
   bool keyLowC = (PINC & KeyLowC);
+#if !MINI_VERSION
   bool keyEb = (PINC & KeyEb);
+#else
+  bool keyEb = false;
+#endif
   bool keyD = (PINC & KeyD);
   bool keyE = (PINB & KeyE);
   bool keyF = (PINB & KeyF);
   bool keyLowCs = (PIND & KeyLowCs);
+#if !MINI_VERSION
   bool keyGs = (PIND & KeyGs);
+#else
+  bool keyGs = false;
+#endif
   bool keyG = (PIND & KeyG);
   bool keyA = (PIND & KeyA);
   bool keyB = (PIND & KeyB);
+#if !MINI_VERSION
   bool octDown = (PIND & KeyDown);
+#else
+  bool octDown = false;
+#endif
   bool octUp = (PIND & KeyUp);
 
   int bnote = 0;
@@ -295,7 +333,11 @@ void setup() {
   setupPorts();
 
   baseNote = 49 + 12 + 12; // C (C#)
+#if !MINI_VERSION
   bool octDown = (PIND & KeyDown);
+#else
+  bool octDown = false;
+#endif
   bool octUp = (PIND & KeyUp);
   
 #if true
@@ -336,11 +378,14 @@ void setup() {
   delay(500);
 
   {
-    bool keyLowC = (PINC & KeyLowC);
-    bool keyEb = (PINC & KeyEb);
-    //bool keyD = (PINC & KeyD);
-    if (keyLowC == false) toneNo = 1;
-    if (keyEb == false) toneNo = 2;
+    bool key1 = (PINC & KeyLowC);
+#if !MINI_VERSION
+    bool key2 = (PINC & KeyEb);
+#else
+    bool key2 = (PINC & KeyD);
+#endif
+    if (key1 == false) toneNo = 1;
+    if (key2 == false) toneNo = 2;
   }
 
 #if ENABLE_BMP180
@@ -402,7 +447,7 @@ void loop() {
     initCnt--;
     pp = 0.2f;
     currentNote = 69;
-    fst = fstd;
+    ftt = CalcInvFrequency(currentNote + pitch);
     delay(1);
   } else {
     currentNote = getNoteNumber();
@@ -433,9 +478,9 @@ void loop() {
 #endif
 
   float ft = CalcInvFrequency(currentNote + pitch);
-  fstd = (ft / fs) * 256;
-  fst += (fstd - fst) * 0.9;
-  //fst = fstd;
+  ftt += (ft - ftt) * 0.9f;
+  fst = (ftt / fs) * 256;
+  fst2 = fst * 2.01f;
 
   if (volReq > 0) {
         digitalWrite(LED_BUILTIN, HIGH);
@@ -446,6 +491,7 @@ void loop() {
 
 volatile uint8_t count = 0;
 volatile uint8_t phase8 = 0;
+volatile uint8_t phase82 = 0;
 //--------------------------
 //ISR(TIMER1_OVF_vect) {
 ISR(TIMER2_OVF_vect) {
@@ -457,6 +503,10 @@ ISR(TIMER2_OVF_vect) {
     phase += fst;
     if (phase >= 256.0f) phase -= 256.0f;
       phase8 = (uint8_t)phase;
+
+    phase2 += fst2;
+    if (phase2 >= 256.0f) phase2 -= 256.0f;
+      phase82 = (uint8_t)phase2;
   }
   else {
     // 2 回目は波形を生成する
@@ -469,6 +519,7 @@ ISR(TIMER2_OVF_vect) {
           e = phase8 - 0x80;
         }
         break;
+#if 0
       case 1: //三角波
         {
           if (phase8 < 0x80) {
@@ -477,6 +528,12 @@ ISR(TIMER2_OVF_vect) {
             e = 0xFF - (phase8 - 0x80)*2;
           }
         }
+#else
+      case 1:
+      {
+        e = ((phase8 >> 1) + (phase82 >> 1)) - 0x80;
+      }
+#endif
         break;
       case 2:  //方形波
         {
