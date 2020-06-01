@@ -39,7 +39,7 @@ static float currentNote = 60.0f;
 static int baseNote = 0;
 static byte toneNo = 0;
 
-#define MINI_VERSION (0)
+#define MINI_VERSION (1)
 
 #if !MINI_VERSION
 //----------------
@@ -62,21 +62,21 @@ static byte toneNo = 0;
 #else
 //----------------
 #define KeyLowC (1<<2) // PC2
-//#define KeyEb   (1<<1) // PC1
-#define KeyD    (1<<1) // PC0
+#define KeyD    (1<<1) // PC1
 
 #define StatusLED (1<<5) // PB5
-#define KeyE    (1<<3) // PB2
-#define KeyF    (1<<2) // PB1
+#define KeyE    (1<<0) // PC0
+#define KeyF    (1<<2) // PB2
+// PB1 not use
 
 #define KeyLowCs (1<<0) // PD0
-//#define KeyGs   (1<<1) // PD1
-#define KeyG    (1<<1) // PD2
-#define SpOut   (1<<2) // PD3
-#define KeyA    (1<<3) // PD4
-#define KeyB    (1<<4) // PD5
-//#define KeyDown (1<<6) // PD6
-#define KeyUp   (1<<6) // PD7
+#define KeyG    (1<<1) // PD1
+#define SpOut   (1<<3) // PD3
+#define KeyA    (1<<2) // PD2
+#define KeyB    (1<<4) // PD4
+// PD5 not use
+#define KeyUp   (1<<6) // PD6
+// PD7 not use
 #endif
 //----------------
 
@@ -248,16 +248,20 @@ int getNoteNumber() {
 #if !MINI_VERSION
   bool keyEb = (PINC & KeyEb);
 #else
-  bool keyEb = false;
+  bool keyEb = HIGH;
 #endif
   bool keyD = (PINC & KeyD);
+#if !MINI_VERSION
   bool keyE = (PINB & KeyE);
+#else
+  bool keyE = (PINC & KeyE);
+#endif
   bool keyF = (PINB & KeyF);
   bool keyLowCs = (PIND & KeyLowCs);
 #if !MINI_VERSION
   bool keyGs = (PIND & KeyGs);
 #else
-  bool keyGs = false;
+  bool keyGs = HIGH;
 #endif
   bool keyG = (PIND & KeyG);
   bool keyA = (PIND & KeyA);
@@ -265,7 +269,7 @@ int getNoteNumber() {
 #if !MINI_VERSION
   bool octDown = (PIND & KeyDown);
 #else
-  bool octDown = false;
+  bool octDown = HIGH;
 #endif
   bool octUp = (PIND & KeyUp);
 
@@ -322,9 +326,15 @@ void setupPorts() {
   DDRB = DDRB | B00100000; // PB5 LED
   DDRC = DDRC | B00000000;
   DDRD = DDRD | B00001000; // PD3 SpOut
-  PORTB = PORTB | B00000110; // PB1,PB2 PullUp  
+#if !MINI_VERSION
+  PORTB = PORTB | B00000110; // PB1,PB2 PullUp
   PORTC = PORTC | B00000111; // PC0,PC1,PC2 PullUp
-  PORTD = PORTD | B11110111; // PD0,1,2,4,5,6,7 PullUp  
+  PORTD = PORTD | B11110111; // PD0,1,2,4,5,6,7 PullUp
+#else
+  PORTB = PORTB | B00000110; // PB2 PullUp
+  PORTC = PORTC | B00000111; // PC0,PC1,PC2 PullUp
+  PORTD = PORTD | B01010111; // PD0,1,2,4,6 PullUp
+#endif
 }
 
 //---------------------------------
@@ -336,7 +346,7 @@ void setup() {
 #if !MINI_VERSION
   bool octDown = (PIND & KeyDown);
 #else
-  bool octDown = false;
+  bool octDown = HIGH;
 #endif
   bool octUp = (PIND & KeyUp);
   
@@ -354,7 +364,7 @@ void setup() {
   if ((octDown == LOW)&&(octUp == LOW)) {
     while (1) {
         bool keyLowC = (PINC & KeyLowC);
-        if (keyLowC == false) {
+        if (keyLowC == LOW) {
           digitalWrite(LED_BUILTIN, HIGH);
         } else {
           digitalWrite(LED_BUILTIN, HIGH);
@@ -384,8 +394,8 @@ void setup() {
 #else
     bool key2 = (PINC & KeyD);
 #endif
-    if (key1 == false) toneNo = 1;
-    if (key2 == false) toneNo = 2;
+    if (key1 == LOW) toneNo = 1;
+    if (key2 == LOW) toneNo = 2;
   }
 
 #if ENABLE_BMP180
@@ -408,7 +418,7 @@ void setup() {
   while (true) {
     while (1) {
         bool keyLowC = (PINC & KeyLowC);
-        if (keyLowC == false) {
+        if (keyLowC == LOW) {
           digitalWrite(LED_BUILTIN, HIGH);
         } else {
           digitalWrite(LED_BUILTIN, HIGH);
@@ -459,13 +469,14 @@ void loop() {
   {
     bool octUp = (PIND & KeyUp);
     bool octDown = (PIND & KeyDown);
-    if ((octDown == false) && (octUp == false)) {
+    if ((octDown == LOW) && (octUp == LOW)) {
       ppReq = 1.0f;
     }
   }
 #endif
   vol += (ppReq - vol) * 0.4f;
   volReq = (uint16_t)(vol * 255);
+
 #if 0
   if (volReq > 0) {
     if (pitch < 0.0f) pitch += ppReq;
@@ -554,14 +565,6 @@ ISR(TIMER2_OVF_vect) {
     g += f;
     
     OCR2B = (uint8_t)((volReq * (g>>8)) >> 8);
-
-#if 0
-    if (phase < volReq) {
-          digitalWrite(LED_BUILTIN, HIGH);
-    } else {
-          digitalWrite(LED_BUILTIN, LOW);
-    }
-#endif
   }
 
 }
