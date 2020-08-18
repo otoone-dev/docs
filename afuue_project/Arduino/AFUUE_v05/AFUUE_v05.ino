@@ -1,7 +1,33 @@
 #include <Wire.h>
 #include <Preferences.h>
+#include <nvs.h>
 
 const char* version = "AFUUE ver0.5.1.4";
+
+class Preferences2 : public Preferences {
+  public:
+    uint32_t getHandle() {
+      return _handle;
+    }
+};
+
+static Preferences2 pref;
+
+struct ToneSetting {
+  int8_t transpose = 0;
+  int8_t fineTune = 0;
+  int8_t reverb = 7;
+  int8_t portamento = 0;
+  int8_t keySense = 0;
+  int8_t breathSense = 0;
+  int8_t padd0 = 0;
+  int8_t padd1 = 0;
+  int16_t waveA[256];
+  int16_t waveB[256];
+  uint8_t shiftTable[32];
+};
+
+static ToneSetting toneSettings[5];
 
 #define BMP180_ADDR 0x77 // 7-bit address
 #define BMP180_REG_CONTROL 0xF4
@@ -21,7 +47,7 @@ volatile int interruptCounter = 0;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 int count = 0;
 
-static uint8_t initCnt = 100;
+static uint8_t initCnt = 50;
 
 static uint32_t defPressure = 0;
 static uint32_t defTemperature = 0;
@@ -33,25 +59,35 @@ volatile double volReq = 0.0;
 volatile double shift = 0.0;
 
 static double vol = 0.0;
-static double pitch = 0.0;
 
 static double currentNote = 60;
 static double startNote = 60;
 static double targetNote = 60;
 static double noteStep = 0;
-const double noteDiv = (1.0 / 3.0);
-const double poltRate = 12.0;
+static double noteDiv = (1.0 / 3.0);
+static int noteOnTimeLength = 0;
+static double keyChangeCurve = 12.0;
 static int baseNote = 0;
-static byte toneNo = 0;
+static int bootBaseNote = 0;
+static int toneNo = -1;
+static double volumeRate = 0.5;
+static double fineTune = 440.0;
+static double portamentoRate = 0.99;
 
-#define ENABLE_BLE_MIDI (1)
-#define ENABLE_MIDI (0)
+volatile short waveA[256];
+volatile short waveB[256];
+volatile short shiftTable[32];
 
-void SerialPrintLn(char* text) {
-#if !ENABLE_MIDI
-  Serial.println(text);
-#endif
-}
+volatile double phase = 0.0;
+//volatile double phase2 = 0.0;
+//volatile double phase3 = 0.0;
+#define REVERB_BUFFER_SIZE (9801)
+static double reverbRate = 0.152;
+volatile double reverbBuffer[REVERB_BUFFER_SIZE];
+volatile int reverbPos = 0;
+
+#define ENABLE_BLE_MIDI (0)
+#define ENABLE_MIDI (1)
 
 bool midiEnabled = false;
 uint8_t midiPacket[32];
@@ -60,6 +96,37 @@ bool playing = false;
 int channelNo = 0;
 int prevNoteNumber = -1;
 unsigned long activeNotifyTime = 0;
+
+void SerialPrintLn(char* text) {
+#if !ENABLE_MIDI
+  Serial.println(text);
+#endif
+}
+
+static uint8_t sendBuffer[600];
+static uint8_t receiveBuffer[1024];
+static int receivePos = 0;
+static bool waitForCommand = true;
+void SerialSend(int sendSize) {
+  if (midiEnabled == false) {
+    Serial.write(sendBuffer, sendSize);
+  }
+}
+
+static bool usePreferences = false;
+void BeginPreferences() {
+  if (usePreferences) return;
+  pref.begin("Afuue/Settings", false);
+  usePreferences = true;
+  if (timer) timerAlarmDisable(timer);
+}
+
+void EndPreferences() {
+  pref.end();  
+  usePreferences = false;
+  if (timer) timerAlarmEnable(timer);
+}
+
 
 #if ENABLE_MIDI
 #include <HardwareSerial.h>
@@ -340,7 +407,7 @@ int getNoteNumber() {
 
 //--------------------------
 double CalcInvFrequency(double note) {
-  return 440.0 * pow(2, (note - (69-12))/12);
+  return fineTune * pow(2, (note - (69-12))/12);
 }
 
 //---------------------------------
@@ -374,8 +441,10 @@ void loop() {
     else if (pp < 0.01) {
       currentNote = targetNote;
       noteStep = 1.0;
+      noteOnTimeLength = 0;
     }
     else {
+      noteOnTimeLength++;
       if (noteStep >= 1.0) {
         
       } else {
@@ -383,7 +452,7 @@ void loop() {
         if (noteStep > 1.0) {
           noteStep = 1.0;
         }
-        double t = pow(noteStep, poltRate);
+        double t = pow(noteStep, keyChangeCurve);
         currentNote = startNote + (targetNote - startNote) * t;
       }
     } 
@@ -403,7 +472,7 @@ void loop() {
 #endif
 
   if (ppReq > vol) {
-    vol += (ppReq - vol) * 0.5;
+    vol += (ppReq - vol) * volumeRate;
   } else {
     vol += (ppReq - vol) * 0.9;
   }
@@ -440,19 +509,33 @@ void loop() {
     return;
   }
 
-  //pitch = 0.0;
-  //if (vol < 0.1) pitch = -(0.1-vol) * 0.4;
-
-  if (vol < 0.01) shift = 0.0;
-  else {
-    if (shift < 1.0) shift += 0.1;
-    else shift = 1.0;
+#if 0
+  {
+    // 時間によるシフト
+    double k = noteOnTimeLength / 50.0;
+    if (k > 1) k = 1;
+    shift = 1 - k;
   }
+#endif
 
-  double ft = CalcInvFrequency(currentNote + pitch);
-  //ftt += (ft - ftt) * 0.99;
-  //fst = (ftt / fs);
-  fst = (ft / fs);
+#if 1
+  {
+    // 音量によるシフト
+    double u = volReq * 30.99;
+    int t = (int)(u);
+    double f = u - t;
+    if (t < 0) t = 0;
+    if (t > 30) t = 30;
+    double k0 = shiftTable[t] / 127.0;
+    double k1 = shiftTable[t + 1] / 127.0;
+    shift = 1 - (k0 * (1.0 - f) + k1 * f);
+  }
+#endif
+
+  double ft = CalcInvFrequency(currentNote);
+  ftt += (ft - ftt) * portamentoRate;
+  fst = (ftt / fs);
+  //fst = (ft / fs);
   ledcWrite(0, (uint8_t)(volReq * 255));
 
   //if (xSemaphoreTake(timerSemaphore, 0) == pdTRUE){
@@ -469,7 +552,8 @@ void loop() {
     SerialPrintLn(s);
     delay(200);
 #endif
-    delay(1);
+  SerialProc();
+  delay(1);
 }
 
 //---------------------------------
@@ -559,6 +643,7 @@ void MIDI_BreathControl(int vol) {
     delay(16);
 }
 
+//---------------------------------
 void MIDI_ActiveNotify() {
 #if ENABLE_BLE_MIDI
     midiPacket[0] = 0x80; // header
@@ -575,17 +660,344 @@ void MIDI_ActiveNotify() {
     delay(4);
 }
 
-volatile double phase = 0.0;
-//volatile double phase2 = 0.0;
-//volatile double phase3 = 0.0;
-#define REVERB_BUFFER_SIZE (9801)
-#define REVERB_RATE (0.152)
-volatile double reverbBuffer[REVERB_BUFFER_SIZE];
-volatile int reverbPos = 0;
+//---------------------------------
+int ChangeSigned(int data) {
+    if (data < 64)
+    {
+        return data;
+    }
+    else
+    {
+        return data - 128;
+    }
+}
 
-volatile short waveA[256];
+int ChangeUnsigned(int data)
+{
+    if (data >= 0)
+    {
+        return data;
+    }
+    else
+    {
+        return 128 + data;
+    }
+}
 
-volatile short wave[256];
+//---------------------------------
+void OnReceiveCommand() {
+    /*
+     * 0xA1 SET TONE NUMBER
+     * 0xA2 SET TRANSPOSE
+     * 0xA3 SET FINE TUNE
+     * 0xA4 SET REVERB LEVEL
+     * 0xA5 SET PORTAMENTO LEVEL
+     * 0xA6 SET KEY SENSITIVITY
+     * 0xA7 SET BREATH SENSITIVITY
+     * 0xAA SET WAVE A DATA
+     * 0xAB SET WAVE B DATA
+     * 0xAC SET SHIFT TABLE
+     * 
+     * 0xB1 GET TONE NUMBER
+     * 0xB2 GET TRANSPOSE
+     * 0xB3 GET FINE TUNE
+     * 0xB4 GET REVERB LEVEL
+     * 0xB5 GET PORTAMENTO LEVEL
+     * 0xB6 GET KEY SENSITIVITY
+     * 0xB7 GET BREATH SENSITIVITY
+     * 0xBA GET WAVE A DATA
+     * 0xBB GET WAVE B DATA
+     * 0xBC GET SHIFT TABLE
+     * 
+     * 0xC1 RESPONSE TONE NUMBER
+     * 0xC2 RESPONSE TRANSPOSE
+     * 0xC3 RESPONSE FINE TUNE
+     * 0xC4 RESPONSE REVERB LEVEL
+     * 0xC5 RESPONSE PORTAMENTO LEVEL
+     * 0xC6 RESPONSE KEY SENSITIVITY
+     * 0xC7 RESPONSE BREATH SENSITIVITY
+     * 0xCA RESPONSE WAVE A DATA
+     * 0xCB RESPONSE WAVE B DATA
+     * 0xCC RESPONSE SHIFT TABLE
+     * 
+     * 0xE1 STORE CONFIGS
+     * 
+     * 0xEE SOFTWARE RESET
+     * 
+     * 0xFE COMMAND ACK
+     * 0xFF END MESSAGE
+     */
+    ToneSetting* ts = &toneSettings[toneNo];
+    int command = receiveBuffer[0];
+    switch (command)
+    {
+        case 0xA1: // SET TONE NUMBER
+        case 0xC1: // RESPONSE TONE NUMBER
+            {
+                int data = receiveBuffer[1];
+                toneNo = data;
+                BeginPreferences(); {
+                  pref.putInt("toneNo", toneNo);
+                  LoadToneSetting(toneNo);
+                } EndPreferences();
+                SendCommandAck();
+            }
+            break;
+        case 0xB1: // GET TONE NUMBER
+            {
+              sendBuffer[0] = 0xC1;
+              sendBuffer[1] = toneNo;
+              sendBuffer[2] = 0xFF;
+              Serial.write(sendBuffer, 3);
+              Serial.flush();
+            }
+            break;
+        case 0xA2: // SET TRANSPOSE
+        case 0xC2: // RESPONSE TRANSPOSE
+            {
+                int data = ChangeSigned( receiveBuffer[1] );
+                ts->transpose = data;
+                baseNote = 60 + 1 + data; // 61  C (C#)
+                SendCommandAck();
+            }
+            break;
+        case 0xB2: // GET TRANSPOSE
+            {
+              sendBuffer[0] = 0xC2;
+              sendBuffer[1] = ChangeUnsigned(ts->transpose);
+              sendBuffer[2] = 0xFF;
+              Serial.write(sendBuffer, 3);
+              Serial.flush();
+            }
+            break;
+        case 0xA3: // SET FINE TUNE
+        case 0xC3: // RESPONSE FINE TUNE
+            {
+                int data = ChangeSigned( receiveBuffer[1] );
+                ts->fineTune = data;
+                fineTune = 440.0 + data;
+                SendCommandAck();
+            }
+            break;
+        case 0xB3: // GET FINE TUNE
+            {
+              sendBuffer[0] = 0xC3;
+              sendBuffer[1] = ChangeUnsigned(ts->fineTune);
+              sendBuffer[2] = 0xFF;
+              Serial.write(sendBuffer, 3);
+              Serial.flush();
+            }
+            break;
+        case 0xA4: // SET REVERB LEVEL
+        case 0xC4: // RESPONSE REVERB LEVEL
+            {
+                int data = ChangeSigned( receiveBuffer[1] ); // 0 - 20
+                ts->reverb = data;
+                reverbRate = data * 0.02; // (default 0.152)
+                SendCommandAck();
+            }
+            break;
+        case 0xB4: // GET REVERB LEVEL
+            {
+              sendBuffer[0] = 0xC4;
+              sendBuffer[1] = ChangeUnsigned(ts->reverb);
+              sendBuffer[2] = 0xFF;
+              Serial.write(sendBuffer, 3);
+              Serial.flush();
+            }
+            break;
+        case 0xA5: // SET PORTAMENTO LEVEL
+        case 0xC5: // RESPONSE PORTAMENTO LEVEL
+            {
+                int data = ChangeSigned( receiveBuffer[1] ); // 0 - 20
+                ts->portamento = data;
+                portamentoRate = 1 - (data * 0.04); // (default 0.99)
+                SendCommandAck();
+            }
+            break;
+        case 0xB5: // GET PORTAMENTO LEVEL
+            {
+              sendBuffer[0] = 0xC5;
+              sendBuffer[1] = ChangeUnsigned(ts->portamento);
+              sendBuffer[2] = 0xFF;
+              Serial.write(sendBuffer, 3);
+              Serial.flush();
+            }
+            break;
+        case 0xA6: // SET KEY SENSITIVITY
+        case 0xC6: // RESPONSE KEY SENSITIVITY
+            {
+                int data = ChangeSigned( receiveBuffer[1] ); // 0 - 20
+                ts->keySense = data;
+                noteDiv = 1.0 / (1 + (data * 0.3)); // (default 1.0 / 3.0)
+                SendCommandAck();
+            }
+            break;
+        case 0xB6: // GET KEY SENSITIVITY
+            {
+              sendBuffer[0] = 0xC6;
+              sendBuffer[1] = ChangeUnsigned(ts->keySense);
+              sendBuffer[2] = 0xFF;
+              Serial.write(sendBuffer, 3);
+              Serial.flush();
+            }
+            break;
+        case 0xA7: // SET BREATH SENSITIVITY
+        case 0xC7: // RESPONSE BREATH SENSITIVITY
+            {
+                int data = ChangeSigned( receiveBuffer[1] ); // 0 - 20
+                ts->breathSense = data;
+                volumeRate = 0.9 - (data * 0.04); // (default 0.5)
+                SendCommandAck();
+            }
+            break;
+        case 0xB7: // GET KEY SENSITIVITY
+            {
+              sendBuffer[0] = 0xC7;
+              sendBuffer[1] = ChangeUnsigned(ts->breathSense);
+              sendBuffer[2] = 0xFF;
+              Serial.write(sendBuffer, 3);
+              Serial.flush();
+            }
+            break;
+        case 0xAA: // SET WAVE A DATA
+        case 0xCA: // SET WAVE A DATA
+        case 0xAB: // SET WAVE B DATA
+        case 0xCB: // SET WAVE B DATA
+            if (receivePos >= 512) {
+              for (int i = 0; i < 256; i++) {
+                uint32_t d0 = receiveBuffer[1 + i*2];
+                uint32_t d1 = receiveBuffer[1 + i*2 + 1];
+                uint32_t rdata = ((d0 << 2) | (d1 << 9));
+                int32_t data = *reinterpret_cast<int32_t*>(&rdata);
+                if ((command & 0x0F) == 0x0A) {
+                  ts->waveA[i] = data;
+                  waveA[i] = data;
+                } else {
+                  ts->waveB[i] = data;
+                  waveB[i] = data;
+                }
+              }
+              SendCommandAck();
+            }
+            break;
+        case 0xBA: // GET WAVE A DATA
+        case 0xBB: // GET WAVE B DATA
+            {
+              if ((command & 0x0F) == 0x0A) {
+                sendBuffer[0] = 0xCA;
+                for (int i = 0; i < 256; i++) {
+                  int d0 = (ts->waveA[i] >> 2) & 0x7F;
+                  int d1 = (ts->waveA[i] >> 9) & 0x7F;
+                  sendBuffer[1 + i*2] = (byte)d0; 
+                  sendBuffer[1 + i*2 + 1] = (byte)d1; 
+                }
+              } else {
+                sendBuffer[0] = 0xCB;
+                for (int i = 0; i < 256; i++) {
+                  int d0 = (ts->waveB[i] >> 2) & 0x7F;
+                  int d1 = (ts->waveB[i] >> 9) & 0x7F;
+                  sendBuffer[1 + i*2] = (byte)d0; 
+                  sendBuffer[1 + i*2 + 1] = (byte)d1; 
+                }
+              }
+              sendBuffer[513] = 0xFF;
+              Serial.write(sendBuffer, 514);
+              Serial.flush();
+            }
+            break;
+        case 0xAC: // SET SHIFT TABLE
+        case 0xCC:
+            {
+              for (int i = 0; i < 32; i++) {
+                shiftTable[i] = receiveBuffer[1 + i];
+                ts->shiftTable[i] = shiftTable[i];
+              }
+              SendCommandAck();
+            }
+            break;
+        case 0xBC: // GET SHIFT TABLE
+            {
+              sendBuffer[0] = 0xCC;
+              for (int i = 0; i < 32; i++) {
+                sendBuffer[1 + i] = ts->shiftTable[i];
+              }
+              sendBuffer[33] = 0xFF;
+              Serial.write(sendBuffer, 34);
+              Serial.flush();
+            }
+            break;
+        case 0xE1: // WRITE TO FLASH
+            if (receiveBuffer[1] == 0x7F) {
+              SaveToneSetting(toneNo);
+              SendCommandAck();
+            }
+            break;
+        case 0xEE: // SOFTWARE RESET
+            if (receiveBuffer[1] == 0x7F) {
+              ESP.restart();
+            } else if ((receiveBuffer[1] == 0x7A) && (receiveBuffer[2] == 0x3C)) {
+              BeginPreferences(); {
+                pref.clear(); // CLEAR ALL FLASH MEMORY
+              } EndPreferences();
+              ESP.restart();
+            }
+            break;
+    }
+
+    waitForCommand = true;
+    receivePos = 0;
+}
+
+//---------------------------------
+void SendCommandAck() {
+  Serial.write(0xFE);
+  Serial.write(0xFF);
+  Serial.flush();
+}
+
+
+//---------------------------------
+void SerialProc() {
+  int dataSize = Serial.available();
+  if (dataSize == 0) return;
+
+  uint8_t buff[256];
+  if (dataSize > 256) dataSize = 256;
+  int readSize = Serial.readBytes(buff, dataSize);
+  for (int i = 0; i < readSize; i++) {
+    if (receivePos >= 1000) break;
+    int d = buff[i];
+    if (waitForCommand)
+    {
+        if ((d >= 0x80) && (d != 0xFF))
+        {
+            receivePos = 0;
+            receiveBuffer[receivePos++] = d;
+            waitForCommand = false;
+        }
+    }
+    else
+    {
+        if (d < 0x80)
+        {
+            receiveBuffer[receivePos++] = d;
+        }
+        else
+        {
+            OnReceiveCommand();
+            if (d < 0xFF)
+            {
+                receivePos = 0;
+                receiveBuffer[receivePos++] = d;
+                waitForCommand = false;
+            }
+        }
+    }
+  }
+}
+
+
 
 const short waveWSynth[256] = {
     -11947,-14483,-17018,-19554,-22090,-24625,-26859,-27731,
@@ -735,6 +1147,112 @@ const short waveHamoA[256] = {
 };
 
 //---------------------------------
+void LoadToneSetting(int idx) {
+  BeginPreferences(); {
+    ToneSetting* ts = &toneSettings[idx];
+
+    ts->transpose = 0;
+    ts->fineTune = 0;
+    ts->reverb = 7;
+    ts->portamento = 2;
+    ts->keySense = 5;
+    ts->breathSense = 4;
+
+    if (idx == 0) {
+      for (int i = 0; i < 256; i++) ts->waveA[i] = waveWSynth[i];
+      for (int i = 0; i < 256; i++) ts->waveB[i] = waveWSynth[i];
+    }
+    else if (idx == 1) {
+      ts->transpose = 3;
+      for (int i = 0; i < 256; i++) ts->waveA[i] = waveCla[i];
+      for (int i = 0; i < 256; i++) ts->waveB[i] = waveCla[i];
+    }
+    else if (idx == 2) {
+      ts->breathSense = 6;
+      for (int i = 0; i < 256; i++) ts->waveA[i] = waveFlute[i];
+      for (int i = 0; i < 256; i++) ts->waveB[i] = waveFlute[i];
+    }
+    else if (idx == 3) {
+      ts->reverb = 15;
+      for (int i = 0; i < 256; i++) ts->waveA[i] = waveHamo[i];
+      for (int i = 0; i < 256; i++) ts->waveB[i] = waveHamo[i];
+    }
+    else {
+      ts->reverb = 15;
+      ts->portamento = 20;
+      for (int i = 0; i < 256; i++) {
+        if (i < 64) {
+          ts->waveA[i] = (-i*400);
+        } else if (i < 192) {
+          ts->waveA[i] = (i*400)-(400*128);
+        } else {
+          ts->waveA[i] = ((256-i)*400);
+        }
+      }
+      for (int i = 0; i < 256; i++) ts->waveB[i] = (i*235)-30080;
+    }
+    for (int i = 0; i < 32; i++) {
+      ts->shiftTable[i] = (127 * i) / 31;
+    }
+  
+    // load from pref
+    bool loaded = false;
+    char key[8];
+    sprintf(key, "Tone%d", idx+1);
+    if (pref.getBytesLength(key) == sizeof(ToneSetting)) {
+      pref.getBytes(key, ts, sizeof(ToneSetting));
+      loaded = true;
+    }
+  
+    // apply
+    if (bootBaseNote == 0) {
+      baseNote = 60 + 1 + ChangeSigned(ts->transpose);
+    } else {
+      baseNote = bootBaseNote;
+    }
+    fineTune = 440 + ChangeSigned(ts->fineTune);
+    reverbRate = ts->reverb * 0.02; // (default 0.152)
+    portamentoRate = 1 - (ts->portamento * 0.04); // (default 0.99)
+    noteDiv = 1.0 / (1 + (ts->keySense * 0.3)); // (default 1.0 / 3.0)
+    volumeRate = 0.9 - (ts->breathSense * 0.04); // (default 0.5)
+
+    for (int i = 0; i < 256; i++) {
+      waveA[i] = ts->waveA[i];
+      waveB[i] = ts->waveB[i];
+    }
+    for  (int i = 0; i < 32; i++) {
+      shiftTable[i] = ts->shiftTable[i];
+    }
+  } EndPreferences();
+}
+
+//---------------------------------
+void SaveToneSetting(int idx) {
+  BeginPreferences(); {
+    ToneSetting* ts = &toneSettings[idx];
+  
+    ts->transpose = (uint8_t)ChangeUnsigned(baseNote - 61);
+    ts->fineTune = (uint8_t)ChangeUnsigned(fineTune - 440);
+    ts->reverb = (uint8_t)ChangeUnsigned((int)(reverbRate / 0.02));
+    ts->portamento = (uint8_t)ChangeUnsigned((int)((1 -portamentoRate) / 0.04));
+    ts->keySense = (uint8_t)ChangeUnsigned((int)(((1.0 / noteDiv) - 1) / 0.3));
+    ts->breathSense = (uint8_t)ChangeUnsigned((int)((0.9 - volumeRate) / 0.04));
+  
+    for (int i = 0; i < 256; i++) {
+      ts->waveA[i] = waveA[i];
+      ts->waveB[i] = waveB[i];
+    }
+    for  (int i = 0; i < 32; i++) {
+      ts->shiftTable[i] = shiftTable[i];
+    }
+    
+    char key[8];
+    sprintf(key, "Tone%d", idx + 1);
+    pref.putBytes(key, ts, sizeof(ToneSetting));
+  } EndPreferences();
+}
+
+//---------------------------------
 double SawWave(double p) {
   return -1.0 + 2 * p;
 }
@@ -743,9 +1261,9 @@ double Voice(double p) {
   double v = 255*p;
   int t = (int)v;
   double f = (v - t);
-  double w0 = (wave[t] * shift + waveA[t] * (1-shift));
+  double w0 = (waveA[t] * shift + waveB[t] * (1-shift));
   t = (t + 1) % 256;
-  double w1 = (wave[t] * shift + waveA[t] * (1-shift));
+  double w1 = (waveA[t] * shift + waveB[t] * (1-shift));
   double w = (w1 * f) + (w0 * (1-f));
   return (w / 32767.0);
 }
@@ -761,7 +1279,7 @@ uint8_t CreateWave() {
     if ( (-0.01 < e) && (e < 0.01) ) {
       e = 0.0;
     }
-    reverbBuffer[reverbPos] = e * REVERB_RATE;
+    reverbBuffer[reverbPos] = e * reverbRate;
     reverbPos = (reverbPos + 1) % REVERB_BUFFER_SIZE;
 
 #if 1
@@ -787,6 +1305,7 @@ void IRAM_ATTR onTimer(){
   //xSemaphoreGiveFromISR(timerSemaphore, NULL);
 }
 
+
 //---------------------------------
 void setup() {
 #if !ENABLE_MIDI
@@ -809,106 +1328,73 @@ void setup() {
   for (int i = 0; i < 12; i++) {
     pinMode(portList[i], INPUT_PULLUP);
   }
-  bool keyLowC = digitalRead(16);
-  bool keyEb = digitalRead(17);
-  bool keyD = digitalRead(5);
-  bool keyE = digitalRead(18);
-  bool keyF = digitalRead(19);
-  bool keyLowCs = digitalRead(13);
-  bool keyGs =digitalRead(12);
-  bool keyG = digitalRead(14);
-  bool keyA = digitalRead(27);
-  bool keyB = digitalRead(26);
-  bool octDown = digitalRead(3);
-  bool octUp = digitalRead(23);
 
-  Preferences pref;
-  pref.begin("Afuue/Settings", false);
-
-  // play key setting
-  baseNote = -1;
-
-  // baseNote はキー全開放時の音 なので通常 C#
-  if ((keyE == LOW)&&(keyF == LOW)) {
-    baseNote = 60 + 1; // 61  C (C#)
-  }
-  else if (keyE == LOW) {
-    baseNote = 58 + 1; // 59  Bb (B)
-  }
-  else if (keyF == LOW) {
-    baseNote = 63 + 1; // 64  Eb (E)
-  }
-  if ((keyLowC == LOW) && (keyEb == HIGH)) {
-    baseNote -= 12;
-  } else if ((keyLowC == HIGH) && (keyEb == LOW)) {
-    baseNote += 12;
-  }
-  if (baseNote < 0) {
-    baseNote = pref.getInt("baseNote", 49 + 12);
-  }
-  else {
-    SerialPrintLn("save baseNote");
-    pref.putInt("baseNote", baseNote);
-  }
-
-  // play voice setting
-  int voiceNo = -1;
-  if ((keyLowCs == HIGH) && (keyGs == HIGH) && (keyG == HIGH) && (keyA == HIGH) && (keyB == LOW)) {
-    voiceNo = 0;
-  }
-  else if ((keyLowCs == HIGH) && (keyGs == HIGH) && (keyG == HIGH) && (keyA == LOW) && (keyB == HIGH)) {
-    voiceNo = 1;
-  }
-  else if ((keyLowCs == HIGH) && (keyGs == HIGH) && (keyG == LOW) && (keyA == HIGH) && (keyB == HIGH)) {
-    voiceNo = 2;
-  }
-  else if ((keyLowCs == HIGH) && (keyGs == LOW) && (keyG == HIGH) && (keyA == HIGH) && (keyB == HIGH)) {
-    voiceNo = 3;
-  }
-  else if ((keyLowCs == LOW) && (keyGs == HIGH) && (keyG == HIGH) && (keyA == HIGH) && (keyB == HIGH)) {
-    voiceNo = 4;
-  }
-  if (voiceNo < 0) {
-    voiceNo = pref.getInt("voiceNo", 0);
-  }
-  else {
-    SerialPrintLn("save voiceNo");
-    pref.putInt("voiceNo", voiceNo);
-  }
+  BeginPreferences(); {
+    bool keyLowC = digitalRead(16);
+    bool keyEb = digitalRead(17);
+    bool keyD = digitalRead(5);
+    bool keyE = digitalRead(18);
+    bool keyF = digitalRead(19);
+    bool keyLowCs = digitalRead(13);
+    bool keyGs =digitalRead(12);
+    bool keyG = digitalRead(14);
+    bool keyA = digitalRead(27);
+    bool keyB = digitalRead(26);
+    bool octDown = digitalRead(3);
+    bool octUp = digitalRead(23);
+    // play key setting
+    bootBaseNote = 0;
   
-  if (voiceNo == 1) {
-    for (int i = 0; i < 256; i++) wave[i] = waveCla[i];
-    for (int i = 0; i < 256; i++) waveA[i] = waveCla[i];
-  }
-  else if (voiceNo == 2) {
-    for (int i = 0; i < 256; i++) wave[i] = waveFlute[i];
-    for (int i = 0; i < 256; i++) waveA[i] = waveFlute[i];
-  }
-  else if (voiceNo == 3) {
-    for (int i = 0; i < 256; i++) wave[i] = waveHamo[i];
-    for (int i = 0; i < 256; i++) waveA[i] = waveHamoA[i];
-    //for (int i = 0; i < 256; i++) wave[i] = (i*235)-30000;
-    //for (int i = 0; i < 256; i++) waveA[i] = wave[i];
-  }
-  else if (voiceNo == 4) {
-    for (int i = 0; i < 256; i++) wave[i] = (i/128)*60000-30000;
-    for (int i = 0; i < 256; i++) waveA[i] = wave[i];
-  }
-  else {
-    for (int i = 0; i < 256; i++) wave[i] = waveWSynth[i];
-    for (int i = 0; i < 256; i++) waveA[i] = waveWSynth[i];
-  }
-
-  pref.end();
-
-  if (keyD == LOW) {
-    midiEnabled = true;
-  }
-
+    // baseNote はキー全開放時の音 なので通常 C#
+    if ((keyE == LOW)&&(keyF == LOW)) {
+      bootBaseNote = 60 + 1; // 61  C (C#)
+    }
+    else if (keyE == LOW) {
+      bootBaseNote = 58 + 1; // 59  Bb (B)
+    }
+    else if (keyF == LOW) {
+      bootBaseNote = 63 + 1; // 64  Eb (E)
+    }
+    if ((keyLowC == LOW) && (keyEb == HIGH)) {
+      bootBaseNote -= 12;
+    } else if ((keyLowC == HIGH) && (keyEb == LOW)) {
+      bootBaseNote += 12;
+    }
+  
+    // play voice setting
+    if ((keyLowCs == HIGH) && (keyGs == HIGH) && (keyG == HIGH) && (keyA == HIGH) && (keyB == LOW)) {
+      toneNo = 0;
+    }
+    else if ((keyLowCs == HIGH) && (keyGs == HIGH) && (keyG == HIGH) && (keyA == LOW) && (keyB == HIGH)) {
+      toneNo = 1;
+    }
+    else if ((keyLowCs == HIGH) && (keyGs == HIGH) && (keyG == LOW) && (keyA == HIGH) && (keyB == HIGH)) {
+      toneNo = 2;
+    }
+    else if ((keyLowCs == HIGH) && (keyGs == LOW) && (keyG == HIGH) && (keyA == HIGH) && (keyB == HIGH)) {
+      toneNo = 3;
+    }
+    else if ((keyLowCs == LOW) && (keyGs == HIGH) && (keyG == HIGH) && (keyA == HIGH) && (keyB == HIGH)) {
+      toneNo = 4;
+    }
+    if (toneNo < 0) {
+      toneNo = pref.getInt("toneNo", 0);
+    }
+    else {
+      SerialPrintLn("save toneNo");
+      pref.putInt("toneNo", toneNo);
+    }
+    LoadToneSetting(toneNo);
+  
+    if (keyD == LOW) {
+      midiEnabled = true;
+    }
+  } EndPreferences();
+  
   //SerialPrintLn("---baseNote");
   //SerialPrintLn(baseNote);
-  //SerialPrintLn("---voiceNo");
-  //SerialPrintLn(voiceNo);
+  //SerialPrintLn("---toneNo");
+  //SerialPrintLn(toneNo);
 
   defPressure = getPressure();
   delay(100);
@@ -972,6 +1458,9 @@ void setup() {
   }
   else
   {
+#if ENABLE_MIDI
+  Serial.begin(115200);
+#endif
     timerSemaphore = xSemaphoreCreateBinary();
     // Use 1st timer of 4 (counted from zero).
     // Set 80 divider for prescaler (see ESP32 Technical Reference Manual for more
