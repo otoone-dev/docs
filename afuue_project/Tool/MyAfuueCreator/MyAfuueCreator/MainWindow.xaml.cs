@@ -22,23 +22,83 @@ namespace MyAfuueCreator
     /// </summary>
     public partial class MainWindow : Window
     {
+        public class ToneSetting
+        {
+            public bool RequestSynchronize = true;
+            
+            public SByte Transpose = 0;
+            public SByte FineTune = 0;
+            public Byte Reverb = 7;
+            public Byte Portamento = 0;
+            public Byte KeySense = 0;
+            public Byte BreathSense = 0;
+            public Int16[] WaveA = new Int16[256];
+            public Int16[] WaveB = new Int16[256];
+            public Byte[] ShiftTable = new Byte[32];
+            public Byte[] NoiseTable = new Byte[32];
+            public Byte[] PitchTable = new Byte[32];
+        }
+
+        public class GlobalSettings
+        {
+            public Byte ToneNo = 0;
+            public Byte Metronome_m = 1;
+            public Byte Metronome_v = 0;
+            public int Metronome_t = 90;
+            public Byte MidiControlType = 0;
+        };
+
+        public class SaveData
+        {
+            public GlobalSettings GlobalSetting = new GlobalSettings();
+            public ToneSetting[] ToneSettings { get; set; } = new ToneSetting[5];
+        }
+
+        public SaveData saveData = new SaveData();
+
+        public class SerialCommand
+        {
+            public bool sended = false;
+            public Action ackAction = null;
+            public bool noWaitResponse = false;
+            public long sendTime = 0;
+
+            public byte[] sendBuffer = null;
+            public void SetBufferSize(int size)
+            {
+                sendBuffer = new byte[size];
+                for (int i =  0; i < size; i++)
+                {
+                    sendBuffer[i] = 0;
+                }
+            }
+        }
+        public List<SerialCommand> commandQueue = new List<SerialCommand>();
+
         private SerialPort serialPort = new SerialPort();
         private const int BUFFERSIZE = 4096;
         private byte[] receiveBuffer = new byte[BUFFERSIZE];
         private int receivePos = 0;
         private bool waitForCommand = true;
-        private bool stopSendChangeEvent = false;
         private string reqSendChangeEvent = "";
         private bool stopViewChangedEvent = false;
-        private DispatcherTimer dispatcherTimer = null;
+        private DispatcherTimer drawTimer = null;
+        private DispatcherTimer sendTimer = null;
+        private System.Diagnostics.Stopwatch stopwatch = null;
+        private int retryCount = 0;
 
-        private List<double> wavePoints = new List<double>();
-        private List<double> shiftTable = new List<double>();
+        private Rectangle backGroundRect = null;
 
         //------------------
         public MainWindow()
         {
+            for (int i = 0; i < 5; i++)
+            {
+                saveData.ToneSettings[i] = new ToneSetting();
+            }
+
             InitializeComponent();
+            DataContext = this;
 
             serialPort.BaudRate = 115200;
             serialPort.Parity = Parity.None;
@@ -48,20 +108,160 @@ namespace MyAfuueCreator
             serialPort.DataReceived += SerialPort_DataReceived;
             serialPort.ErrorReceived += (sender, e) => { MessageBox.Show("serialError" + e.EventType.ToString()); };
 
-            dispatcherTimer = new DispatcherTimer(DispatcherPriority.ContextIdle, this.Dispatcher);
-            dispatcherTimer.Interval = new TimeSpan(0, 0, 0, 0, 200);
-            dispatcherTimer.Tick += DispatcherTimer_Tick;
-            dispatcherTimer.Start();
+            drawTimer = new DispatcherTimer(DispatcherPriority.ContextIdle, this.Dispatcher);
+            drawTimer.Interval = new TimeSpan(0, 0, 0, 0, 200);
+            drawTimer.Tick += DispatcherTimer_Tick;
+            drawTimer.Start();
+
+            stopwatch = new System.Diagnostics.Stopwatch();
+            stopwatch.Start();
+
+            sendTimer = new DispatcherTimer(DispatcherPriority.ContextIdle, this.Dispatcher);
+            sendTimer.Interval = new TimeSpan(0, 0, 0, 0, 8);
+            sendTimer.Tick += SendTimer_Tick;
+            sendTimer.Start();
+        }
+
+        //------------------
+        private void SendTimer_Tick(object sender, EventArgs e)
+        {
+            if (commandQueue.Count == 0)
+            {
+                SyncLabel.Visibility = Visibility.Hidden;
+                return;
+            }
+            long t = stopwatch.ElapsedMilliseconds;
+            SyncLabel.Visibility = Visibility.Visible;
+            var firstCommand = commandQueue.First();
+            if (firstCommand.sended == true)
+            {
+                long p = t - firstCommand.sendTime;
+                if (p < 500)
+                {
+                    return;
+                }
+                retryCount++;
+                if (retryCount >= 10)
+                {
+                    if (retryCount == 10)
+                    {
+                        serialPort.Close();
+                        SerialPortComboBox.Text = "";
+                        WriteLog("[FAIL] 0x" + String.Format("{0:X2}", firstCommand.sendBuffer[0]));
+                        WriteLog(serialPort.PortName + " was disconnected.");
+                    }
+                    return;
+                }
+                WriteLog("[RETRY] 0x" + String.Format("{0:X2}", firstCommand.sendBuffer[0]));
+            } else
+            {
+                WriteLog("[SEND] 0x" + String.Format("{0:X2}", firstCommand.sendBuffer[0]));
+            }
+            firstCommand.sended = true;
+            firstCommand.sendTime = t;
+            serialPort.Write(firstCommand.sendBuffer, 0, firstCommand.sendBuffer.Length);
+        }
+
+        //------------------
+        private void RemoveFirstCommand()
+        {
+            var firstCommand = commandQueue.First();
+            if (firstCommand.sended == false) return;
+
+            commandQueue.Remove(firstCommand);
+        }
+
+        //------------------
+        private SerialCommand AddCommandQueue(Byte command)
+        {
+            SerialCommand addCommand = new SerialCommand();
+            addCommand.SetBufferSize(2);
+            addCommand.sendBuffer[0] = command;
+            addCommand.sendBuffer[1] = 0xFF;
+            commandQueue.Add(addCommand);
+            return addCommand;
+        }
+
+        //------------------
+        private SerialCommand AddCommandQueue(Byte command, Byte param1)
+        {
+            SerialCommand addCommand = new SerialCommand();
+            addCommand.SetBufferSize(3);
+            addCommand.sendBuffer[0] = command;
+            addCommand.sendBuffer[1] = param1;
+            addCommand.sendBuffer[2] = 0xFF;
+            commandQueue.Add(addCommand);
+            return addCommand;
+        }
+
+        //------------------
+        private SerialCommand AddCommandQueue(Byte command, Byte param1, Byte param2)
+        {
+            SerialCommand addCommand = new SerialCommand();
+            addCommand.SetBufferSize(4);
+            addCommand.sendBuffer[0] = command;
+            addCommand.sendBuffer[1] = param1;
+            addCommand.sendBuffer[2] = param2;
+            addCommand.sendBuffer[3] = 0xFF;
+            commandQueue.Add(addCommand);
+            return addCommand;
+        }
+
+        //------------------
+        private SerialCommand AddCommandQueue(Byte command, Byte param1, Byte param2, Byte param3)
+        {
+            SerialCommand addCommand = new SerialCommand();
+            addCommand.SetBufferSize(5);
+            addCommand.sendBuffer[0] = command;
+            addCommand.sendBuffer[1] = param1;
+            addCommand.sendBuffer[2] = param2;
+            addCommand.sendBuffer[3] = param3;
+            addCommand.sendBuffer[4] = 0xFF;
+            commandQueue.Add(addCommand);
+            return addCommand;
+        }
+
+        //------------------
+        private SerialCommand AddCommandQueue(Byte command, Byte param1, Byte param2, Byte param3, Byte param4)
+        {
+            SerialCommand addCommand = new SerialCommand();
+            addCommand.SetBufferSize(6);
+            addCommand.sendBuffer[0] = command;
+            addCommand.sendBuffer[1] = param1;
+            addCommand.sendBuffer[2] = param2;
+            addCommand.sendBuffer[3] = param3;
+            addCommand.sendBuffer[4] = param4;
+            addCommand.sendBuffer[5] = 0xFF;
+            commandQueue.Add(addCommand);
+            return addCommand;
+        }
+
+        //------------------
+        private SerialCommand AddCommandQueue(Byte command, Byte[] data)
+        {
+            SerialCommand addCommand = new SerialCommand();
+            addCommand.SetBufferSize(2 + data.Length);
+            addCommand.sendBuffer[0] = command;
+            for (int i = 0; i < data.Length; i++)
+            {
+                addCommand.sendBuffer[1 + i] = data[i];
+            }
+            addCommand.sendBuffer[data.Length + 1] = 0xFF;
+            commandQueue.Add(addCommand);
+            return addCommand;
         }
 
         //------------------
         private void DispatcherTimer_Tick(object sender, EventArgs e)
         {
+            int toneNo = saveData.GlobalSetting.ToneNo;
             if (WaveCanvas.Children.Count > 0)
             {
-                double w = WaveCanvas.ActualWidth;
-                double h = WaveCanvas.ActualHeight;
+                double w = WaveCanvas.ActualWidth - 20;
+                double h = WaveCanvas.ActualHeight - 20;
                 int i = 0;
+                var waveA = saveData.ToneSettings[toneNo].WaveA;
+                var waveB = saveData.ToneSettings[toneNo].WaveB;
                 foreach (var item in WaveCanvas.Children)
                 {
                     if (item.GetType() == typeof(Line))
@@ -70,9 +270,19 @@ namespace MyAfuueCreator
                         {
                             int j = i - 2;
                             Line line = item as Line;
-                            double x = ((j % 256) * 2);
-                            double y1 = h / 2 - (h / 2) * wavePoints[(j % 256) + (j / 256) * 256];
-                            double y2 = h / 2 - (h / 2) * wavePoints[((j + 1) % 256) + (j / 256) * 256];
+                            double x = 10 + ((j % 256) * 2);
+                            double y1 = 0;
+                            double y2 = 0;
+                            if (j < 256)
+                            {
+                                y1 = 10 + h / 2 - (h / 2) * (waveA[(j % 256)] / 32767.0);
+                                y2 = 10 + h / 2 - (h / 2) * (waveA[((j + 1) % 256)] / 32767.0);
+                            } else
+                            {
+                                y1 = 10 + h / 2 - (h / 2) * (waveB[((j - 256) % 256)] / 32767.0);
+                                y2 = 10 + h / 2 - (h / 2) * (waveB[(((j - 256) + 1) % 256)] / 32767.0);
+                            }
+
                             line.X1 = x;
                             line.X2 = x + 2;
                             line.Y1 = y1;
@@ -83,22 +293,53 @@ namespace MyAfuueCreator
                     }
                 }
             }
-            if (ShiftCanvas.Children.Count > 0)
+            if (CurveCanvas.Children.Count > 0)
             {
-                double w = ShiftCanvas.ActualWidth;
-                double h = ShiftCanvas.ActualHeight;
+                double w = CurveCanvas.ActualWidth - 20;
+                double h = CurveCanvas.ActualHeight - 20;
                 int i = 0;
-                foreach (var item in ShiftCanvas.Children)
+                Brush lineBrush = null;
+                var curveTable = saveData.ToneSettings[toneNo].ShiftTable;
+
+                if (RadioButtonToneShift.IsChecked == true)
+                {
+                    backGroundRect.Fill = new SolidColorBrush(Color.FromArgb(255, 50, 30, 30));
+                    lineBrush = Brushes.Red;
+                    CurveLabelUp.Content = "WaveB ↑";
+                    CurveLabelDown.Content = "WaveA ↓";
+                    CurveLabelRight.Content = "→ Volume";
+                }
+                if (RadioButtonNoise.IsChecked == true)
+                {
+                    backGroundRect.Fill = new SolidColorBrush(Color.FromArgb(255, 30, 50, 30));
+                    lineBrush = Brushes.Lime;
+                    CurveLabelUp.Content = "Noisy ↑";
+                    CurveLabelDown.Content = "Silent ↓";
+                    CurveLabelRight.Content = "→ Volume";
+                    curveTable = saveData.ToneSettings[toneNo].NoiseTable;
+                }
+                if (RadioButtonPitch.IsChecked == true)
+                {
+                    backGroundRect.Fill = new SolidColorBrush(Color.FromArgb(255, 50, 30, 50));
+                    lineBrush = Brushes.Pink;
+                    CurveLabelUp.Content = "Pitch Up ↑";
+                    CurveLabelDown.Content = "Pitch Down ↓";
+                    CurveLabelRight.Content = "→ Volume";
+                    curveTable = saveData.ToneSettings[toneNo].PitchTable;
+                }
+
+                foreach (var item in CurveCanvas.Children)
                 {
                     if (item.GetType() == typeof(Line))
                     {
-                        if (i > 0)
+                        if (i > 1)
                         {
-                            int j = i - 1;
+                            int j = i - 2;
                             Line line = item as Line;
-                            double x = ((j % 32) * (512.0/31.0));
-                            double y1 = h - h * shiftTable[j];
-                            double y2 = h - h * shiftTable[j + 1];
+                            line.Stroke = lineBrush;
+                            double x = 10 + ((j % 32) * (512.0/31.0));
+                            double y1 = 10 + h - h * curveTable[j] / 127.0;
+                            double y2 = 10 + h - h * curveTable[j + 1] / 127.0;
                             line.X1 = x;
                             line.X2 = x + (512.0/31.0);
                             line.Y1 = y1;
@@ -129,14 +370,26 @@ namespace MyAfuueCreator
                 serialPort.Close();
                 System.Threading.Thread.Sleep(1000);
             }
-            if (SerialPortComboBox.Text.StartsWith("COM"))
+            LogTextBox.Clear();
+            if (SerialPortComboBox.SelectedIndex < 0) return;
+            var port = (SerialPortComboBox.SelectedItem as string);
+            if (port.StartsWith("COM"))
             {
                 try
                 {
-                    serialPort.PortName = SerialPortComboBox.Text;
+                    serialPort.PortName = port;
                     serialPort.Open();
-                    System.Threading.Thread.Sleep(1000);
-                    GetAllToneData();
+                    retryCount = 0;
+
+                    if (serialPort.IsOpen)
+                    {
+                        CheckVersion();
+                        SynchronizeAfuueAll();
+                    }
+                    else
+                    {
+                        WriteLog("Can't connect to " + port);
+                    }
                 }
                 catch (Exception)
                 {
@@ -148,72 +401,79 @@ namespace MyAfuueCreator
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             {
-                double w = WaveCanvas.ActualWidth;
-                double h = WaveCanvas.ActualHeight;
+                double w = WaveCanvas.ActualWidth - 20;
+                double h = WaveCanvas.ActualHeight - 20;
                 Rectangle rect = new Rectangle();
-                rect.Width = w;
-                rect.Height = h;
-                rect.Fill = new SolidColorBrush(Color.FromArgb(255, 30, 50, 30));
+                rect.Width = w + 20;
+                rect.Height = h + 20;
+                rect.Fill = new SolidColorBrush(Color.FromArgb(255, 50, 50, 30));
                 WaveCanvas.Children.Add(rect);
-
+                Brush waveLineBrush = new SolidColorBrush(Color.FromArgb(255, 80, 80, 50));
                 {
                     Line line = new Line();
-                    line.X1 = 0;
-                    line.X2 = w;
-                    line.Y1 = line.Y2 = h / 2;
-                    line.Stroke = Brushes.Green;
+                    line.X1 = 10;
+                    line.X2 = 10 + w;
+                    line.Y1 = line.Y2 = 10 + (h / 2);
+                    line.Stroke = waveLineBrush;
                     WaveCanvas.Children.Add(line);
                 }
                 {
                     Line line = new Line();
-                    line.X1 = line.X2 = w / 2;
-                    line.Y1 = 0;
-                    line.Y2 = h;
-                    line.Stroke = Brushes.Green;
+                    line.X1 = line.X2 = 10 + (w / 2);
+                    line.Y1 = 10;
+                    line.Y2 = h + 10;
+                    line.Stroke = waveLineBrush;
                     WaveCanvas.Children.Add(line);
                 }
 
                 for (int i = 0; i < 256; i++)
                 {
-                    wavePoints.Add(0);
-
                     Line box = new Line();
                     box.Stroke = new SolidColorBrush(Color.FromArgb(255, 255, 192, 32));
                     WaveCanvas.Children.Add(box);
                 }
                 for (int i = 0; i < 256; i++)
                 {
-                    wavePoints.Add(0);
-
                     Line waveLine = new Line();
                     waveLine.Stroke = new SolidColorBrush(Color.FromArgb(255, 32, 192, 255));
                     WaveCanvas.Children.Add(waveLine);
                 }
             }
             {
-                double w = ShiftCanvas.ActualWidth;
-                double h = ShiftCanvas.ActualHeight;
-                Rectangle rect = new Rectangle();
-                rect.Width = w;
-                rect.Height = h;
-                rect.Fill = new SolidColorBrush(Color.FromArgb(255, 30, 30, 50));
-                ShiftCanvas.Children.Add(rect);
+                double w = CurveCanvas.ActualWidth - 20;
+                double h = CurveCanvas.ActualHeight - 20;
+                backGroundRect = new Rectangle();
+                backGroundRect.Width = w + 20;
+                backGroundRect.Height = h + 20;
+                backGroundRect.Fill = new SolidColorBrush(Color.FromArgb(255, 50, 30, 30));
+                CurveCanvas.Children.Add(backGroundRect);
 
-                Line line = new Line();
-                line.X1 = 0;
-                line.X2 = w;
-                line.Y1 = line.Y2 = h / 2;
-                line.Stroke = Brushes.Blue;
-                ShiftCanvas.Children.Add(line);
+                {
+                    Line line = new Line();
+                    line.X1 = 10;
+                    line.X2 = 10 + w;
+                    line.Y1 = 10 + h;
+                    line.Y2 = 10;
+                    line.Stroke = new SolidColorBrush(Color.FromArgb(255, 30, 30, 30));
+                    CurveCanvas.Children.Add(line);
+                }
+                {
+                    Line line = new Line();
+                    line.X1 = 10;
+                    line.X2 = 10 + w;
+                    line.Y1 = 10 + h/2;
+                    line.Y2 = 10 + h/2;
+                    line.Stroke = new SolidColorBrush(Color.FromArgb(255, 30, 30, 30));
+                    CurveCanvas.Children.Add(line);
+                }
 
                 for (int i = 0; i < 32; i++)
                 {
-                    shiftTable.Add(0);
                     if (i == 31) break;
 
                     Line shiftLine = new Line();
                     shiftLine.Stroke = new SolidColorBrush(Color.FromArgb(255, 130, 192, 255));
-                    ShiftCanvas.Children.Add(shiftLine);
+                    CurveCanvas.Children.Add(shiftLine);
                 }
             }
             string[] ports = SerialPort.GetPortNames();
@@ -274,6 +534,9 @@ namespace MyAfuueCreator
              * 0xA7 SET BREATH SENSITIVITY
              * 0xAA SET WAVE A DATA
              * 0xAB SET WAVE B DATA
+             * 0xAC SET TONE SHIFT CURVE TABLE
+             * 0xAD SET NOISECURVE TABLE
+             * 0xAE SET PITCH CURVE TABLE
              * 
              * 0xB1 GET TONE NUMBER
              * 0xB2 GET TRANSPOSE
@@ -284,6 +547,9 @@ namespace MyAfuueCreator
              * 0xB7 GET BREATH SENSITIVITY
              * 0xBA GET WAVE A DATA
              * 0xBB GET WAVE B DATA
+             * 0xBC GET TONE SHIFT CURVE TABLE
+             * 0xBD GET NOISECURVE TABLE
+             * 0xBE GET PITCH CURVE TABLE
              * 
              * 0xC1 RESPONSE TONE NUMBER
              * 0xC2 RESPONSE TRANSPOSE
@@ -294,6 +560,9 @@ namespace MyAfuueCreator
              * 0xC7 RESPONSE BREATH SENSITIVITY
              * 0xCA RESPONSE WAVE A DATA
              * 0xCB RESPONSE WAVE B DATA
+             * 0xBC RESPONSE TONE SHIFT CURVE TABLE
+             * 0xBD RESPONSE NOISECURVE TABLE
+             * 0xBE RESPONSE PITCH CURVE TABLE
              * 
              * 0xE1 STORE CONFIGS
              * 
@@ -310,29 +579,40 @@ namespace MyAfuueCreator
                 case 0xA1: // SET TONE NUMBER
                 case 0xC1: // RESPONSE TONE NUMBER
                     {
-                        int data = receiveBuffer[1];
+                        int tno = receiveBuffer[1];
+                        int vol0 = receiveBuffer[2];
+                        int vol1 = receiveBuffer[3];
+                        int vol2 = receiveBuffer[4];
                         this.Dispatcher.Invoke((Action)(() =>
                         {
-                            ToneComboBox.SelectedIndex = data;
+                            saveData.GlobalSetting.ToneNo = (Byte)tno;
+                            ToneComboBox.SelectedIndex = tno;
+                            CheckBoxEnableChordPlay.IsChecked = (vol1 > 0) || (vol2 > 0);
+                            RemoveFirstCommand();
                         }));
                     }
                     break;
                 case 0xA2: // SET TRANSPOSE
                 case 0xC2: // RESPONSE TRANSPOSE
                     {
-                        int data = ChangeSigned(receiveBuffer[1]);
+                        int tno = receiveBuffer[1];
+                        int data = ChangeSigned(receiveBuffer[2]);
                         this.Dispatcher.Invoke((Action)(() =>
                         {
+                            saveData.ToneSettings[tno].Transpose = (SByte)data;
                             TransposeComboBox.SelectedIndex = data + 12;
+                            RemoveFirstCommand();
                         }));
                     }
                     break;
                 case 0xA3: // SET FINE TUNE
                 case 0xC3: // RESPONSE FINE TUNE
                     {
-                        int data = ChangeSigned(receiveBuffer[1]);
+                        int tno = receiveBuffer[1];
+                        int data = ChangeSigned(receiveBuffer[2]);
                         this.Dispatcher.Invoke((Action)(() =>
                         {
+                            saveData.ToneSettings[tno].FineTune = (SByte)data;
                             string t = (data + 440).ToString();
                             int i = 0;
                             foreach (var item in TuneComboBox.Items)
@@ -345,46 +625,84 @@ namespace MyAfuueCreator
                                 }
                                 i++;
                             }
+                            RemoveFirstCommand();
                         }));
                     }
                     break;
                 case 0xA4: // SET REVERB LEVEL
                 case 0xC4: // RESPONSE REVERB LEVEL
                     {
-                        int data = ChangeSigned(receiveBuffer[1]);
+                        int tno = receiveBuffer[1];
+                        int data = ChangeSigned(receiveBuffer[2]);
                         this.Dispatcher.Invoke((Action)(() =>
                         {
+                            saveData.ToneSettings[tno].Reverb = (Byte)data;
                             ReverbLevelSlider.Value = data;
+                            RemoveFirstCommand();
                         }));
                     }
                     break;
                 case 0xA5: // SET PORTAMENT LEVEL
                 case 0xC5: // RESPONSE PORTAMENT LEVEL
                     {
-                        int data = ChangeSigned(receiveBuffer[1]);
+                        int tno = receiveBuffer[1];
+                        int data = ChangeSigned(receiveBuffer[2]);
                         this.Dispatcher.Invoke((Action)(() =>
                         {
+                            saveData.ToneSettings[tno].Portamento = (Byte)data;
                             PortamentoLevelSlider.Value = data;
+                            RemoveFirstCommand();
                         }));
                     }
                     break;
                 case 0xA6: // SET KEY SENSITIVITY
                 case 0xC6: // RESPONSE KEY SENSITIVITY
                     {
-                        int data = ChangeSigned(receiveBuffer[1]);
+                        int tno = receiveBuffer[1];
+                        int data = ChangeSigned(receiveBuffer[2]);
                         this.Dispatcher.Invoke((Action)(() =>
                         {
+                            saveData.ToneSettings[tno].KeySense = (Byte)data;
                             KeySensitivityLevelSlider.Value = data;
+                            RemoveFirstCommand();
                         }));
                     }
                     break;
                 case 0xA7: // SET BREATH SENSITIVITY
                 case 0xC7: // RESPONSE BREATH SENSITIVITY
                     {
-                        int data = ChangeSigned(receiveBuffer[1]);
+                        int tno = receiveBuffer[1];
+                        int data = ChangeSigned(receiveBuffer[2]);
                         this.Dispatcher.Invoke((Action)(() =>
                         {
+                            saveData.ToneSettings[tno].BreathSense = (Byte)data;
                             BreathSensitivityLevelSlider.Value = data;
+                            RemoveFirstCommand();
+                        }));
+                    }
+                    break;
+                case 0xA8: // SET METRONOME
+                case 0xC8: // RESPONSE METRONOME
+                    {
+                        Byte enabled = receiveBuffer[1];
+                        Byte mode = receiveBuffer[2];
+                        Byte vol = receiveBuffer[3];
+                        int d0 = receiveBuffer[4];
+                        int d1 = receiveBuffer[5];
+                        this.Dispatcher.Invoke((Action)(() =>
+                        {
+                            CheckBoxMetronomeEnable.IsChecked = (enabled == 1);
+                            saveData.GlobalSetting.Metronome_m = mode;
+                            saveData.GlobalSetting.Metronome_v = vol;
+                            int tempo = d0 | (d1 << 7);
+                            saveData.GlobalSetting.Metronome_t = tempo;
+                            RadioButtonMetronomeSimple.IsChecked = (mode == 1);
+                            RadioButtonMetronome2Beats.IsChecked = (mode == 2);
+                            RadioButtonMetronome3Beats.IsChecked = (mode == 3);
+                            RadioButtonMetronome4Beats.IsChecked = (mode == 4);
+                            MetronomeVolumeSlider.Value = vol;
+                            MetronomeTempoSlider.Value = tempo;
+                            RemoveFirstCommand();
                         }));
                     }
                     break;
@@ -393,36 +711,86 @@ namespace MyAfuueCreator
                 case 0xAB: // SET WAVE B DATA
                 case 0xCB: // RESPONSE WAVE B DATA
                     if (receivePos >= 256) {
-                        int offset = 0;
+                        int tno = receiveBuffer[1];
+                        bool isWaveB = false;
                         if ((command & 0x0F) == 0x0B)
                         {
-                            offset = 256;
+                            isWaveB = true;
                         }
                         for (int i = 0; i < 256; i++)
                         {
-                            int d0 = receiveBuffer[1 + i * 2];
-                            int d1 = receiveBuffer[1 + i * 2 + 1];
+                            int d0 = receiveBuffer[2 + i * 2];
+                            int d1 = receiveBuffer[2 + i * 2 + 1];
                             int data = (d0 << 2) | (d1 << 9);
                             if (data >= 0x8000)
                             {
                                 data = data - 0x10000;
                             }
-                            wavePoints[i + offset] = data / 32767.0;
+                            if (isWaveB == false)
+                            {
+                                saveData.ToneSettings[tno].WaveA[i] = (Int16)data;
+                            } else
+                            {
+                                saveData.ToneSettings[tno].WaveB[i] = (Int16)data;
+                            }
                         }
+                        RemoveFirstCommand();
                     }
                     break;
-                case 0xAC: // SET SHIFT TABLE
-                case 0xCC: // RESPONSE SHIFT TABLE
+                case 0xAC: // SET TONE SHIFT CURVE TABLE
+                case 0xCC: // RESPONSE TONE SHIFT CURVE TABLE
+                case 0xAD: // SET NOISE CURVE TABLE
+                case 0xCD: // RESPONSE NOISE CURVE TABLE
+                case 0xAE: // SET PITCH CURVE TABLE
+                case 0xCE: // RESPONSE PITCH CURVE TABLE
                     if (receivePos >= 32)
                     {
+                        int tno = receiveBuffer[1];
                         for (int i = 0; i < 32; i++)
                         {
-                            shiftTable[i] = receiveBuffer[1 + i] / 127.0;
+                            if ((command & 0x0F) == 0x0C)
+                            {
+                                saveData.ToneSettings[tno].ShiftTable[i] = receiveBuffer[2 + i];
+                            }
+                            else if ((command & 0x0F) == 0x0D)
+                            {
+                                saveData.ToneSettings[tno].NoiseTable[i] = receiveBuffer[2 + i];
+                            }
+                            else if ((command & 0x0F) == 0x0E)
+                            {
+                                saveData.ToneSettings[tno].PitchTable[i] = receiveBuffer[2 + i];
+                            }
+                        }
+                        RemoveFirstCommand();
+                    }
+                    break;
+                case 0xF1: // GET VERSION
+                    {
+                        int ver = receiveBuffer[1];
+                        int protocol = receiveBuffer[2];
+                        if ((ver == 0x15) && (protocol == 0x01))
+                        {
+                            this.Dispatcher.Invoke((Action)(() =>
+                            {
+                                CheckLabel.Visibility = Visibility.Collapsed;
+                                RemoveFirstCommand();
+                            }));
                         }
                     }
                     break;
                 case 0xFE: // COMMAND ACK
-                    WriteLog("(ACK)");
+                    {
+                        WriteLog("(ACK)");
+                        var firstCommand = commandQueue.First();
+                        bool sended = firstCommand.sended;
+                        Action ackAction = firstCommand.ackAction;
+                        RemoveFirstCommand();
+
+                        if ((sended == true) && (ackAction != null))
+                        {
+                            ackAction();
+                        }
+                    }
                     break;
             }
             stopViewChangedEvent = false;
@@ -481,99 +849,121 @@ namespace MyAfuueCreator
         }
 
         //------------------
-        private void GetToneNumber()
+        private SerialCommand GetToneNumber()
         {
-            if (serialPort.IsOpen == false) return;
+            if (serialPort.IsOpen == false) return null;
 
-            byte[] buff = new byte[256];
-            buff[0] = 0xB1; // GET TONE NUMBER
-            buff[1] = 0xFF;
-            serialPort.Write(buff, 0, 2);
-
-            WriteLog("send get toneNo");
+            WriteLog("send get tone number");
+            return AddCommandQueue(0xB1); // GET TONE NUMBER
         }
 
         //------------------
-        private void SendToneNumber()
+        private void SendToneNumber(int toneNo)
         {
             if (serialPort.IsOpen == false) return;
 
-            byte[] buff = new byte[256];
-            buff[0] = 0xA1; // SET TONE NUMBER
-            buff[1] = (byte)(ToneComboBox.SelectedIndex);
-            buff[2] = 0xFF;
-            serialPort.Write(buff, 0, 3);
-
-            WriteLog("send set toneNo");
+            WriteLog("send set tone number");
+            Byte vol0 = 127;
+            Byte vol1 = 0;
+            Byte vol2 = 0;
+            if (CheckBoxEnableChordPlay.IsChecked == true)
+            {
+                vol0 = vol1 = vol2 = 64;
+            }
+            AddCommandQueue(0xA1, (Byte)toneNo, vol0, vol1, vol2);  // SET TONE NUMBER
         }
 
         //------------------
-        private void SendAllToneData()
+        private SerialCommand GetGlobalSettings()
+        {
+            if (serialPort.IsOpen == false) return null;
+
+            WriteLog("send get global settings");
+            return AddCommandQueue(0xB8); // GET METRONOME
+        }
+
+        //------------------
+        private void SendGlobalSettings()
         {
             if (serialPort.IsOpen == false) return;
 
-            byte[] buff = new byte[256];
-            buff[0] = 0xA1; // SET TONE NUMBER
-            buff[1] = (byte)(ToneComboBox.SelectedIndex);
-            buff[2] = 0xA2; // SET TRANSPOSE
-            buff[3] = (byte)ChangeUnsigned(TransposeComboBox.SelectedIndex - 12);
-            buff[4] = 0xA3; // SET FINE TUNE
-            Label label = TuneComboBox.SelectedItem as Label;
-            string[] tunestr = (label.Content as string).Split(' ');
-            int tune = int.Parse(tunestr[0]) - 440;
-            buff[5] = (byte)ChangeUnsigned(tune);
-            buff[6] = 0xA4; // SET REVERB LEVEL
-            buff[7] = (byte)ReverbLevelSlider.Value;
-            buff[8] = 0xA5; // SET PORTAMENT LEVEL
-            buff[9] = (byte)PortamentoLevelSlider.Value;
-            buff[10] = 0xA6; // SET KEY SENSITIVITY
-            buff[11] = (byte)KeySensitivityLevelSlider.Value;
-            buff[12] = 0xA7; // SET BREATH SENSITIVIY
-            buff[13] = (byte)BreathSensitivityLevelSlider.Value;
-            buff[14] = 0xFF;
-            serialPort.Write(buff, 0, 15);
+            WriteLog("send set global settings");
+            int tempo = saveData.GlobalSetting.Metronome_t;
+            byte[] data = new byte[5];
+            data[0] = 0;
+            if (CheckBoxMetronomeEnable.IsChecked == true)
+            {
+                data[0] = 1;
+            }
+            data[1] = (Byte)saveData.GlobalSetting.Metronome_m;
+            data[2] = (Byte)saveData.GlobalSetting.Metronome_v;
+            data[3] = (Byte)(tempo & 0x7F);
+            data[4] = (Byte)((tempo >> 7) & 0x7F);
+            AddCommandQueue(0xA8, data); // SET METRONOME
+        }
 
+        //------------------
+        private void SendToneData(int toneNo)
+        {
+            if (serialPort.IsOpen == false) return;
+
+            var ts = saveData.ToneSettings[toneNo];
             WriteLog("send set all");
-        }
-        //------------------
-        private void GetAllToneData()
-        {
-            if (serialPort.IsOpen == false) return;
+            AddCommandQueue(0xA2, (Byte)toneNo, (Byte)ChangeUnsigned(ts.Transpose)); // SET TRANSPOSE
+            AddCommandQueue(0xA3, (Byte)toneNo, (Byte)ChangeUnsigned(ts.FineTune)); // SET FINE TUNE
+            AddCommandQueue(0xA4, (Byte)toneNo, (Byte)ts.Reverb); // SET REVERB LEVEL
+            AddCommandQueue(0xA5, (Byte)toneNo, (Byte)ts.Portamento); // SET PORTAMENTO LEVEL
+            AddCommandQueue(0xA6, (Byte)toneNo, (Byte)ts.KeySense); // SET KEY SENSITIVITY
+            AddCommandQueue(0xA7, (Byte)toneNo, (Byte)ts.BreathSense); // SET BREATH SENSITIVIY
 
-            byte[] buff = new byte[256];
-            buff[0] = 0xB1; // GET TONE NUMBER
-            buff[1] = 0xB2; // GET TRANSPOSE
-            buff[2] = 0xB3; // GET FINE TUNE
-            buff[3] = 0xB4; // GET REVERB LEVEL
-            buff[4] = 0xB5; // GET PORTAMENT LEVEL
-            buff[5] = 0xB6; // GET KEY SENSITIVITY
-            buff[6] = 0xB7; // GET BREATH SENSITIVIY
-            buff[7] = 0xBA; // GET WAVE A DATA
-            buff[8] = 0xBB; // GET WAVE B DATA
-            buff[9] = 0xBC; // GET SHIFT TABLE
-            buff[10] = 0xFF;
-            serialPort.Write(buff, 0, 11);
+            SendWaveData(toneNo, false);
+            SendWaveData(toneNo, true);
+
+            SendCurveTable(toneNo, 0);
+            SendCurveTable(toneNo, 1);
+            SendCurveTable(toneNo, 2);
+        }
+
+        //------------------
+        private SerialCommand GetToneData(int toneNo)
+        {
+            if (serialPort.IsOpen == false) return null;
 
             WriteLog("send get all");
+            AddCommandQueue(0xB2, (Byte)toneNo); // GET TRANSPOSE
+            AddCommandQueue(0xB3, (Byte)toneNo); // GET FINE TUNE
+            AddCommandQueue(0xB4, (Byte)toneNo); // GET REVERB LEVEL
+            AddCommandQueue(0xB5, (Byte)toneNo); // GET PORTAMENT LEVEL
+            AddCommandQueue(0xB6, (Byte)toneNo); // GET KEY SENSITIVITY
+            AddCommandQueue(0xB7, (Byte)toneNo); // GET BREATH SENSITIVIY
+
+            AddCommandQueue(0xBA, (Byte)toneNo); // GET WAVE A DATA
+            AddCommandQueue(0xBB, (Byte)toneNo); // GET WAVE B DATA
+            AddCommandQueue(0xBC, (Byte)toneNo); // GET SHIFT TABLE
+            AddCommandQueue(0xBD, (Byte)toneNo); // GET NOISE TABLE
+            return AddCommandQueue(0xBE, (Byte)toneNo); // GET PITCH TABLE
         }
 
         //------------------
-        private void SendWaveData()
+        private void SendWaveData(int toneNo, bool isWaveB)
         {
             if (serialPort.IsOpen == false) return;
 
-            byte[] buff = new byte[600];
-            buff[0] = 0xAA; // SET WAVE A DATA
-            int offset = 0;
-            if ((bool)RadioButtonWaveB.IsChecked)
-            {
-                offset = 256;
-            }
+            var ts = saveData.ToneSettings[toneNo];
+
+            byte[] buff = new byte[513];
+            buff[0] = (Byte)toneNo;
             for (int i = 0; i < 256; i++)
             {
-                int data = (int)(32767 * wavePoints[i + offset]);
-                if (data < -32767) data = -32767;
-                if (data > 32767) data = 32767;
+                int data = 0;
+                if (isWaveB == false)
+                {
+                    data = ts.WaveA[i];
+                }
+                else
+                {
+                    data = ts.WaveB[i];
+                }
                 if (data < 0)
                 {
                     data = 0x10000 + data;
@@ -583,22 +973,47 @@ namespace MyAfuueCreator
                 buff[1 + i * 2] = (byte)(d0);
                 buff[1 + i * 2 + 1] = (byte)(d1);
             }
-            buff[513] = 0xFF;
-            serialPort.Write(buff, 0, 514);
 
-            WriteLog("send set wave data");
+            if (isWaveB == false)
+            {
+                WriteLog("send set wave a data");
+                AddCommandQueue(0xAA, buff); // SET WAVE A DATA
+            }
+            else
+            {
+                WriteLog("send set wave b data");
+                AddCommandQueue(0xAB, buff); // SET WAVE B DATA
+            }
         }
 
         //------------------
-        private void SendShiftTable()
+        private void SendCurveTable(int toneNo, int mode)
         {
             if (serialPort.IsOpen == false) return;
 
-            byte[] buff = new byte[600];
-            buff[0] = 0xAC; // SET SHIFT TABLE
+            bool isToneShiftCurve = (mode == 0);
+            bool isNoiseCurve = (mode == 1);
+            bool isPitchCurve = (mode == 2);
+
+            var ts = saveData.ToneSettings[toneNo];
+
+            byte[] buff = new byte[33];
+            buff[0] = (byte)toneNo;
             for (int i = 0; i < 32; i++)
             {
-                int data = (int)(127 * shiftTable[i]);
+                int data = 0;
+                if (isToneShiftCurve)
+                {
+                    data = (int)(ts.ShiftTable[i]);
+                }
+                else if (isNoiseCurve)
+                {
+                    data = (int)(ts.NoiseTable[i]);
+                }
+                else if (isPitchCurve)
+                {
+                    data = (int)(ts.PitchTable[i]);
+                }
                 if (data > 127) data = 127;
                 if (data < 0)
                 {
@@ -606,34 +1021,47 @@ namespace MyAfuueCreator
                 }
                 buff[1 + i] = (byte)(data);
             }
-            buff[33] = 0xFF;
-            serialPort.Write(buff, 0, 34);
 
-            WriteLog("send shift table");
+            if (isToneShiftCurve)
+            {
+                WriteLog("send shift table");
+                AddCommandQueue(0xAC, buff); // SET SHIFT TABLE
+            }
+            else if (isNoiseCurve)
+            {
+                WriteLog("send noise table");
+                AddCommandQueue(0xAD, buff); // SET NOISE TABLE
+            }
+            else if (isPitchCurve)
+            {
+                WriteLog("send pitch table");
+                AddCommandQueue(0xAE, buff); // SET PITCH TABLE
+            }
         }
 
         //------------------
         private void WriteButton_Click(object sender, RoutedEventArgs e)
         {
-            byte[] buff = new byte[4];
-            buff[0] = 0xE1;
-            buff[1] = 0x7F;
-            buff[2] = 0xFF;
-            serialPort.Write(buff, 0, 3);
+            if (serialPort.IsOpen == false) return;
+
+            WriteLog("send flash write");
+            AddCommandQueue(0xE1, 0x7F);    // WRITE TO FLASH
         }
 
         //------------------
         private void ToneComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (serialPort.IsOpen == false) return;
             if (stopViewChangedEvent) return;
-            SendToneNumber();
-            System.Threading.Thread.Sleep(500);
-            GetAllToneData();
+            saveData.GlobalSetting.ToneNo = (Byte)ToneComboBox.SelectedIndex;
+            SendToneNumber(saveData.GlobalSetting.ToneNo);
+            GetToneData(saveData.GlobalSetting.ToneNo);
         }
 
         //------------------
-        private void ToneValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        private void SliderValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
+            if (serialPort.IsOpen == false) return;
             if (stopViewChangedEvent) return;
             if (sender == ReverbLevelSlider)
             {
@@ -654,10 +1082,28 @@ namespace MyAfuueCreator
         }
 
         //------------------
-        private void ToneValueChanged2(object sender, SelectionChangedEventArgs e)
+        private void ComboBoxChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (serialPort.IsOpen == false) return;
             if (stopViewChangedEvent) return;
-            SendAllToneData();
+
+            byte[] buff = new Byte[256];
+            if (sender == TransposeComboBox)
+            {
+                WriteLog("send set transpose");
+                int data = TransposeComboBox.SelectedIndex - 12;
+                saveData.ToneSettings[saveData.GlobalSetting.ToneNo].Transpose = (SByte)data;
+                AddCommandQueue(0xA2, (Byte)saveData.GlobalSetting.ToneNo, (Byte)ChangeUnsigned(data)); // SET TRANSPOSE
+            }
+            if (sender == TuneComboBox)
+            {
+                WriteLog("send set finetune");
+                Label label = TuneComboBox.SelectedItem as Label;
+                string[] tunestr = (label.Content as string).Split(' ');
+                int tune = int.Parse(tunestr[0]) - 440;
+                saveData.ToneSettings[saveData.GlobalSetting.ToneNo].FineTune = (SByte)tune;
+                AddCommandQueue(0xA3, (Byte)saveData.GlobalSetting.ToneNo, (Byte)ChangeUnsigned(tune)); // SET FINE TUNE
+            }
         }
 
         private Point? waveCanvasMousePoint = null;
@@ -673,6 +1119,7 @@ namespace MyAfuueCreator
         {
             if (waveCanvasMousePoint == null) return;
 
+            bool isWaveB = (bool)RadioButtonWaveB.IsChecked;
             double w = WaveCanvas.ActualWidth;
             double h = WaveCanvas.ActualHeight;
 
@@ -682,11 +1129,6 @@ namespace MyAfuueCreator
             double dx = p.X - mx;
             double dy = p.Y - my;
 
-            int offset = 0;
-            if ((bool)RadioButtonWaveB.IsChecked)
-            {
-                offset = 256;
-            }
             for (int i = 0; i < 256; i++)
             {
                 double x = i * w / 256.0;
@@ -695,7 +1137,13 @@ namespace MyAfuueCreator
                     double v = -((my + (dy * i) / 256) - h / 2) / 127.0;
                     if (v > 1.0) v = 1.0;
                     if (v < -1.0) v = -1.0;
-                    wavePoints[i + offset] = v;
+                    if (isWaveB == false)
+                    {
+                        saveData.ToneSettings[saveData.GlobalSetting.ToneNo].WaveA[i] = (Int16)(v * 32767);
+                    } else
+                    {
+                        saveData.ToneSettings[saveData.GlobalSetting.ToneNo].WaveB[i] = (Int16)(v * 32767);
+                    }
                 }
             }
             waveCanvasMousePoint = p;
@@ -706,28 +1154,30 @@ namespace MyAfuueCreator
         {
             waveCanvasMousePoint = null;
             WaveCanvas.ReleaseMouseCapture();
-            SendWaveData();
+            SendWaveData(saveData.GlobalSetting.ToneNo, (bool)RadioButtonWaveB.IsChecked);
         }
 
-        private Point? shiftCanvasMousePoint = null;
+        private Point? curveCanvasMousePoint = null;
         //------------------
         private void ShiftCanvas_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            shiftCanvasMousePoint = e.GetPosition(ShiftCanvas);
-            ShiftCanvas.CaptureMouse();
+            curveCanvasMousePoint = e.GetPosition(CurveCanvas);
+            CurveCanvas.CaptureMouse();
         }
 
         //------------------
         private void ShiftCanvas_MouseMove(object sender, MouseEventArgs e)
         {
-            if (shiftCanvasMousePoint == null) return;
+            if (curveCanvasMousePoint == null) return;
 
-            double w = ShiftCanvas.ActualWidth;
-            double h = ShiftCanvas.ActualHeight;
+            double w = CurveCanvas.ActualWidth;
+            double h = CurveCanvas.ActualHeight;
 
-            Point p = e.GetPosition(ShiftCanvas);
-            double mx = ((Point)shiftCanvasMousePoint).X;
-            double my = ((Point)shiftCanvasMousePoint).Y;
+            Point p = e.GetPosition(CurveCanvas);
+            p.X -= 10;
+            p.Y -= 10;
+            double mx = ((Point)curveCanvasMousePoint).X;
+            double my = ((Point)curveCanvasMousePoint).Y;
             double dx = p.X - mx;
             double dy = p.Y - my;
 
@@ -739,100 +1189,232 @@ namespace MyAfuueCreator
                     double v = (256.0 - p.Y) / 256.0;
                     if (v < 0.0) v = 0.0;
                     if (v > 1.0) v = 1.0;
-                    shiftTable[i] = v;
+                    if (RadioButtonToneShift.IsChecked == true)
+                    {
+                        saveData.ToneSettings[saveData.GlobalSetting.ToneNo].ShiftTable[i] = (Byte)(127 * v);
+                    }
+                    if (RadioButtonNoise.IsChecked == true)
+                    {
+                        saveData.ToneSettings[saveData.GlobalSetting.ToneNo].NoiseTable[i] = (Byte)(127 * v);
+                    }
+                    if (RadioButtonPitch.IsChecked == true)
+                    {
+                        saveData.ToneSettings[saveData.GlobalSetting.ToneNo].PitchTable[i] = (Byte)(127 * v);
+                    }
                 }
             }
-            shiftCanvasMousePoint = p;
+            curveCanvasMousePoint = p;
         }
 
         //------------------
         private void ShiftCanvas_MouseUp(object sender, MouseButtonEventArgs e)
         {
-            shiftCanvasMousePoint = null;
-            ShiftCanvas.ReleaseMouseCapture();
-            SendShiftTable();
-        }
-
-        //------------------
-        private void RebootButton_Click(object sender, RoutedEventArgs e)
-        {
-            byte[] buff = new byte[4];
-            buff[0] = 0xEE;
-            buff[1] = 0x7F;
-            buff[2] = 0xFF;
-            serialPort.Write(buff, 0, 3);
-            //System.Threading.Thread.Sleep(3000);
-            //Connect();
+            curveCanvasMousePoint = null;
+            CurveCanvas.ReleaseMouseCapture();
+            int toneNo = saveData.GlobalSetting.ToneNo;
+            if ((bool)RadioButtonToneShift.IsChecked)
+            {
+                SendCurveTable(toneNo, 0);
+            }
+            if ((bool)RadioButtonNoise.IsChecked)
+            {
+                SendCurveTable(toneNo, 1);
+            }
+            if ((bool)RadioButtonPitch.IsChecked)
+            {
+                SendCurveTable(toneNo, 2);
+            }
         }
 
         //------------------
         private void Slider_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            stopSendChangeEvent = true;
         }
 
         //------------------
         private void Slider_MouseUp(object sender, MouseButtonEventArgs e)
         {
-            stopSendChangeEvent = false;
             if (serialPort.IsOpen == false) return;
 
-            if (reqSendChangeEvent == "Reverb")
-            {
-                byte[] buff = new byte[256];
-                buff[0] = 0xA4; // SET REVERB LEVEL
-                buff[1] = (byte)ReverbLevelSlider.Value;
-                buff[2] = 0xFF;
-                serialPort.Write(buff, 0, 3);
-            }
-            if (reqSendChangeEvent == "Portamento")
-            {
-                byte[] buff = new byte[256];
-                buff[0] = 0xA5; // SET PORTAMENT LEVEL
-                buff[1] = (byte)PortamentoLevelSlider.Value;
-                buff[2] = 0xFF;
-                serialPort.Write(buff, 0, 3);
-            }
-            if (reqSendChangeEvent == "KeySense")
-            {
-                byte[] buff = new byte[256];
-                buff[0] = 0xA6; // SET KEY SENSITIVITY
-                buff[1] = (byte)KeySensitivityLevelSlider.Value;
-                buff[2] = 0xFF;
-                serialPort.Write(buff, 0, 3);
-            }
-            if (reqSendChangeEvent == "BreathSense")
-            {
-                byte[] buff = new byte[256];
-                buff[0] = 0xA7; // SET BREATH SENSITIVIY
-                buff[1] = (byte)BreathSensitivityLevelSlider.Value;
-                buff[2] = 0xFF;
-                serialPort.Write(buff, 0, 3);
-            }
             if (reqSendChangeEvent != "")
             {
                 WriteLog("send " + reqSendChangeEvent);
             }
+            int tno = saveData.GlobalSetting.ToneNo;
+            if (reqSendChangeEvent == "Reverb")
+            {
+                saveData.ToneSettings[saveData.GlobalSetting.ToneNo].Reverb = (Byte)ReverbLevelSlider.Value;
+                AddCommandQueue(0xA4, (Byte)tno, (Byte)ReverbLevelSlider.Value); // SET REVERB LEVEL
+            }
+            if (reqSendChangeEvent == "Portamento")
+            {
+                saveData.ToneSettings[saveData.GlobalSetting.ToneNo].Portamento = (Byte)PortamentoLevelSlider.Value;
+                AddCommandQueue(0xA5, (Byte)tno, (Byte)PortamentoLevelSlider.Value); // SET PORTAMENT LEVEL
+            }
+            if (reqSendChangeEvent == "KeySense")
+            {
+                saveData.ToneSettings[saveData.GlobalSetting.ToneNo].KeySense = (Byte)KeySensitivityLevelSlider.Value;
+                AddCommandQueue(0xA6, (Byte)tno, (Byte)KeySensitivityLevelSlider.Value); // SET KEY SENSITIVITY
+            }
+            if (reqSendChangeEvent == "BreathSense")
+            {
+                saveData.ToneSettings[saveData.GlobalSetting.ToneNo].BreathSense = (Byte)BreathSensitivityLevelSlider.Value;
+                AddCommandQueue(0xA7, (Byte)tno, (Byte)BreathSensitivityLevelSlider.Value); // SET BREATH SENSITIVIY
+            }
             reqSendChangeEvent = "";
         }
 
-        private void Button_Click(object sender, RoutedEventArgs e)
+        //------------------
+        private void SynchronizeAfuueAll()
+        {
+            GetGlobalSettings();
+            for (int i = 1; i < 5; i++)
+            {
+                GetToneData(i);
+            }
+            SendToneNumber(0);
+            GetToneNumber();
+            GetToneData(0);
+        }
+
+        //------------------
+        private void RebootButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (serialPort.IsOpen == false) return;
+
+            var command = AddCommandQueue(0xEE, 0x7F);    // REBOOT
+
+            command.ackAction = new Action(() => {
+                WriteLog("reboot");
+                WriteLog("wait 10 seconds ...");
+                System.Threading.Thread.Sleep(7000);
+
+                this.Dispatcher.Invoke((Action)(() =>
+                {
+                    SynchronizeAfuueAll();
+                }));
+            });
+        }
+
+        //------------------
+        private void FactoryResetButton_Click(object sender, RoutedEventArgs e)
         {
             // Are you sure?
 
             if (serialPort.IsOpen == false) return;
 
-            byte[] buff = new byte[256];
-            buff[0] = 0xEE; // RESET
-            buff[1] = 0x7A;
-            buff[2] = 0x3C;
-            buff[3] = 0xFF;
-            serialPort.Write(buff, 0, 4);
-            WriteLog("factory reset");
+            var command = AddCommandQueue(0xEE, 0x7A, 0x3C);
 
-            System.Threading.Thread.Sleep(5000);
+            command.ackAction = new Action(() => {
+                WriteLog("factory reset");
+                WriteLog("wait 10 seconds ...");
+                System.Threading.Thread.Sleep(7000);
 
-            GetAllToneData();
+                this.Dispatcher.Invoke((Action)(() =>
+                {
+                    SynchronizeAfuueAll();
+                }));
+            });
+        }
+
+        //------------------
+        private void LogClearButton_Click(object sender, RoutedEventArgs e)
+        {
+            LogTextBox.Clear();
+        }
+
+        //------------------
+        private void MenuItemOpen_Click(object sender, RoutedEventArgs e)
+        {
+            Microsoft.Win32.OpenFileDialog openFileDialog = new Microsoft.Win32.OpenFileDialog();
+            openFileDialog.DefaultExt = ".afux";
+            var ret = openFileDialog.ShowDialog();
+
+            if (ret == true)
+            {
+                System.Xml.Serialization.XmlSerializer ser = new System.Xml.Serialization.XmlSerializer(typeof(SaveData));
+                using (var sr = new System.IO.StreamReader(openFileDialog.FileName, Encoding.UTF8))
+                {
+                    saveData = (SaveData)ser.Deserialize(sr);
+                    sr.Close();
+                }
+
+                for (int i = 0; i < 5; i++)
+                {
+                    SendToneData(i);
+                }
+
+                SendToneNumber(0);
+                GetToneNumber();
+                GetToneData(0);
+            }
+        }
+
+        //------------------
+        private void MenuItemSaveAs_Click(object sender, RoutedEventArgs e)
+        {
+            Microsoft.Win32.SaveFileDialog saveFileDialog = new Microsoft.Win32.SaveFileDialog();
+            saveFileDialog.DefaultExt = ".afux";
+            var ret = saveFileDialog.ShowDialog();
+
+            if (ret == true)
+            {
+                System.Xml.Serialization.XmlSerializer ser = new System.Xml.Serialization.XmlSerializer(typeof(SaveData));
+                using (var sw = new System.IO.StreamWriter(saveFileDialog.FileName, false, Encoding.UTF8))
+                {
+                    ser.Serialize(sw, saveData);
+                    sw.Close();
+                }
+            }
+        }
+
+        //------------------
+        private void MetronomeVolumeSlider_MouseUp(object sender, MouseButtonEventArgs e)
+        {
+            saveData.GlobalSetting.Metronome_v = (Byte)MetronomeVolumeSlider.Value;
+            saveData.GlobalSetting.Metronome_t = (int)MetronomeTempoSlider.Value;
+            SendGlobalSettings();
+        }
+
+        //------------------
+        private void MetronomeStatusChanged(object sender, RoutedEventArgs e)
+        {
+            if (RadioButtonMetronomeSimple.IsChecked == true)
+            {
+                saveData.GlobalSetting.Metronome_m = 1;
+            }
+            if (RadioButtonMetronome2Beats.IsChecked == true)
+            {
+                saveData.GlobalSetting.Metronome_m = 2;
+            }
+            if (RadioButtonMetronome3Beats.IsChecked == true)
+            {
+                saveData.GlobalSetting.Metronome_m = 3;
+            }
+            if (RadioButtonMetronome4Beats.IsChecked == true)
+            {
+                saveData.GlobalSetting.Metronome_m = 4;
+            }
+            SendGlobalSettings();
+        }
+
+        //------------------
+        private void CheckVersion()
+        {
+            AddCommandQueue(0xF1);
+        }
+
+        //------------------
+        private void CheckBoxEnableChordPlay_Click(object sender, RoutedEventArgs e)
+        {
+            SendToneNumber(saveData.GlobalSetting.ToneNo);
+        }
+
+        //------------------
+        private void MenuItemShowFingeringChart_Click(object sender, RoutedEventArgs e)
+        {
+            HelpWindow helpWindow = new HelpWindow();
+            helpWindow.ShowDialog();
         }
     }
 }

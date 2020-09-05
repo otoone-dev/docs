@@ -5,160 +5,218 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:MyAfuueCreator"
         mc:Ignorable="d"
-        Title="My AFUUE Creator" Width="1200" Height="660" Background="#404040" Loaded="Window_Loaded">
+        Title="My AFUUE Creator" Width="1220" Height="800" Background="#404040" Loaded="Window_Loaded">
     <Grid>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="1*"/>
-            <ColumnDefinition Width="5"/>
-            <ColumnDefinition Width="1*"/>
-            <ColumnDefinition Width="5"/>
-            <ColumnDefinition Width="546"/>
-        </Grid.ColumnDefinitions>
-        <Grid Grid.Column="0" Background="#505050">
-            <!-- Selector -->
-            <Grid.RowDefinitions>
-                <RowDefinition Height="4*"/>
-                <RowDefinition Height="30"/>
-                <RowDefinition Height="1*"/>
-            </Grid.RowDefinitions>
-            <StackPanel Grid.Row="0" Orientation="Vertical" Margin="5,5,5,5">
-                <StackPanel Orientation="Horizontal" Margin="5,0,5,0">
-                    <Button Content="Reboot AFUUE" Width="100" Margin="5, 5, 5, 5" Click="RebootButton_Click"/>
-                    <Button Content="FactoryReset" Width="100" Margin="5, 5, 5, 5" Click="Button_Click"/>
-                </StackPanel>
-                <Label Content="Commuinication Port" Foreground="White"/>
-                <ComboBox Name="SerialPortComboBox" Margin="5,0,5,0" SelectionChanged="SerialPortComboBox_SelectionChanged"/>
-                <Label Content="Current Tone" Foreground="White" Margin="0,15,0,0"/>
-                <ComboBox Name="ToneComboBox" SelectedIndex="0" Margin="5,0,5,0" SelectionChanged="ToneComboBox_SelectionChanged">
-                    <Label Content="Tone 1"/>
-                    <Label Content="Tone 2"/>
-                    <Label Content="Tone 3"/>
-                    <Label Content="Tone 4"/>
-                    <Label Content="Tone 5"/>
-                </ComboBox>
-                <Label Content="MIDI command" Foreground="White" Margin="0,15,0,0"/>
-                <StackPanel Orientation="Horizontal" Margin="15,0,0,0">
-                    <RadioButton Content="BC" Foreground="White" Margin="5,0,5,0" IsChecked="True"/>
-                    <RadioButton Content="Exp" Foreground="White" Margin="5,0,5,0"/>
-                    <RadioButton Content="Aft" Foreground="White" Margin="5,0,5,0"/>
-                    <RadioButton Content="Vol" Foreground="White" Margin="5,0,5,0"/>
-                </StackPanel>
-                <Label Content="Key Config" Foreground="White" Margin="0,15,0,0"/>
-                <Label Content="(Comming soon)" Foreground="Silver" Margin="5,0,5,0"/>
-            </StackPanel>
-            <Label Grid.Row="1" Content="Log" Foreground="Gray" Margin="5,0,5,0"/>
-            <TextBox Grid.Row="2" Name="LogTextBox" TextWrapping="NoWrap" HorizontalScrollBarVisibility="Visible" VerticalScrollBarVisibility="Visible" IsReadOnly="True" Margin="5,0,5,5" Foreground="Gray" Background="Black"/>
-        </Grid>
-        <GridSplitter Grid.Column="1"/>
-        <Grid Grid.Column="2">
-            <!-- Tone Editing -->
-            <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="25"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Menu Grid.Row="0" Background="#303030" Foreground="#C0C0C0">
+            <MenuItem Header="File(_F)">
+                <MenuItem Header="Open(_O)" Background="#303030" Foreground="#C0C0C0" Click="MenuItemOpen_Click"/>
+                <MenuItem Header="SaveAs(_A)" Background="#303030" Foreground="#C0C0C0" Click="MenuItemSaveAs_Click"/>
+            </MenuItem>
+            <MenuItem Header="Help(_H)">
+                <MenuItem Header="Show FingeringChart(_F)" Background="#303030" Foreground="#C0C0C0" Click="MenuItemShowFingeringChart_Click"/>
+            </MenuItem>
+        </Menu>
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1*"/>
+                <ColumnDefinition Width="5"/>
+                <ColumnDefinition Width="1*"/>
+                <ColumnDefinition Width="5"/>
+                <ColumnDefinition Width="566"/>
+            </Grid.ColumnDefinitions>
+            <Grid Grid.Column="0" Background="#505050">
+                <!-- Selector -->
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="50"/>
+                    <RowDefinition Height="4*"/>
+                    <RowDefinition Height="30"/>
+                    <RowDefinition Height="1*"/>
                 </Grid.RowDefinitions>
-                <StackPanel Orientation="Vertical" Margin="5,5,5,5">
-                    <Label Content="Transpose" Foreground="White"/>
-                    <ComboBox Grid.Row="0" Name="TransposeComboBox" SelectedIndex="12" Margin="5,0,5,0" SelectionChanged="ToneValueChanged2">
-                        <Label Content="-12 C-"/>
-                        <Label Content="-11 Db"/>
-                        <Label Content="-10 D"/>
-                        <Label Content="-9 / Eb"/>
-                        <Label Content="-8 / E"/>
-                        <Label Content="-7 / F"/>
-                        <Label Content="-6 / Gb"/>
-                        <Label Content="-5 / G"/>
-                        <Label Content="-4 / Ab"/>
-                        <Label Content="-3 / A"/>
-                        <Label Content="-2 / Bb"/>
-                        <Label Content="-1 / B"/>
-                        <Label Content="0 / C"/>
-                        <Label Content="+1 / Db"/>
-                        <Label Content="+2 / D"/>
-                        <Label Content="+3 / Eb"/>
-                        <Label Content="+4 / E"/>
-                        <Label Content="+5 / F"/>
-                        <Label Content="+6 / Gb"/>
-                        <Label Content="+7 / G"/>
-                        <Label Content="+8 / Ab"/>
-                        <Label Content="+9 / A"/>
-                        <Label Content="+10 / Bb"/>
-                        <Label Content="+11 / B"/>
-                        <Label Content="+12 / C+"/>
+                <StackPanel Grid.Row="0" Orientation="Vertical" Margin="5,5,5,5">
+                    <StackPanel Orientation="Horizontal" Margin="5,0,5,0">
+                        <Button Content="Reboot AFUUE" Width="100" Margin="5, 5, 5, 5" Click="RebootButton_Click"/>
+                        <Button Content="FactoryReset" Width="100" Margin="5, 5, 5, 5" Click="FactoryResetButton_Click"/>
+                        <Grid>
+                            <Label Name="SyncLabel" Content="SYNC" Background="Lime" Foreground="Black" FontWeight="Bold" Margin="5,5,5,5" Visibility="Hidden"/>
+                            <Label Name="CheckLabel" Content="CHECK" Background="YELLOW" Foreground="Black" FontWeight="Bold" Margin="5,5,5,5" Visibility="Visible"/>
+                        </Grid>
+                    </StackPanel>
+                    <Label Content="Commuinication Port" Foreground="White"/>
+                    <ComboBox Name="SerialPortComboBox" Margin="5,0,5,0" SelectionChanged="SerialPortComboBox_SelectionChanged"/>
+                    <Label Content="Current Tone" Foreground="White" Margin="0,15,0,0"/>
+                    <ComboBox Name="ToneComboBox" SelectedIndex="0" Margin="5,0,5,0" SelectionChanged="ToneComboBox_SelectionChanged">
+                        <Label Content="Tone 1"/>
+                        <Label Content="Tone 2"/>
+                        <Label Content="Tone 3"/>
+                        <Label Content="Tone 4"/>
+                        <Label Content="Tone 5"/>
                     </ComboBox>
-                    <Label Content="Fine Tune" Foreground="White" Margin="0,10,0,0"/>
-                    <ComboBox Name="TuneComboBox" SelectedIndex="6" Margin="5,0,5,0" SelectionChanged="ToneValueChanged2">
-                        <Label Content="434 Hz"/>
-                        <Label Content="435 Hz"/>
-                        <Label Content="436 Hz"/>
-                        <Label Content="437 Hz"/>
-                        <Label Content="438 Hz"/>
-                        <Label Content="439 Hz"/>
-                        <Label Content="440 Hz (default)"/>
-                        <Label Content="441 Hz"/>
-                        <Label Content="442 Hz"/>
-                        <Label Content="443 Hz"/>
-                        <Label Content="444 Hz"/>
-                        <Label Content="445 Hz"/>
-                        <Label Content="446 Hz"/>
-                    </ComboBox>
-                    <StackPanel Orientation="Horizontal">
-                        <Label Content="Reverb Level =" Foreground="White" Margin="0,10,0,0"/>
-                        <Label Content="{Binding ElementName=ReverbLevelSlider, Path=Value}" ContentStringFormat="{}{0:F0}" Foreground="White" Margin="0,10,0,0"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,15,0,0">
+                        <Label Content="Metronome " Foreground="White"/>
+                        <CheckBox VerticalAlignment="Center" Name="CheckBoxMetronomeEnable" Click="MetronomeStatusChanged"/>
                     </StackPanel>
-                    <Slider Name="ReverbLevelSlider" Height="30" Margin="5,0,5,0" Minimum="0" Maximum="20" Delay="500" ValueChanged="ToneValueChanged" PreviewMouseDown="Slider_MouseDown" PreviewMouseUp="Slider_MouseUp" />
-                    <StackPanel Orientation="Horizontal">
-                        <Label Content="Portament Level =" Foreground="White" Margin="0,10,0,0"/>
-                        <Label Content="{Binding ElementName=PortamentoLevelSlider, Path=Value}" ContentStringFormat="{}{0:F0}" Foreground="White" Margin="0,10,0,0"/>
+                    <StackPanel Margin="15,0, 15, 0">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton Name="RadioButtonMetronomeSimple" Content="Simple" Foreground="White" Margin="5,0,0,0" Click="MetronomeStatusChanged"/>
+                            <RadioButton Name="RadioButtonMetronome2Beats" Content="2-beats" Foreground="White" Margin="5,0,0,0" Click="MetronomeStatusChanged"/>
+                            <RadioButton Name="RadioButtonMetronome3Beats" Content="3-beats" Foreground="White" Margin="5,0,0,0" Click="MetronomeStatusChanged"/>
+                            <RadioButton Name="RadioButtonMetronome4Beats" Content="4-beats" Foreground="White" Margin="5,0,0,0" Click="MetronomeStatusChanged"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="Volume =" Foreground="White"/>
+                            <Label Content="{Binding ElementName=MetronomeVolumeSlider, Path=Value}" ContentStringFormat="{}{0:F0}" Foreground="White"/>
+                        </StackPanel>
+                        <Slider Name="MetronomeVolumeSlider" Minimum="0" Maximum="127" Margin="5,0, 0, 0" PreviewMouseUp="MetronomeVolumeSlider_MouseUp" SmallChange="1"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="Tempo =" Foreground="White"/>
+                            <Label Content="{Binding ElementName=MetronomeTempoSlider, Path=Value}" ContentStringFormat="{}{0:F0}" Foreground="White"/>
+                            <Label Content="BPM" Foreground="White"/>
+                        </StackPanel>
+                        <Slider Name="MetronomeTempoSlider" Minimum="40" Maximum="360" Margin="5,0,0,0" PreviewMouseUp="MetronomeVolumeSlider_MouseUp" SmallChange="1"/>
                     </StackPanel>
-                    <Slider Name="PortamentoLevelSlider" Height="30" Margin="5,0,5,0" Minimum="0" Maximum="20" Delay="500" ValueChanged="ToneValueChanged" PreviewMouseDown="Slider_MouseDown" PreviewMouseUp="Slider_MouseUp"/>
-                    <StackPanel Orientation="Horizontal">
-                        <Label Content="Key Sensitivity Level =" Foreground="White" Margin="0,10,0,0"/>
-                        <Label Content="{Binding ElementName=KeySensitivityLevelSlider, Path=Value}" ContentStringFormat="{}{0:F0}" Foreground="White" Margin="0,10,0,0"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,15,0,0">
+                        <Label Content="Enable Chord Play" Foreground="White"/>
+                        <CheckBox Name="CheckBoxEnableChordPlay" VerticalAlignment="Center" Click="CheckBoxEnableChordPlay_Click"/>
                     </StackPanel>
-                    <Slider Name="KeySensitivityLevelSlider" Height="30" Margin="5,0,5,0" Minimum="0" Maximum="20" Delay="500" ValueChanged="ToneValueChanged" PreviewMouseDown="Slider_MouseDown" PreviewMouseUp="Slider_MouseUp"/>
-                    <StackPanel Orientation="Horizontal">
-                        <Label Content="Breath Sensitivity Level =" Foreground="White" Margin="0,10,0,0"/>
-                        <Label Content="{Binding ElementName=BreathSensitivityLevelSlider, Path=Value}" ContentStringFormat="{}{0:F0}" Foreground="White" Margin="0,10,0,0"/>
+                    <Label Content="MIDI command" Foreground="White" Margin="0,15,0,0"/>
+                    <StackPanel Orientation="Horizontal" Margin="15,0,0,0">
+                        <RadioButton Content="BC" Foreground="White" Margin="5,0,5,0" IsChecked="True"/>
+                        <RadioButton Content="Exp" Foreground="White" Margin="5,0,5,0"/>
+                        <RadioButton Content="Aft" Foreground="White" Margin="5,0,5,0"/>
+                        <RadioButton Content="Vol" Foreground="White" Margin="5,0,5,0"/>
                     </StackPanel>
-                    <Slider Name="BreathSensitivityLevelSlider" Height="30" Margin="5,0,5,0" Minimum="0" Maximum="20" Delay="500" ValueChanged="ToneValueChanged" PreviewMouseDown="Slider_MouseDown" PreviewMouseUp="Slider_MouseUp"/>
-                    <CheckBox Name="AdvancedCheckBox" Content="Advanced" Foreground="White" Margin="5, 10, 5, 0" HorizontalAlignment="Right"/>
+                    <Label Content="Key Config" Foreground="White" Margin="0,15,0,0"/>
+                    <Label Content="(Comming soon)" Foreground="Silver" Margin="5,0,5,0"/>
                 </StackPanel>
-                <Button Grid.Row="1" Width="180" Content="Write to flash on AFUUE" Margin="5,5,5,15" Click="WriteButton_Click"/>
+                <Grid Grid.Row="1">
+                    <Label Content="Log" Foreground="Gray" Margin="5,0,5,0"/>
+                    <Button Content="Clear" Margin="0,4,10,4" HorizontalAlignment="Right" Click="LogClearButton_Click"/>
+                </Grid>
+                <TextBox Grid.Row="2" Name="LogTextBox" TextWrapping="NoWrap" HorizontalScrollBarVisibility="Visible" VerticalScrollBarVisibility="Visible" IsReadOnly="True" Margin="5,0,5,5" Foreground="Gray" Background="Black"/>
             </Grid>
-        </Grid>
-        <GridSplitter Grid.Column="3"/>
-        <Grid Grid.Column="4" Margin="5,5,5,5">
-            <Grid.Style>
-                <Style TargetType="Grid">
-                    <Setter Property="Visibility" Value="Visible"/>
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding Path=IsChecked, ElementName=AdvancedCheckBox}" Value="true">
-                            <Setter Property="Visibility" Value="Visible"/>
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </Grid.Style>
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="30"/>
-                    <RowDefinition Height="280"/>
-                    <RowDefinition Height="30"/>
-                    <RowDefinition Height="280"/>
-                </Grid.RowDefinitions>
-                <StackPanel Grid.Row="0" Orientation="Horizontal">
-                    <Label Content="Wave" Foreground="White"/>
-                    <RadioButton Name="RadioButtonWaveA" Content="Wave A" Foreground="#FFC020" VerticalAlignment="Center" Margin="5,0,5,0" IsChecked="True"/>
-                    <RadioButton Name="RadioButtonWaveB" Content="Wave B" Foreground="#20C0FF" VerticalAlignment="Center" Margin="5,0,5,0"/>
-                </StackPanel>
-                <Border Grid.Row="1" Margin="5,5,5,5" BorderBrush="Gray" BorderThickness="1">
-                    <Canvas Name="WaveCanvas" Margin="5,5,5,5" Width="512" Height="256" MouseDown="WaveCanvas_MouseDown" MouseMove="WaveCanvas_MouseMove" MouseUp="WaveCanvas_MouseUp"/>
-                </Border>
-                <Label Grid.Row="2" Content="Tone Shift Curve" Foreground="White"/>
-                <Border Grid.Row="3" Margin="5,5,5,5" BorderBrush="Gray" BorderThickness="1">
-                    <Canvas Name="ShiftCanvas" Margin="5,5,5,5" MouseDown="ShiftCanvas_MouseDown" MouseMove="ShiftCanvas_MouseMove" MouseUp="ShiftCanvas_MouseUp"/>
-                </Border>
-            </Grid>            
+            <GridSplitter Grid.Column="1"/>
+            <Grid Grid.Column="2">
+                <!-- Tone Editing -->
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="50"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Orientation="Vertical" Margin="5,5,5,5">
+                        <Label Content="Transpose" Foreground="White"/>
+                        <ComboBox Grid.Row="0" Name="TransposeComboBox" SelectedIndex="12" Margin="5,0,5,0" SelectionChanged="ComboBoxChanged">
+                            <Label Content="-12 C-"/>
+                            <Label Content="-11 Db"/>
+                            <Label Content="-10 D"/>
+                            <Label Content="-9 / Eb"/>
+                            <Label Content="-8 / E"/>
+                            <Label Content="-7 / F"/>
+                            <Label Content="-6 / Gb"/>
+                            <Label Content="-5 / G"/>
+                            <Label Content="-4 / Ab"/>
+                            <Label Content="-3 / A"/>
+                            <Label Content="-2 / Bb"/>
+                            <Label Content="-1 / B"/>
+                            <Label Content="0 / C"/>
+                            <Label Content="+1 / Db"/>
+                            <Label Content="+2 / D"/>
+                            <Label Content="+3 / Eb"/>
+                            <Label Content="+4 / E"/>
+                            <Label Content="+5 / F"/>
+                            <Label Content="+6 / Gb"/>
+                            <Label Content="+7 / G"/>
+                            <Label Content="+8 / Ab"/>
+                            <Label Content="+9 / A"/>
+                            <Label Content="+10 / Bb"/>
+                            <Label Content="+11 / B"/>
+                            <Label Content="+12 / C+"/>
+                        </ComboBox>
+                        <Label Content="Fine Tune" Foreground="White" Margin="0,10,0,0"/>
+                        <ComboBox Name="TuneComboBox" SelectedIndex="6" Margin="5,0,5,0" SelectionChanged="ComboBoxChanged">
+                            <Label Content="434 Hz"/>
+                            <Label Content="435 Hz"/>
+                            <Label Content="436 Hz"/>
+                            <Label Content="437 Hz"/>
+                            <Label Content="438 Hz"/>
+                            <Label Content="439 Hz"/>
+                            <Label Content="440 Hz (default)"/>
+                            <Label Content="441 Hz"/>
+                            <Label Content="442 Hz"/>
+                            <Label Content="443 Hz"/>
+                            <Label Content="444 Hz"/>
+                            <Label Content="445 Hz"/>
+                            <Label Content="446 Hz"/>
+                        </ComboBox>
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="Reverb Level =" Foreground="White" Margin="0,10,0,0"/>
+                            <Label Content="{Binding ElementName=ReverbLevelSlider, Path=Value}" ContentStringFormat="{}{0:F0}" Foreground="White" Margin="0,10,0,0"/>
+                        </StackPanel>
+                        <Slider Name="ReverbLevelSlider" Height="30" Margin="5,0,5,0" Minimum="0" Maximum="20" Delay="500" ValueChanged="SliderValueChanged" PreviewMouseDown="Slider_MouseDown" PreviewMouseUp="Slider_MouseUp" SmallChange="1"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="Portament Level =" Foreground="White" Margin="0,10,0,0"/>
+                            <Label Content="{Binding ElementName=PortamentoLevelSlider, Path=Value}" ContentStringFormat="{}{0:F0}" Foreground="White" Margin="0,10,0,0"/>
+                        </StackPanel>
+                        <Slider Name="PortamentoLevelSlider" Height="30" Margin="5,0,5,0" Minimum="0" Maximum="20" Delay="500" ValueChanged="SliderValueChanged" PreviewMouseDown="Slider_MouseDown" PreviewMouseUp="Slider_MouseUp" SmallChange="1"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="Key Sensitivity Level =" Foreground="White" Margin="0,10,0,0"/>
+                            <Label Content="{Binding ElementName=KeySensitivityLevelSlider, Path=Value}" ContentStringFormat="{}{0:F0}" Foreground="White" Margin="0,10,0,0"/>
+                        </StackPanel>
+                        <Slider Name="KeySensitivityLevelSlider" Height="30" Margin="5,0,5,0" Minimum="0" Maximum="20" Delay="500" ValueChanged="SliderValueChanged" PreviewMouseDown="Slider_MouseDown" PreviewMouseUp="Slider_MouseUp" SmallChange="1"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="Breath Sensitivity Level =" Foreground="White" Margin="0,10,0,0"/>
+                            <Label Content="{Binding ElementName=BreathSensitivityLevelSlider, Path=Value}" ContentStringFormat="{}{0:F0}" Foreground="White" Margin="0,10,0,0"/>
+                        </StackPanel>
+                        <Slider Name="BreathSensitivityLevelSlider" Height="30" Margin="5,0,5,0" Minimum="0" Maximum="20" Delay="500" ValueChanged="SliderValueChanged" PreviewMouseDown="Slider_MouseDown" PreviewMouseUp="Slider_MouseUp" SmallChange="1"/>
+                    </StackPanel>
+                    <Button Grid.Row="1" Width="180" Content="Write to flash on AFUUE" Margin="5,5,5,15" Click="WriteButton_Click"/>
+                </Grid>
+            </Grid>
+            <GridSplitter Grid.Column="3"/>
+            <Grid Grid.Column="4" Margin="5,5,5,5">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Visible"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Path=IsChecked, ElementName=AdvancedCheckBox}" Value="true">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="30"/>
+                        <RowDefinition Height="300"/>
+                        <RowDefinition Height="30"/>
+                        <RowDefinition Height="26"/>
+                        <RowDefinition Height="300"/>
+                        <RowDefinition Height="26"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Orientation="Horizontal">
+                        <Label Content="Wave" Foreground="White"/>
+                        <RadioButton Name="RadioButtonWaveA" Content="Wave A" Foreground="#FFC020" VerticalAlignment="Center" Margin="5,0,5,0" IsChecked="True"/>
+                        <RadioButton Name="RadioButtonWaveB" Content="Wave B" Foreground="#20C0FF" VerticalAlignment="Center" Margin="5,0,5,0"/>
+                    </StackPanel>
+                    <Border Grid.Row="1" Margin="5,5,5,5" BorderBrush="Gray" BorderThickness="1">
+                        <Canvas Name="WaveCanvas" Margin="5,5,5,5" Width="532" Height="276" MouseDown="WaveCanvas_MouseDown" MouseMove="WaveCanvas_MouseMove" MouseUp="WaveCanvas_MouseUp"/>
+                    </Border>
+                    <StackPanel Grid.Row="2" Orientation="Horizontal">
+                        <Label Content="Curve" Foreground="White"/>
+                        <RadioButton Name="RadioButtonToneShift" Content="ToneShift" Foreground="#FF6060" VerticalAlignment="Center" Margin="5,0,5,0" IsChecked="True"/>
+                        <RadioButton Name="RadioButtonNoise" Content="Noise" Foreground="#40C040" VerticalAlignment="Center" Margin="5,0,5,0"/>
+                        <RadioButton Name="RadioButtonPitch" Content="Pitch" Foreground="#FFC0FF" VerticalAlignment="Center" Margin="5,0,5,0"/>
+                    </StackPanel>
+                    <Label Grid.Row="3" Name="CurveLabelUp" Content="WaveB ↑" Foreground="DimGray" Margin="15,0,0,0"/>
+                    <Border Grid.Row="4" Margin="5,5,5,5" BorderBrush="Gray" BorderThickness="1">
+                        <Canvas Name="CurveCanvas" Margin="5,5,5,5" Width="532" Height="276" MouseDown="ShiftCanvas_MouseDown" MouseMove="ShiftCanvas_MouseMove" MouseUp="ShiftCanvas_MouseUp"/>
+                    </Border>
+                    <Label Grid.Row="5" Name="CurveLabelDown" Content="WaveA ↓" Foreground="DimGray" Margin="15,0,0,0"/>
+                    <Label Grid.Row="5" Name="CurveLabelRight" Content="→ Volume" Foreground="DimGray" Margin="0,0,15,0" HorizontalAlignment="Right"/>
+                </Grid>
+            </Grid>
         </Grid>
     </Grid>
 </Window>

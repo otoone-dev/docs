@@ -4,19 +4,12 @@
 
 const char* version = "AFUUE ver0.5.1.4";
 
-class Preferences2 : public Preferences {
-  public:
-    uint32_t getHandle() {
-      return _handle;
-    }
-};
-
-static Preferences2 pref;
+static Preferences pref;
 
 struct ToneSetting {
   int8_t transpose = 0;
   int8_t fineTune = 0;
-  int8_t reverb = 7;
+  int8_t reverb = 0;
   int8_t portamento = 0;
   int8_t keySense = 0;
   int8_t breathSense = 0;
@@ -25,6 +18,8 @@ struct ToneSetting {
   int16_t waveA[256];
   int16_t waveB[256];
   uint8_t shiftTable[32];
+  uint8_t noiseTable[32];
+  uint8_t pitchTable[32];
 };
 
 static ToneSetting toneSettings[5];
@@ -45,24 +40,26 @@ hw_timer_t * timer = NULL;
 volatile SemaphoreHandle_t timerSemaphore;
 volatile int interruptCounter = 0;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
-int count = 0;
 
 static uint8_t initCnt = 50;
 
 static uint32_t defPressure = 0;
 static uint32_t defTemperature = 0;
 
-#define fs (40000.0)
-static double ftt = 0.0;
-volatile double fst = 0.0;
+#define fs (20000.0)
+static double ftt[3] = { 0.0, 0.0, 0.0 };
+volatile double fst[3] = { 0.0, 0.0, 0.0 };
+volatile double volBase[3] = {1.0, 0.0, 0.0 };
 volatile double volReq = 0.0;
 volatile double shift = 0.0;
+volatile double noise = 0.0;
+volatile double pitch = 0.0;
 
 static double vol = 0.0;
 
-static double currentNote = 60;
-static double startNote = 60;
-static double targetNote = 60;
+static double currentNote[3] = { 60, 64, 67 };
+static double startNote[3] = { 60, 64, 67 };
+static double targetNote[3] = { 60, 64, 67 };
 static double noteStep = 0;
 static double noteDiv = (1.0 / 3.0);
 static int noteOnTimeLength = 0;
@@ -70,21 +67,28 @@ static double keyChangeCurve = 12.0;
 static int baseNote = 0;
 static int bootBaseNote = 0;
 static int toneNo = -1;
-static double volumeRate = 0.5;
 static double fineTune = 440.0;
+static double reverbRate = 0.152;
 static double portamentoRate = 0.99;
+static double volumeRate = 0.5;
 
 volatile short waveA[256];
 volatile short waveB[256];
-volatile short shiftTable[32];
+volatile uint8_t shiftTable[32];
+volatile uint8_t noiseTable[32];
+volatile uint8_t pitchTable[32];
 
-volatile double phase = 0.0;
-//volatile double phase2 = 0.0;
-//volatile double phase3 = 0.0;
+volatile double phase[3] = { 0.0, 0.0, 0.0 };
 #define REVERB_BUFFER_SIZE (9801)
-static double reverbRate = 0.152;
 volatile double reverbBuffer[REVERB_BUFFER_SIZE];
 volatile int reverbPos = 0;
+
+volatile bool metronome = false;
+volatile uint8_t metronome_m = 1;
+volatile unsigned long metronome_tm = 0;
+volatile int metronome_t = 90;
+volatile uint8_t metronome_v = 10;
+volatile int metronome_cnt = 0;
 
 #define ENABLE_BLE_MIDI (0)
 #define ENABLE_MIDI (1)
@@ -99,7 +103,7 @@ unsigned long activeNotifyTime = 0;
 
 void SerialPrintLn(char* text) {
 #if !ENABLE_MIDI
-  Serial.println(text);
+  //Serial.println(text);
 #endif
 }
 
@@ -113,18 +117,23 @@ void SerialSend(int sendSize) {
   }
 }
 
-static bool usePreferences = false;
+static int usePreferencesDepth = 0;
 void BeginPreferences() {
-  if (usePreferences) return;
-  pref.begin("Afuue/Settings", false);
-  usePreferences = true;
+  usePreferencesDepth++;
+  if (usePreferencesDepth > 1) return;
   if (timer) timerAlarmDisable(timer);
+  delay(10);
+  pref.begin("Afuue/Settings", false);
 }
 
 void EndPreferences() {
   pref.end();  
-  usePreferences = false;
-  if (timer) timerAlarmEnable(timer);
+  delay(10);
+  usePreferencesDepth--;
+  if (usePreferencesDepth == 0) {
+    if (timer) timerAlarmEnable(timer);
+  }
+  if (usePreferencesDepth < 0) usePreferencesDepth = 0;
 }
 
 
@@ -257,7 +266,7 @@ int16_t getTemperature() {  // 16bit singed
 
 
 //---------------------------------
-double getNoteNumber2() {
+double getNoteNumber2(bool chordFlag) {
   bool keyLowC = digitalRead(16);
   bool keyEb = digitalRead(17);
   bool keyD = digitalRead(5);
@@ -355,8 +364,10 @@ double getNoteNumber2() {
   }
 
   if (keyEb == LOW) n += 1.0; // #
-  if (keyGs == LOW) n += 1.0; // #
-  if (keyLowCs == LOW) n -= 1.0; // b
+  if (chordFlag == false) {
+    if (keyGs == LOW) n += 1.0; // #
+    if (keyLowCs == LOW) n -= 1.0; // b
+  }
   
   if (octDown == LOW) n -= 12;
   if (octUp == LOW) n += 12;
@@ -405,6 +416,21 @@ int getNoteNumber() {
   return note;
 }
 
+//---------------------------------
+void getChord(int& n0, int& n1, int& n2) {
+  bool keyLowCs = digitalRead(13);
+  bool keyGs =digitalRead(12);
+
+  double note = getNoteNumber2(true);
+
+  n0 = note;
+  n1 = note + 4;
+  n2 = note + 7;
+
+  if (keyGs == LOW) n1++;     // sus4
+  if (keyLowCs == LOW) n1--;  // Minor
+}
+
 //--------------------------
 double CalcInvFrequency(double note) {
   return fineTune * pow(2, (note - (69-12))/12);
@@ -426,20 +452,40 @@ void loop() {
   if (initCnt > 0) {
     initCnt--;
     pp = 0.2;
-    currentNote = baseNote - 1;
-    targetNote = baseNote - 1;
+    currentNote[0] = baseNote - 1;
+    currentNote[1] = currentNote[0] + 4;
+    currentNote[2] = currentNote[0] + 7;
+    for (int i = 0; i < 3; i++) {
+      targetNote[i] = currentNote[i];
+    }
     noteStep = 1;
+    
   } else {
-     double note = getNoteNumber2();
+    
+    int n0;
+    int n1;
+    int n2;
+    if ((volBase[1] > 0.0) || (volBase[2] > 0.0)) {
+      getChord(n0, n1, n2);
+    } else {
+      n0 = getNoteNumber2(false);
+      n1 = n2 = n0;
+    }
 
-    if (targetNote != note) {
+    if ((targetNote[0] != n0) || (targetNote[1] != n1) || (targetNote[2] != n2)) {
       //double d = abs(note - currentNote);
       noteStep = 0.0;
-      startNote = currentNote;
-      targetNote = note;
+      for (int i = 0; i < 3; i++) {
+        startNote[i] = currentNote[i];
+      }
+      targetNote[0] = n0;
+      targetNote[1] = n1;
+      targetNote[2] = n2;
     }
     else if (pp < 0.01) {
-      currentNote = targetNote;
+      for (int i = 0; i < 3; i++) {
+        currentNote[i] = targetNote[i];
+      }
       noteStep = 1.0;
       noteOnTimeLength = 0;
     }
@@ -453,7 +499,9 @@ void loop() {
           noteStep = 1.0;
         }
         double t = pow(noteStep, keyChangeCurve);
-        currentNote = startNote + (targetNote - startNote) * t;
+        for (int i = 0; i < 3; i++) {
+          currentNote[i] = startNote[i] + (targetNote[i] - startNote[i]) * t;
+        }
       }
     } 
   }
@@ -521,24 +569,33 @@ void loop() {
 #if 1
   {
     // 音量によるシフト
-    double u = volReq * 30.99;
+    double u = vol * 30.99;
     int t = (int)(u);
     double f = u - t;
     if (t < 0) t = 0;
     if (t > 30) t = 30;
+
     double k0 = shiftTable[t] / 127.0;
     double k1 = shiftTable[t + 1] / 127.0;
-    shift = 1 - (k0 * (1.0 - f) + k1 * f);
+    shift = (k0 * (1.0 - f) + k1 * f);
+
+    double n0 = noiseTable[t] / 127.0;
+    double n1 = noiseTable[t + 1] / 127.0;
+    noise = (n0 * (1.0 - f) + n1 * f);
+
+    double p0 = pitchTable[t] / 127.0;
+    double p1 = pitchTable[t + 1] / 127.0;
+    pitch = ((p0 * (1.0 - f) + p1 * f)) - 0.5;
   }
 #endif
 
-  double ft = CalcInvFrequency(currentNote);
-  ftt += (ft - ftt) * portamentoRate;
-  fst = (ftt / fs);
-  //fst = (ft / fs);
+  for (int i = 0; i < 3; i++) {
+    double ft = CalcInvFrequency(currentNote[i]);
+    ftt[i] += (ft - ftt[i]) * portamentoRate;
+    fst[i] = (ftt[i] / fs);
+  }
   ledcWrite(0, (uint8_t)(volReq * 255));
 
-  //if (xSemaphoreTake(timerSemaphore, 0) == pdTRUE){
   if (interruptCounter > 0) {
     portENTER_CRITICAL(&timerMux);
     {
@@ -546,12 +603,6 @@ void loop() {
     }
     portEXIT_CRITICAL(&timerMux);
   }
-#if 0
-    char s[32];
-    sprintf(s, "note %d", currentNote);
-    SerialPrintLn(s);
-    delay(200);
-#endif
   SerialProc();
   delay(1);
 }
@@ -687,35 +738,38 @@ int ChangeUnsigned(int data)
 //---------------------------------
 void OnReceiveCommand() {
     /*
-     * 0xA1 SET TONE NUMBER
+     * 0xA1 SET TONE
      * 0xA2 SET TRANSPOSE
      * 0xA3 SET FINE TUNE
      * 0xA4 SET REVERB LEVEL
      * 0xA5 SET PORTAMENTO LEVEL
      * 0xA6 SET KEY SENSITIVITY
      * 0xA7 SET BREATH SENSITIVITY
+     * 0xA8 SET METRONOME
      * 0xAA SET WAVE A DATA
      * 0xAB SET WAVE B DATA
      * 0xAC SET SHIFT TABLE
      * 
-     * 0xB1 GET TONE NUMBER
+     * 0xB1 GET TONE
      * 0xB2 GET TRANSPOSE
      * 0xB3 GET FINE TUNE
      * 0xB4 GET REVERB LEVEL
      * 0xB5 GET PORTAMENTO LEVEL
      * 0xB6 GET KEY SENSITIVITY
      * 0xB7 GET BREATH SENSITIVITY
+     * 0xB8 GET METRONOME
      * 0xBA GET WAVE A DATA
      * 0xBB GET WAVE B DATA
      * 0xBC GET SHIFT TABLE
      * 
-     * 0xC1 RESPONSE TONE NUMBER
+     * 0xC1 RESPONSE TONE
      * 0xC2 RESPONSE TRANSPOSE
      * 0xC3 RESPONSE FINE TUNE
      * 0xC4 RESPONSE REVERB LEVEL
      * 0xC5 RESPONSE PORTAMENTO LEVEL
      * 0xC6 RESPONSE KEY SENSITIVITY
      * 0xC7 RESPONSE BREATH SENSITIVITY
+     * 0xC8 RESPONSE METRONOME
      * 0xCA RESPONSE WAVE A DATA
      * 0xCB RESPONSE WAVE B DATA
      * 0xCC RESPONSE SHIFT TABLE
@@ -724,6 +778,8 @@ void OnReceiveCommand() {
      * 
      * 0xEE SOFTWARE RESET
      * 
+     * 0xF1 GET VERSION
+     * 
      * 0xFE COMMAND ACK
      * 0xFF END MESSAGE
      */
@@ -731,13 +787,15 @@ void OnReceiveCommand() {
     int command = receiveBuffer[0];
     switch (command)
     {
-        case 0xA1: // SET TONE NUMBER
-        case 0xC1: // RESPONSE TONE NUMBER
+        case 0xA1: // SET TONE
+        case 0xC1: // RESPONSE TONE
             {
-                int data = receiveBuffer[1];
-                toneNo = data;
+                toneNo = receiveBuffer[1];
+                volBase[0] = receiveBuffer[2] / 127.0;
+                volBase[1] = receiveBuffer[3] / 127.0;
+                volBase[2] = receiveBuffer[4] / 127.0;
                 BeginPreferences(); {
-                  pref.putInt("toneNo", toneNo);
+                  pref.putInt("ToneNo", toneNo);
                   LoadToneSetting(toneNo);
                 } EndPreferences();
                 SendCommandAck();
@@ -747,134 +805,191 @@ void OnReceiveCommand() {
             {
               sendBuffer[0] = 0xC1;
               sendBuffer[1] = toneNo;
-              sendBuffer[2] = 0xFF;
-              Serial.write(sendBuffer, 3);
+              sendBuffer[2] = (uint8_t)(volBase[0] * 127);
+              sendBuffer[3] = (uint8_t)(volBase[1] * 127);
+              sendBuffer[4] = (uint8_t)(volBase[2] * 127);
+              sendBuffer[5] = 0xFF;
+              Serial.write(sendBuffer, 4);
               Serial.flush();
             }
             break;
         case 0xA2: // SET TRANSPOSE
         case 0xC2: // RESPONSE TRANSPOSE
             {
-                int data = ChangeSigned( receiveBuffer[1] );
-                ts->transpose = data;
+                int tno = receiveBuffer[1];
+                int data = ChangeSigned( receiveBuffer[2] );
+                toneSettings[tno].transpose = data;
                 baseNote = 60 + 1 + data; // 61  C (C#)
                 SendCommandAck();
             }
             break;
         case 0xB2: // GET TRANSPOSE
             {
+              int tno = receiveBuffer[1];
+              sendBuffer[1] = tno;
               sendBuffer[0] = 0xC2;
-              sendBuffer[1] = ChangeUnsigned(ts->transpose);
-              sendBuffer[2] = 0xFF;
-              Serial.write(sendBuffer, 3);
+              sendBuffer[2] = ChangeUnsigned(ts->transpose);
+              sendBuffer[3] = 0xFF;
+              Serial.write(sendBuffer, 4);
               Serial.flush();
             }
             break;
         case 0xA3: // SET FINE TUNE
         case 0xC3: // RESPONSE FINE TUNE
             {
-                int data = ChangeSigned( receiveBuffer[1] );
-                ts->fineTune = data;
+                int tno = receiveBuffer[1];
+                int data = ChangeSigned( receiveBuffer[2] );
+                toneSettings[tno].fineTune = data;
                 fineTune = 440.0 + data;
                 SendCommandAck();
             }
             break;
         case 0xB3: // GET FINE TUNE
             {
+              int tno = receiveBuffer[1];
+              sendBuffer[1] = tno;
               sendBuffer[0] = 0xC3;
-              sendBuffer[1] = ChangeUnsigned(ts->fineTune);
-              sendBuffer[2] = 0xFF;
-              Serial.write(sendBuffer, 3);
+              sendBuffer[2] = ChangeUnsigned(ts->fineTune);
+              sendBuffer[3] = 0xFF;
+              Serial.write(sendBuffer, 4);
               Serial.flush();
             }
             break;
         case 0xA4: // SET REVERB LEVEL
         case 0xC4: // RESPONSE REVERB LEVEL
             {
-                int data = ChangeSigned( receiveBuffer[1] ); // 0 - 20
-                ts->reverb = data;
+                int tno = receiveBuffer[1];
+                int data = ChangeSigned( receiveBuffer[2] ); // 0 - 20
+                toneSettings[tno].reverb = data;
                 reverbRate = data * 0.02; // (default 0.152)
                 SendCommandAck();
             }
             break;
         case 0xB4: // GET REVERB LEVEL
             {
+              int tno = receiveBuffer[1];
+              sendBuffer[1] = tno;
               sendBuffer[0] = 0xC4;
-              sendBuffer[1] = ChangeUnsigned(ts->reverb);
-              sendBuffer[2] = 0xFF;
-              Serial.write(sendBuffer, 3);
+              sendBuffer[2] = ChangeUnsigned(ts->reverb);
+              sendBuffer[3] = 0xFF;
+              Serial.write(sendBuffer, 4);
               Serial.flush();
             }
             break;
         case 0xA5: // SET PORTAMENTO LEVEL
         case 0xC5: // RESPONSE PORTAMENTO LEVEL
             {
-                int data = ChangeSigned( receiveBuffer[1] ); // 0 - 20
-                ts->portamento = data;
+                int tno = receiveBuffer[1];
+                int data = ChangeSigned( receiveBuffer[2] ); // 0 - 20
+                toneSettings[tno].portamento = data;
                 portamentoRate = 1 - (data * 0.04); // (default 0.99)
                 SendCommandAck();
             }
             break;
         case 0xB5: // GET PORTAMENTO LEVEL
             {
+              int tno = receiveBuffer[1];
+              sendBuffer[1] = tno;
               sendBuffer[0] = 0xC5;
-              sendBuffer[1] = ChangeUnsigned(ts->portamento);
-              sendBuffer[2] = 0xFF;
-              Serial.write(sendBuffer, 3);
+              sendBuffer[2] = ChangeUnsigned(ts->portamento);
+              sendBuffer[3] = 0xFF;
+              Serial.write(sendBuffer, 4);
               Serial.flush();
             }
             break;
         case 0xA6: // SET KEY SENSITIVITY
         case 0xC6: // RESPONSE KEY SENSITIVITY
             {
-                int data = ChangeSigned( receiveBuffer[1] ); // 0 - 20
-                ts->keySense = data;
+                int tno = receiveBuffer[1];
+                int data = ChangeSigned( receiveBuffer[2] ); // 0 - 20
+                toneSettings[tno].keySense = data;
                 noteDiv = 1.0 / (1 + (data * 0.3)); // (default 1.0 / 3.0)
                 SendCommandAck();
             }
             break;
         case 0xB6: // GET KEY SENSITIVITY
             {
+              int tno = receiveBuffer[1];
+              sendBuffer[1] = tno;
               sendBuffer[0] = 0xC6;
-              sendBuffer[1] = ChangeUnsigned(ts->keySense);
-              sendBuffer[2] = 0xFF;
-              Serial.write(sendBuffer, 3);
+              sendBuffer[2] = ChangeUnsigned(ts->keySense);
+              sendBuffer[3] = 0xFF;
+              Serial.write(sendBuffer, 4);
               Serial.flush();
             }
             break;
         case 0xA7: // SET BREATH SENSITIVITY
         case 0xC7: // RESPONSE BREATH SENSITIVITY
             {
-                int data = ChangeSigned( receiveBuffer[1] ); // 0 - 20
-                ts->breathSense = data;
+                int tno = receiveBuffer[1];
+                int data = ChangeSigned( receiveBuffer[2] ); // 0 - 20
+                toneSettings[tno].breathSense = data;
                 volumeRate = 0.9 - (data * 0.04); // (default 0.5)
                 SendCommandAck();
             }
             break;
-        case 0xB7: // GET KEY SENSITIVITY
+        case 0xB7: // GET BREATH SENSITIVITY
             {
+              int tno = receiveBuffer[1];
+              sendBuffer[1] = tno;
               sendBuffer[0] = 0xC7;
-              sendBuffer[1] = ChangeUnsigned(ts->breathSense);
-              sendBuffer[2] = 0xFF;
-              Serial.write(sendBuffer, 3);
+              sendBuffer[2] = ChangeUnsigned(ts->breathSense);
+              sendBuffer[3] = 0xFF;
+              Serial.write(sendBuffer, 4);
               Serial.flush();
             }
             break;
+        case 0xA8: // SET METRONOME
+            {
+              bool enabled = (receiveBuffer[1] == 1);
+              uint8_t mode = receiveBuffer[2];
+              int volume = receiveBuffer[3];
+              int tempo = receiveBuffer[4] & 0x7F | ((receiveBuffer[5] & 0x7F) << 7);
+              metronome = enabled;
+              metronome_m = mode;
+              metronome_t = tempo;
+              metronome_v = volume;
+              metronome_cnt = 0;
+              BeginPreferences(); {
+                pref.putInt("MetroMode", metronome_m);
+                pref.putInt("MetroTempo", metronome_t);
+                pref.putInt("MetroVolume", metronome_v);
+              } EndPreferences();
+              SendCommandAck();
+              break;
+            }
+        case 0xB8: // GET METRONOME
+            {
+              sendBuffer[0] = 0xC8;
+              sendBuffer[1] = 0;
+              if (metronome) {
+                sendBuffer[1] = 1;
+              }
+              sendBuffer[2] = metronome_m;
+              sendBuffer[3] = metronome_v;
+              sendBuffer[4] = (uint8_t)(metronome_t & 0x7F);
+              sendBuffer[5] = (uint8_t)((metronome_t >> 7) & 0x7F);
+              sendBuffer[6] = 0xFF;
+              Serial.write(sendBuffer, 7);
+              Serial.flush();
+              break;
+            }
         case 0xAA: // SET WAVE A DATA
         case 0xCA: // SET WAVE A DATA
         case 0xAB: // SET WAVE B DATA
         case 0xCB: // SET WAVE B DATA
             if (receivePos >= 512) {
+              int tno = receiveBuffer[1];
               for (int i = 0; i < 256; i++) {
-                uint32_t d0 = receiveBuffer[1 + i*2];
-                uint32_t d1 = receiveBuffer[1 + i*2 + 1];
+                uint32_t d0 = receiveBuffer[2 + i*2];
+                uint32_t d1 = receiveBuffer[2 + i*2 + 1];
                 uint32_t rdata = ((d0 << 2) | (d1 << 9));
                 int32_t data = *reinterpret_cast<int32_t*>(&rdata);
                 if ((command & 0x0F) == 0x0A) {
-                  ts->waveA[i] = data;
+                  toneSettings[tno].waveA[i] = data;
                   waveA[i] = data;
                 } else {
-                  ts->waveB[i] = data;
+                  toneSettings[tno].waveB[i] = data;
                   waveB[i] = data;
                 }
               }
@@ -884,46 +999,99 @@ void OnReceiveCommand() {
         case 0xBA: // GET WAVE A DATA
         case 0xBB: // GET WAVE B DATA
             {
+              int tno = receiveBuffer[1];
+              sendBuffer[1] = tno;
               if ((command & 0x0F) == 0x0A) {
                 sendBuffer[0] = 0xCA;
                 for (int i = 0; i < 256; i++) {
-                  int d0 = (ts->waveA[i] >> 2) & 0x7F;
-                  int d1 = (ts->waveA[i] >> 9) & 0x7F;
-                  sendBuffer[1 + i*2] = (byte)d0; 
-                  sendBuffer[1 + i*2 + 1] = (byte)d1; 
+                  int d0 = (toneSettings[tno].waveA[i] >> 2) & 0x7F;
+                  int d1 = (toneSettings[tno].waveA[i] >> 9) & 0x7F;
+                  sendBuffer[2 + i*2] = (byte)d0; 
+                  sendBuffer[2 + i*2 + 1] = (byte)d1; 
                 }
               } else {
                 sendBuffer[0] = 0xCB;
                 for (int i = 0; i < 256; i++) {
-                  int d0 = (ts->waveB[i] >> 2) & 0x7F;
-                  int d1 = (ts->waveB[i] >> 9) & 0x7F;
-                  sendBuffer[1 + i*2] = (byte)d0; 
-                  sendBuffer[1 + i*2 + 1] = (byte)d1; 
+                  int d0 = (toneSettings[tno].waveB[i] >> 2) & 0x7F;
+                  int d1 = (toneSettings[tno].waveB[i] >> 9) & 0x7F;
+                  sendBuffer[2 + i*2] = (byte)d0; 
+                  sendBuffer[2 + i*2 + 1] = (byte)d1; 
                 }
               }
-              sendBuffer[513] = 0xFF;
-              Serial.write(sendBuffer, 514);
+              sendBuffer[514] = 0xFF;
+              Serial.write(sendBuffer, 515);
               Serial.flush();
             }
             break;
         case 0xAC: // SET SHIFT TABLE
         case 0xCC:
             {
+              int tno = receiveBuffer[1];
               for (int i = 0; i < 32; i++) {
-                shiftTable[i] = receiveBuffer[1 + i];
-                ts->shiftTable[i] = shiftTable[i];
+                shiftTable[i] = receiveBuffer[2 + i];
+                toneSettings[tno].shiftTable[i] = shiftTable[i];
               }
               SendCommandAck();
             }
             break;
         case 0xBC: // GET SHIFT TABLE
             {
+              int tno = receiveBuffer[1];
+              sendBuffer[1] = tno;
               sendBuffer[0] = 0xCC;
               for (int i = 0; i < 32; i++) {
-                sendBuffer[1 + i] = ts->shiftTable[i];
+                sendBuffer[2 + i] = toneSettings[tno].shiftTable[i];
               }
-              sendBuffer[33] = 0xFF;
-              Serial.write(sendBuffer, 34);
+              sendBuffer[34] = 0xFF;
+              Serial.write(sendBuffer, 35);
+              Serial.flush();
+            }
+            break;
+        case 0xAD: // SET NOISE TABLE
+        case 0xCD:
+            {
+              int tno = receiveBuffer[1];
+              for (int i = 0; i < 32; i++) {
+                noiseTable[i] = receiveBuffer[2 + i];
+                toneSettings[tno].noiseTable[i] = noiseTable[i];
+              }
+              SendCommandAck();
+            }
+            break;
+        case 0xBD: // GET NOISE TABLE
+            {
+              int tno = receiveBuffer[1];
+              sendBuffer[1] = tno;
+              sendBuffer[0] = 0xCD;
+              for (int i = 0; i < 32; i++) {
+                sendBuffer[2 + i] = toneSettings[tno].noiseTable[i];
+              }
+              sendBuffer[34] = 0xFF;
+              Serial.write(sendBuffer, 35);
+              Serial.flush();
+            }
+            break;
+        case 0xAE: // SET PITCH TABLE
+        case 0xCE:
+            {
+              int tno = receiveBuffer[1];
+              for (int i = 0; i < 32; i++) {
+                pitchTable[i] = receiveBuffer[2 + i];
+                toneSettings[tno].pitchTable[i] = pitchTable[i];
+              }
+              SendCommandAck();
+            }
+            break;
+        case 0xBE: // GET PITCH TABLE
+            {
+              int tno = receiveBuffer[1];
+              sendBuffer[1] = tno;
+              sendBuffer[0] = 0xCE;
+              for (int i = 0; i < 32; i++) {
+                sendBuffer[2 + i] = toneSettings[tno].pitchTable[i];
+              }
+              sendBuffer[34] = 0xFF;
+              Serial.write(sendBuffer, 35);
               Serial.flush();
             }
             break;
@@ -934,6 +1102,9 @@ void OnReceiveCommand() {
             }
             break;
         case 0xEE: // SOFTWARE RESET
+            SendCommandAck();
+            delay(1000);
+
             if (receiveBuffer[1] == 0x7F) {
               ESP.restart();
             } else if ((receiveBuffer[1] == 0x7A) && (receiveBuffer[2] == 0x3C)) {
@@ -943,6 +1114,13 @@ void OnReceiveCommand() {
               ESP.restart();
             }
             break;
+        case 0xF1: // GET AFUUE VERSION
+          sendBuffer[0] = 0xF1;
+          sendBuffer[1] = 0x15; // ver1.5
+          sendBuffer[2] = 0x01; // protocol version
+          sendBuffer[3] = 0xFF;
+          Serial.write(sendBuffer, 3);
+          Serial.flush();
     }
 
     waitForCommand = true;
@@ -1147,6 +1325,46 @@ const short waveHamoA[256] = {
 };
 
 //---------------------------------
+int GetPreferenceInt(int tno, const char* name, int defaultValue) {
+  char key[32];
+  sprintf(key, "Tone%d/%s", tno, name);
+  int ret = -1;
+  BeginPreferences(); {
+    ret = pref.getInt(key, defaultValue);
+  } EndPreferences();
+  return ret;
+}
+
+//---------------------------------
+size_t GetPreferenceBytes(int tno, const char* name, uint8_t* data, size_t length) {
+  char key[32];
+  sprintf(key, "Tone%d/%s", tno, name);
+  size_t ret = 0;
+  BeginPreferences(); {
+    ret = pref.getBytes(key, data, length);
+  } EndPreferences();
+  return ret;
+}
+
+//---------------------------------
+void PutPreferenceInt(int idx, const char* name, int value) {
+  char key[32];
+  sprintf(key, "Tone%d/%s", idx, name);
+  BeginPreferences(); {
+    pref.putInt(key, value);
+  } EndPreferences();
+}
+
+//---------------------------------
+void PutPreferenceBytes(int idx, const char* name, const uint8_t* data, size_t length) {
+  char key[32];
+  sprintf(key, "Tone%d/%s", idx, name);
+  BeginPreferences(); {
+    pref.putBytes(key, data, length);
+  } EndPreferences();
+}
+
+//---------------------------------
 void LoadToneSetting(int idx) {
   BeginPreferences(); {
     ToneSetting* ts = &toneSettings[idx];
@@ -1196,13 +1414,17 @@ void LoadToneSetting(int idx) {
     }
   
     // load from pref
-    bool loaded = false;
-    char key[8];
-    sprintf(key, "Tone%d", idx+1);
-    if (pref.getBytesLength(key) == sizeof(ToneSetting)) {
-      pref.getBytes(key, ts, sizeof(ToneSetting));
-      loaded = true;
-    }
+    ts->transpose = GetPreferenceInt(idx, "Transpose", ts->transpose);
+    ts->fineTune = GetPreferenceInt(idx, "FineTune", ts->fineTune);
+    ts->reverb = GetPreferenceInt(idx, "Reverb", ts->reverb);
+    ts->portamento = GetPreferenceInt(idx, "Portamento", ts->portamento);
+    ts->keySense = GetPreferenceInt(idx, "KeySense", ts->keySense);
+    ts->breathSense = GetPreferenceInt(idx, "BreathSense", ts->breathSense);
+    GetPreferenceBytes(idx, "WaveA", (uint8_t*)ts->waveA, 256*2);
+    GetPreferenceBytes(idx, "WaveB", (uint8_t*)ts->waveB, 256*2);
+    GetPreferenceBytes(idx, "ShiftTable", (uint8_t*)ts->shiftTable, 32);
+    GetPreferenceBytes(idx, "NoiseTable", (uint8_t*)ts->noiseTable, 32);
+    GetPreferenceBytes(idx, "PitchTable", (uint8_t*)ts->pitchTable, 32);
   
     // apply
     if (bootBaseNote == 0) {
@@ -1231,24 +1453,18 @@ void SaveToneSetting(int idx) {
   BeginPreferences(); {
     ToneSetting* ts = &toneSettings[idx];
   
-    ts->transpose = (uint8_t)ChangeUnsigned(baseNote - 61);
-    ts->fineTune = (uint8_t)ChangeUnsigned(fineTune - 440);
-    ts->reverb = (uint8_t)ChangeUnsigned((int)(reverbRate / 0.02));
-    ts->portamento = (uint8_t)ChangeUnsigned((int)((1 -portamentoRate) / 0.04));
-    ts->keySense = (uint8_t)ChangeUnsigned((int)(((1.0 / noteDiv) - 1) / 0.3));
-    ts->breathSense = (uint8_t)ChangeUnsigned((int)((0.9 - volumeRate) / 0.04));
-  
-    for (int i = 0; i < 256; i++) {
-      ts->waveA[i] = waveA[i];
-      ts->waveB[i] = waveB[i];
-    }
-    for  (int i = 0; i < 32; i++) {
-      ts->shiftTable[i] = shiftTable[i];
-    }
-    
-    char key[8];
-    sprintf(key, "Tone%d", idx + 1);
-    pref.putBytes(key, ts, sizeof(ToneSetting));
+    PutPreferenceInt(idx, "Transpose", ts->transpose);
+    PutPreferenceInt(idx, "FineTune", ts->fineTune);
+    PutPreferenceInt(idx, "Reverb", ts->reverb);
+    PutPreferenceInt(idx, "Portamento", ts->portamento);
+    PutPreferenceInt(idx, "KeySense", ts->keySense);
+    PutPreferenceInt(idx, "BreathSense", ts->breathSense);
+    PutPreferenceBytes(idx, "WaveA", (uint8_t*)ts->waveA, 512);
+    PutPreferenceBytes(idx, "WaveB", (uint8_t*)ts->waveB, 512);
+    PutPreferenceBytes(idx, "ShiftTable", (uint8_t*)ts->shiftTable, 32);
+    PutPreferenceBytes(idx, "NoiseTable", (uint8_t*)ts->noiseTable, 32);
+    PutPreferenceBytes(idx, "PitchTable", (uint8_t*)ts->pitchTable, 32);
+
   } EndPreferences();
 }
 
@@ -1261,27 +1477,61 @@ double Voice(double p) {
   double v = 255*p;
   int t = (int)v;
   double f = (v - t);
-  double w0 = (waveA[t] * shift + waveB[t] * (1-shift));
+  
+  double w0 = (waveA[t] * (1-shift) + waveB[t] * shift);
   t = (t + 1) % 256;
-  double w1 = (waveA[t] * shift + waveB[t] * (1-shift));
-  double w = (w1 * f) + (w0 * (1-f));
+  double w1 = (waveA[t] * (1-shift) + waveB[t] * shift);
+  double w = (w0 * (1-f)) + (w1 * f);
   return (w / 32767.0);
 }
 
 //---------------------------------
 uint8_t CreateWave() {
     // double 演算で波形のフェーズを 0-255 で算出する
-    phase += fst;
-    if (phase >= 1.0) phase -= 1.0;
-
+    for (int i = 0; i < 3; i++) {
+      phase[i] += fst[i];
+      if (phase[i] >= 1.0) phase[i] -= 1.0;
+    }
     // 波形を生成する
-    double e = (150 * Voice(phase) * volReq) + reverbBuffer[reverbPos];// + phase2 * volReq2 + phase3 * volReq3;
-    if ( (-0.01 < e) && (e < 0.01) ) {
+    //double g = Voice(phase);
+    double g = Voice(phase[0]) * volBase[0] + Voice(phase[1]) * volBase[1] + Voice(phase[2]) * volBase[2];
+    
+    //ノイズ
+    double n = ((double)rand() / RAND_MAX);
+    double e = 150 * (g * (1-noise) + n * noise) * volReq + reverbBuffer[reverbPos];;
+    //double e = 150 * n * volReq + reverbBuffer[reverbPos];;
+    
+    if ( (-0.005 < e) && (e < 0.005) ) {
       e = 0.0;
     }
+
     reverbBuffer[reverbPos] = e * reverbRate;
     reverbPos = (reverbPos + 1) % REVERB_BUFFER_SIZE;
 
+#if 1
+    //メトロノーム
+    if (metronome) {
+      unsigned long t = millis();
+      unsigned long p = t - metronome_tm;
+      if (p > 60000/metronome_t) {
+        metronome_tm = t;
+        metronome_cnt++;
+      }
+      if (p < 10) {
+        //ホワイトノイズを乗せる
+        if (metronome_m <= 1) {
+          e += metronome_v * n;
+        }
+        else {
+          if ((metronome_cnt % metronome_m) == 1) {
+            e += metronome_v * n;
+          } else {
+            e += metronome_v/2 * n;
+          }
+        }
+      }
+    }
+#endif
 #if 1
     if (e < -127.0) e = -256 - e;
     else if (e > 127.0) e = 256 - e;
@@ -1355,11 +1605,6 @@ void setup() {
     else if (keyF == LOW) {
       bootBaseNote = 63 + 1; // 64  Eb (E)
     }
-    if ((keyLowC == LOW) && (keyEb == HIGH)) {
-      bootBaseNote -= 12;
-    } else if ((keyLowC == HIGH) && (keyEb == LOW)) {
-      bootBaseNote += 12;
-    }
   
     // play voice setting
     if ((keyLowCs == HIGH) && (keyGs == HIGH) && (keyG == HIGH) && (keyA == HIGH) && (keyB == LOW)) {
@@ -1378,13 +1623,27 @@ void setup() {
       toneNo = 4;
     }
     if (toneNo < 0) {
-      toneNo = pref.getInt("toneNo", 0);
+      toneNo = pref.getInt("ToneNo", 0);
     }
     else {
       SerialPrintLn("save toneNo");
-      pref.putInt("toneNo", toneNo);
+      pref.putInt("ToneNo", toneNo);
     }
     LoadToneSetting(toneNo);
+    metronome_m = (uint8_t)pref.getInt("MetroMode", 1);
+    metronome_t = pref.getInt("MetroTempo", 120);
+    metronome_v = (uint8_t)pref.getInt("MetroVolume", 10);
+    if (keyLowC == LOW) {
+      metronome = true;
+    }
+    volBase[0] = 1.0;
+    volBase[1] = 0.0;
+    volBase[2] = 0.0;
+    if (keyEb == LOW) {
+      volBase[0] = 0.5;
+      volBase[1] = 0.5;
+      volBase[2] = 0.5;
+    }
   
     if (keyD == LOW) {
       midiEnabled = true;
@@ -1470,7 +1729,7 @@ void setup() {
     // Set alarm to call onTimer function every second (value in microseconds).
     // Repeat the alarm (third parameter)
     //timerAlarmWrite(timer, 300*1000, true);
-    timerAlarmWrite(timer, 25, true); //40kHz
+    timerAlarmWrite(timer, 50, true); //20kHz
     timerAlarmEnable(timer);
     SerialPrintLn("timer begin");
   }
