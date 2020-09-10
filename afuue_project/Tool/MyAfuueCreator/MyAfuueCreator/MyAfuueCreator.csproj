@@ -103,10 +103,9 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Resources\FingeringChart.png" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Resources\fingering.png" />
+    <None Include="Resources\FingeringChart.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
