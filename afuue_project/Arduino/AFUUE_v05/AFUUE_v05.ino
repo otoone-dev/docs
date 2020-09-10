@@ -407,7 +407,7 @@ int getNoteNumber() {
   if (keyE == LOW) note--;
   if (keyD == LOW) note -= 2;
   if (keyEb == LOW) note++;
-  if (keyLowC == LOW) note -=2;
+  if (keyLowC == LOW) note -= 2;
   if (keyLowCs == LOW) note--;
 
   if (octDown == LOW) note -= 12;
@@ -427,7 +427,7 @@ void getChord(int& n0, int& n1, int& n2) {
   n1 = note + 4;
   n2 = note + 7;
 
-  if (keyGs == LOW) n1++;     // sus4
+  if (keyGs == LOW) n0 -= 2;     // 7th
   if (keyLowCs == LOW) n1--;  // Minor
 }
 
