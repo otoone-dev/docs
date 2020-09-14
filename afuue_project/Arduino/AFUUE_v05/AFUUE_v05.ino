@@ -94,6 +94,8 @@ volatile int metronome_cnt = 0;
 #define ENABLE_MIDI (1)
 
 bool midiEnabled = false;
+byte midiMode = 2; // 1:BreathControl 2:Expression 3:AfterTouch 4:MainVolume
+byte midiPgNo = 51;
 uint8_t midiPacket[32];
 bool deviceConnected = false;
 bool playing = false;
@@ -112,7 +114,7 @@ static uint8_t receiveBuffer[1024];
 static int receivePos = 0;
 static bool waitForCommand = true;
 void SerialSend(int sendSize) {
-  if (midiEnabled == false) {
+  if (midiEnabled) {
     Serial.write(sendBuffer, sendSize);
   }
 }
@@ -127,10 +129,10 @@ void BeginPreferences() {
 }
 
 void EndPreferences() {
-  pref.end();  
-  delay(10);
   usePreferencesDepth--;
   if (usePreferencesDepth == 0) {
+    pref.end();  
+    delay(10);
     if (timer) timerAlarmEnable(timer);
   }
   if (usePreferencesDepth < 0) usePreferencesDepth = 0;
@@ -364,13 +366,13 @@ double getNoteNumber2(bool chordFlag) {
   }
 
   if (keyEb == LOW) n += 1.0; // #
+  if (keyGs == LOW) n += 1.0; // #
+  if (keyLowCs == LOW) n -= 1.0; // b
+
   if (chordFlag == false) {
-    if (keyGs == LOW) n += 1.0; // #
-    if (keyLowCs == LOW) n -= 1.0; // b
+    if (octDown == LOW) n -= 12;
+    if (octUp == LOW) n += 12;
   }
-  
-  if (octDown == LOW) n -= 12;
-  if (octUp == LOW) n += 12;
 
   double bnote = baseNote - 13; // C
   return bnote + n;
@@ -420,15 +422,31 @@ int getNoteNumber() {
 void getChord(int& n0, int& n1, int& n2) {
   bool keyLowCs = digitalRead(13);
   bool keyGs =digitalRead(12);
+  bool octDown = digitalRead(23);
+  bool octUp = digitalRead(3);
 
   double note = getNoteNumber2(true);
 
-  n0 = note;
-  n1 = note + 4;
-  n2 = note + 7;
+  n0 = ((int)(note - (baseNote - 1))+24) % 12;
+  n1 = (n0 + 4) % 12;
+  n2 = (n0 + 7) % 12;
 
-  if (keyGs == LOW) n0 -= 2;     // 7th
-  if (keyLowCs == LOW) n1--;  // Minor
+  //if (keyGs == LOW) n0 -= 2;     // 7th
+  //if (keyLowCs == LOW) n1--;  // Minor
+  if ((octDown == LOW) && (octUp == HIGH)) n1 += 11; // Minor
+  if ((octDown == HIGH) && (octUp == LOW)) {
+    n1 += 11;
+    n2 += 11; // dim
+  }
+  if ((octDown == LOW) && (octUp == LOW)) n1++; // sus4
+
+  n0 = (n0 % 12) - 12;
+  n1 = (n1 % 12) - 12;
+  n2 = (n2 % 12) - 12;
+
+  n0 += (int)(baseNote-1);
+  n1 += (int)(baseNote-1);
+  n2 += (int)(baseNote-1);
 }
 
 //--------------------------
@@ -528,7 +546,7 @@ void loop() {
 
   if (midiEnabled) {
     if (deviceConnected) {
-      int note = (int)targetNote;
+      int note = (int)targetNote[0];
       int v = (int)(vol * 127);
       if (playing == false) {
         if (v > 0) {
@@ -538,7 +556,7 @@ void loop() {
         if (v == 0) {
             MIDI_NoteOff();
         } else {
-          if (prevNoteNumber != note) {
+          if ((prevNoteNumber != note) && (noteStep > 0.8)) {
             MIDI_ChangeNote(note, v);
   
           } else {
@@ -626,13 +644,23 @@ void MIDI_NoteOn(int note, int vol) {
 #if ENABLE_MIDI
     midiPacket[0] = 0x90 + channelNo;
     midiPacket[1] = note;
-    midiPacket[2] = 127;
-    midiPacket[3] = 0xB0 + channelNo;
-    //midiPacket[3] = 0x0B; // expression
-    midiPacket[3] = 0x02; // breath control
-    midiPacket[5] = vol;
-      
-    SerialHW.write(midiPacket, 6);
+    midiPacket[2] = 120;
+    if (midiMode == 3) { // after touch (channel pressure)
+      midiPacket[3] = 0xD0 + channelNo;
+      midiPacket[4] = vol;
+      SerialHW.write(midiPacket, 5);
+    } else {
+      midiPacket[3] = 0xB0 + channelNo;
+      midiPacket[4] = 0x0B; // expression
+      if (midiMode == 1) {
+        midiPacket[4] = 0x02; // breath control
+      }
+      else if (midiMode == 4) {
+        midiPacket[4] = 0x07; // main volume
+      }
+      midiPacket[5] = vol;
+      SerialHW.write(midiPacket, 6);
+    }
 #endif
     playing = true;
     prevNoteNumber = note;
@@ -684,12 +712,35 @@ void MIDI_BreathControl(int vol) {
     pCharacteristic->notify();
 #endif
 #if ENABLE_MIDI
-    midiPacket[0] = 0xB0 + channelNo;
-    //midiPacket[1] = 0x0B; // expression
-    midiPacket[1] = 0x02; // breath control
-    midiPacket[2] = vol;
+    if (midiMode == 3) { // after touch (channel pressure)
+      midiPacket[0] = 0xD0 + channelNo;
+      midiPacket[1] = vol;
+      SerialHW.write(midiPacket, 2);
+    } else {
+      midiPacket[0] = 0xB0 + channelNo;
+      midiPacket[1] = 0x0B; // expression
+      if (midiMode == 1) {
+        midiPacket[1] = 0x02; // breath control
+      }
+      else if (midiMode == 4) {
+        midiPacket[1] = 0x07; // main volume
+      }
+      midiPacket[2] = vol;
+      SerialHW.write(midiPacket, 3);
+    }
+#endif
+    delay(16);
+}
+
+//---------------------------------
+void MIDI_ProgramChange(int no) {
+#if ENABLE_BLE_MIDI
+#endif
+#if ENABLE_MIDI
+    midiPacket[0] = 0xC0 + channelNo;
+    midiPacket[1] = no;
       
-    SerialHW.write(midiPacket, 3);
+    SerialHW.write(midiPacket, 2);
 #endif
     delay(16);
 }
@@ -746,6 +797,7 @@ void OnReceiveCommand() {
      * 0xA6 SET KEY SENSITIVITY
      * 0xA7 SET BREATH SENSITIVITY
      * 0xA8 SET METRONOME
+     * 0xA9 SET MIDI
      * 0xAA SET WAVE A DATA
      * 0xAB SET WAVE B DATA
      * 0xAC SET SHIFT TABLE
@@ -758,6 +810,7 @@ void OnReceiveCommand() {
      * 0xB6 GET KEY SENSITIVITY
      * 0xB7 GET BREATH SENSITIVITY
      * 0xB8 GET METRONOME
+     * 0xB9 GET MIDI
      * 0xBA GET WAVE A DATA
      * 0xBB GET WAVE B DATA
      * 0xBC GET SHIFT TABLE
@@ -770,6 +823,7 @@ void OnReceiveCommand() {
      * 0xC6 RESPONSE KEY SENSITIVITY
      * 0xC7 RESPONSE BREATH SENSITIVITY
      * 0xC8 RESPONSE METRONOME
+     * 0xC9 RESPONSE MIDI
      * 0xCA RESPONSE WAVE A DATA
      * 0xCB RESPONSE WAVE B DATA
      * 0xCC RESPONSE SHIFT TABLE
@@ -940,6 +994,7 @@ void OnReceiveCommand() {
             }
             break;
         case 0xA8: // SET METRONOME
+        case 0xC8: // RESPONSE METRONOME
             {
               bool enabled = (receiveBuffer[1] == 1);
               uint8_t mode = receiveBuffer[2];
@@ -971,6 +1026,27 @@ void OnReceiveCommand() {
               sendBuffer[5] = (uint8_t)((metronome_t >> 7) & 0x7F);
               sendBuffer[6] = 0xFF;
               Serial.write(sendBuffer, 7);
+              Serial.flush();
+              break;
+            }
+        case 0xA9: // SET MIDI
+            {
+              midiMode = receiveBuffer[1];
+              midiPgNo = receiveBuffer[2];
+              BeginPreferences(); {
+                pref.putInt("MidiMode", midiMode);
+                pref.putInt("MidiPgNo", midiPgNo);
+              } EndPreferences();
+              SendCommandAck();
+              break;
+            }
+        case 0xB9: // GET MIDI
+            {
+              sendBuffer[0] = 0xC9;
+              sendBuffer[1] = midiMode;
+              sendBuffer[2] = midiPgNo;
+              sendBuffer[3] = 0xFF;
+              Serial.write(sendBuffer, 4);
               Serial.flush();
               break;
             }
@@ -1645,6 +1721,8 @@ void setup() {
       volBase[2] = 0.5;
     }
   
+    midiMode = pref.getInt("MidiMode", 2);
+    midiPgNo = pref.getInt("MidiPgNo", 64);
     if (keyD == LOW) {
       midiEnabled = true;
     }
@@ -1676,8 +1754,9 @@ void setup() {
     SerialHW.begin(31250, SERIAL_8N1, 4, 1);
     deviceConnected = true;
 
-    delay(500);
-    MIDI_NoteOn(baseNote + 1, 32);
+    delay(100);
+    MIDI_ProgramChange(midiPgNo);
+    MIDI_NoteOn(baseNote + 1, 10);
     delay(500);
     MIDI_NoteOff();
 #endif

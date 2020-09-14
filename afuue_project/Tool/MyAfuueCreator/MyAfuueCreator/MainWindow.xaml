@@ -83,11 +83,19 @@
                     </StackPanel>
                     <Label Content="MIDI command" Foreground="White" Margin="0,15,0,0"/>
                     <StackPanel Orientation="Horizontal" Margin="15,0,0,0">
-                        <RadioButton Content="BC" Foreground="White" Margin="5,0,5,0" IsChecked="True"/>
-                        <RadioButton Content="Exp" Foreground="White" Margin="5,0,5,0"/>
-                        <RadioButton Content="Aft" Foreground="White" Margin="5,0,5,0"/>
-                        <RadioButton Content="Vol" Foreground="White" Margin="5,0,5,0"/>
+                        <RadioButton Name="RadioButtonBC" Content="BC" Foreground="White" Margin="5,0,5,0" Click="RadioButtonBC_Click"/>
+                        <RadioButton Name="RadioButtonExp" Content="Exp" Foreground="White" Margin="5,0,5,0" Click="RadioButtonBC_Click"/>
+                        <RadioButton Name="RadioButtonAft" Content="Aft" Foreground="White" Margin="5,0,5,0" Click="RadioButtonBC_Click"/>
+                        <RadioButton Name="RadioButtonVol" Content="Vol" Foreground="White" Margin="5,0,5,0" Click="RadioButtonBC_Click"/>
                     </StackPanel>
+                    <Grid Margin="0,15,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1*"/>
+                            <ColumnDefinition Width="1*"/>
+                        </Grid.ColumnDefinitions>
+                        <Label Grid.Column="0" Content="MIDI Program Number" Foreground="White"/>
+                        <ComboBox Name="MidiPgNoComboBox" Grid.Column="1" SelectionChanged="MidiPgNoComboBox_SelectionChanged"/>
+                    </Grid>
                     <Label Content="Key Config" Foreground="White" Margin="0,15,0,0"/>
                     <Label Content="(Comming soon)" Foreground="Silver" Margin="5,0,5,0"/>
                 </StackPanel>

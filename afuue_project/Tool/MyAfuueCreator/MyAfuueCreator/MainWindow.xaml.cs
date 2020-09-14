@@ -46,6 +46,7 @@ namespace MyAfuueCreator
             public Byte Metronome_v = 0;
             public int Metronome_t = 90;
             public Byte MidiControlType = 0;
+            public Byte MidiPgNo = 51;
         };
 
         public class SaveData
@@ -486,6 +487,141 @@ namespace MyAfuueCreator
                 SerialPortComboBox.SelectedIndex = 0;
                 Connect();
             }
+            string[] voiceList =
+            {
+                "1: Acoustic Piano",
+                "2: Bright Piano",
+                "3: Electric Grand Piano",
+                "4: Honky-tonk Piano",
+                "5: Electric Piano",
+                "6: Electric Piano 2",
+                "7: Harpsichord",
+                "8: Clavi",
+                "9: Celesta",
+                "10:  Glockenspiel",
+                "11: Musical box",
+                "12: Vibraphone",
+                "13: Marimba",
+                "14: Xylophone",
+                "15: Tubular Bell",
+                "16: Dulcime",
+                "17: Drawbar Organ",
+                "18: Percussive Organ",
+                "19: Rock Organ",
+                "20:  Church organ",
+                "21: Reed organ",
+                "22: Accordion",
+                "23: Harmonica",
+                "24: Tango Accordion",
+                "25: Acoustic Guitar (nylon)",
+                "26: Acoustic Guitar (steel)",
+                "27: Electric Guitar (jazz)",
+                "28: Electric Guitar (clean)",
+                "29: Electric Guitar (muted)",
+                "30:  Overdriven Guitar",
+                "31: Distortion Guitar",
+                "32: Guitar harmonics",
+                "33: Acoustic Bass",
+                "34: Electric Bass (finger)",
+                "35: Electric Bass (pick)",
+                "36: Fretless Bass",
+                "37: Slap Bass 1",
+                "38: Slap Bass 2",
+                "39: Synth Bass 1",
+                "40:  Synth Bass 2",
+                "41: Violin",
+                "42: Viola",
+                "43: Cello",
+                "44: Double Bass",
+                "45: Tremolo Strings",
+                "46: Pizzicato Strings",
+                "47: Orchestral Harp",
+                "48: Timpani",
+                "49: String Ensemble 1",
+                "50:  String Ensemble 2",
+                "51: Synth Strings 1",
+                "52: Synth Strings 2",
+                "53: Voice Aahs",
+                "54: Voice Oohs",
+                "55: Synth Voice",
+                "56: Orchestra Hit",
+                "57: Trumpet",
+                "58: Trombone",
+                "59: Tuba",
+                "60: Muted Trumpet",
+                "61: French horn",
+                "62: Brass Section",
+                "63: Synth Brass 1",
+                "64: Synth Brass 2",
+                "65: Soprano Sax",
+                "66: Alto Sax",
+                "67: Tenor Sax",
+                "68: Baritone Sax",
+                "69: Oboe",
+                "70:  English Horn",
+                "71: Bassoon",
+                "72: Clarinet",
+                "73: Piccolo",
+                "74: Flute",
+                "75: Recorder",
+                "76: Pan Flute",
+                "77: Blown Bottle",
+                "78: Shakuhachi",
+                "79: Whistle",
+                "80:  Ocarina",
+                "81: Lead 1 (square)",
+                "82: Lead 2 (sawtooth)",
+                "83: Lead 3 (calliope)",
+                "84: Lead 4 (chiff)",
+                "85: Lead 5 (charang)",
+                "86: Lead 6 (voice)",
+                "87: Lead 7 (fifths)",
+                "88: Lead 8 (bass + lead)",
+                "89: Pad 1 (Fantasia)",
+                "90:  Pad 2 (warm)",
+                "91: Pad 3 (polysynth)",
+                "92: Pad 4 (choir)",
+                "93: Pad 5 (bowed)",
+                "94: Pad 6 (metallic)",
+                "95: Pad 7 (halo)",
+                "96: Pad 8 (sweep)",
+                "97: FX 1 (rain)",
+                "98: FX 2 (soundtrack)",
+                "99: FX 3 (crystal)",
+                "100: FX 4 (atmosphere)",
+                "101: FX 5 (brightness)",
+                "102: FX 6 (goblins)",
+                "103: FX 7 (echoes)",
+                "104: FX 8 (sci-fi)",
+                "105: Sitar",
+                "106: Banjo",
+                "107: Shamisen",
+                "108: Koto",
+                "109: Kalimba",
+                "110: Bagpipe",
+                "111: Fiddle",
+                "112: Shanai",
+                "113: Tinkle Bell",
+                "114: Agogo",
+                "115: Steel Drums",
+                "116: Woodblock",
+                "117: Taiko Drum",
+                "118: Melodic Tom",
+                "119: Synth Drum",
+                "120: Reverse Cymbal",
+                "121: Guitar Fret Noise",
+                "122: Breath Noise",
+                "123: Seashore",
+                "124: Bird Tweet",
+                "125: Telephone Ring",
+                "126: Helicopter",
+                "127: Applause",
+                "128: Gunshot",
+            };
+            foreach (var s in voiceList)
+            {
+                MidiPgNoComboBox.Items.Add(s);
+            }
         }
 
         //------------------
@@ -532,6 +668,8 @@ namespace MyAfuueCreator
              * 0xA5 SET PORTAMENT LEVEL
              * 0xA6 SET KEY SENSITIVITY
              * 0xA7 SET BREATH SENSITIVITY
+             * 0xA8 SET METRONOME
+             * 0xA9 SET MIDI
              * 0xAA SET WAVE A DATA
              * 0xAB SET WAVE B DATA
              * 0xAC SET TONE SHIFT CURVE TABLE
@@ -545,6 +683,8 @@ namespace MyAfuueCreator
              * 0xB5 GET PORTAMENT LEVEL
              * 0xB6 GET KEY SENSITIVITY
              * 0xB7 GET BREATH SENSITIVITY
+             * 0xB8 GET METRONOME
+             * 0xB9 GET MIDI
              * 0xBA GET WAVE A DATA
              * 0xBB GET WAVE B DATA
              * 0xBC GET TONE SHIFT CURVE TABLE
@@ -558,6 +698,8 @@ namespace MyAfuueCreator
              * 0xC5 RESPONSE PORTAMENT LEVEL
              * 0xC6 RESPONSE KEY SENSITIVITY
              * 0xC7 RESPONSE BREATH SENSITIVITY
+             * 0xC8 RESPONSE METRONOME
+             * 0xC9 RESPONSE MIDI
              * 0xCA RESPONSE WAVE A DATA
              * 0xCB RESPONSE WAVE B DATA
              * 0xBC RESPONSE TONE SHIFT CURVE TABLE
@@ -702,6 +844,24 @@ namespace MyAfuueCreator
                             RadioButtonMetronome4Beats.IsChecked = (mode == 4);
                             MetronomeVolumeSlider.Value = vol;
                             MetronomeTempoSlider.Value = tempo;
+                            RemoveFirstCommand();
+                        }));
+                    }
+                    break;
+                case 0xA9: // SET MIDI
+                case 0xC9: // RESPONSE MIDI
+                    {
+                        Byte tp = receiveBuffer[1];
+                        Byte pg = receiveBuffer[2];
+                        this.Dispatcher.Invoke((Action)(() =>
+                        {
+                            saveData.GlobalSetting.MidiControlType = tp;
+                            RadioButtonBC.IsChecked = (tp == 1);
+                            RadioButtonExp.IsChecked = (tp == 2);
+                            RadioButtonAft.IsChecked = (tp == 3);
+                            RadioButtonVol.IsChecked = (tp == 4);
+                            saveData.GlobalSetting.MidiPgNo = pg;
+                            MidiPgNoComboBox.SelectedIndex = pg;
                             RemoveFirstCommand();
                         }));
                     }
@@ -879,6 +1039,7 @@ namespace MyAfuueCreator
             if (serialPort.IsOpen == false) return null;
 
             WriteLog("send get global settings");
+            AddCommandQueue(0xB9); // GET MIDI
             return AddCommandQueue(0xB8); // GET METRONOME
         }
 
@@ -1415,6 +1576,25 @@ namespace MyAfuueCreator
         {
             HelpWindow helpWindow = new HelpWindow();
             helpWindow.ShowDialog();
+        }
+
+        //------------------
+        private void MidiPgNoComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            saveData.GlobalSetting.MidiPgNo = (byte)MidiPgNoComboBox.SelectedIndex;
+            AddCommandQueue(0xA9, (byte)saveData.GlobalSetting.MidiControlType, (byte)saveData.GlobalSetting.MidiPgNo);
+        }
+
+        //------------------
+        private void RadioButtonBC_Click(object sender, RoutedEventArgs e)
+        {
+            int tp = 0;
+            if (RadioButtonBC.IsChecked == true) tp = 1;
+            if (RadioButtonExp.IsChecked == true) tp = 2;
+            if (RadioButtonAft.IsChecked == true) tp = 3;
+            if (RadioButtonVol.IsChecked == true) tp = 4;
+            saveData.GlobalSetting.MidiControlType = (byte)tp;
+            AddCommandQueue(0xA9, (byte)saveData.GlobalSetting.MidiControlType, (byte)saveData.GlobalSetting.MidiPgNo);
         }
     }
 }
