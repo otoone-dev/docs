@@ -2,7 +2,11 @@
 #include <Preferences.h>
 #include <nvs.h>
 
-const char* version = "AFUUE ver0.5.1.4";
+#define ENABLE_FMSG (0)
+
+const char* version = "AFUUE ver0.5.1.5";
+const uint8_t commVer1 = 0x15;  // 1.5
+const uint8_t commVer2 = 0x02;  // protocolVer = 2
 
 static Preferences pref;
 
@@ -427,7 +431,7 @@ void getChord(int& n0, int& n1, int& n2) {
 
   double note = getNoteNumber2(true);
 
-  n0 = ((int)(note - (baseNote - 1))+24) % 12;
+  n0 = ((int)(note - (baseNote - 1 -4))+24) % 12;
   n1 = (n0 + 4) % 12;
   n2 = (n0 + 7) % 12;
 
@@ -444,9 +448,39 @@ void getChord(int& n0, int& n1, int& n2) {
   n1 = (n1 % 12) - 12;
   n2 = (n2 % 12) - 12;
 
-  n0 += (int)(baseNote-1);
-  n1 += (int)(baseNote-1);
-  n2 += (int)(baseNote-1);
+  n0 += (int)(baseNote-1 -4);
+  n1 += (int)(baseNote-1 -4);
+  n2 += (int)(baseNote-1 -4);
+}
+
+//---------------------------------
+bool isAnyKeyDown() {
+  bool keyLowC = digitalRead(16);
+  bool keyEb = digitalRead(17);
+  bool keyD = digitalRead(5);
+  bool keyE = digitalRead(18);
+  bool keyF = digitalRead(19);
+  bool keyLowCs = digitalRead(13);
+  bool keyGs =digitalRead(12);
+  bool keyG = digitalRead(14);
+  bool keyA = digitalRead(27);
+  bool keyB = digitalRead(26);
+  bool octDown = digitalRead(23);
+  bool octUp = digitalRead(3);
+  if (keyLowC == LOW) return true;
+  if (keyEb == LOW) return true;
+  if (keyLowC == LOW) return true;
+  if (keyD == LOW) return true;
+  if (keyE == LOW) return true;
+  if (keyF == LOW) return true;
+  if (keyLowCs == LOW) return true;
+  if (keyGs == LOW) return true;
+  if (keyG == LOW) return true;
+  if (keyA == LOW) return true;
+  if (keyB == LOW) return true;
+  if (octDown == LOW) return true;
+  if (octUp == LOW) return true;
+  return false;
 }
 
 //--------------------------
@@ -485,6 +519,13 @@ void loop() {
     int n2;
     if ((volBase[1] > 0.0) || (volBase[2] > 0.0)) {
       getChord(n0, n1, n2);
+#if 0
+      //押すだけプレイ機能
+      bool anyKeyDown = isAnyKeyDown();
+      if (anyKeyDown) {
+        pp = 0.8;
+      }
+#endif
     } else {
       n0 = getNoteNumber2(false);
       n1 = n2 = n0;
@@ -569,8 +610,10 @@ void loop() {
         activeNotifyTime = t;
         MIDI_ActiveNotify();
       } else {
-        delay(1);
+//        delay(1);
       }
+    } else {
+      delay(1);
     }
     return;
   }
@@ -664,7 +707,7 @@ void MIDI_NoteOn(int note, int vol) {
 #endif
     playing = true;
     prevNoteNumber = note;
-    delay(16);
+    delay(8);
 }
 
 //---------------------------------
@@ -696,7 +739,7 @@ void MIDI_NoteOff() {
 #endif
     playing = false;
     prevNoteNumber = -1;
-    delay(16);
+    delay(4);
 }
 
 //---------------------------------
@@ -729,7 +772,7 @@ void MIDI_BreathControl(int vol) {
       SerialHW.write(midiPacket, 3);
     }
 #endif
-    delay(16);
+    delay(4);
 }
 
 //---------------------------------
@@ -742,7 +785,7 @@ void MIDI_ProgramChange(int no) {
       
     SerialHW.write(midiPacket, 2);
 #endif
-    delay(16);
+    delay(2);
 }
 
 //---------------------------------
@@ -759,7 +802,7 @@ void MIDI_ActiveNotify() {
       
     SerialHW.write(midiPacket, 1);
 #endif
-    delay(4);
+    delay(1);
 }
 
 //---------------------------------
@@ -1192,8 +1235,8 @@ void OnReceiveCommand() {
             break;
         case 0xF1: // GET AFUUE VERSION
           sendBuffer[0] = 0xF1;
-          sendBuffer[1] = 0x15; // ver1.5
-          sendBuffer[2] = 0x01; // protocol version
+          sendBuffer[1] = commVer1;
+          sendBuffer[2] = commVer2;
           sendBuffer[3] = 0xFF;
           Serial.write(sendBuffer, 3);
           Serial.flush();
@@ -1561,17 +1604,41 @@ double Voice(double p) {
   return (w / 32767.0);
 }
 
+#define SIN_TABLE_COUNT (1000)
+double sin_table[SIN_TABLE_COUNT];
+//---------------------------------
+double tsin(double p) {
+  int i = (int)(SIN_TABLE_COUNT * p) % SIN_TABLE_COUNT;
+  return sin_table[i];
+}
+
+//---------------------------------
+double FmVoice(double phase, double cp, double mv, double mp) {
+//  return 0.5 + 0.5 * sin(6.2831853 * phase * cp + mv * sin(6.2831853 * phase * mp));
+  return 0.5 + 0.5 * tsin(phase * cp + (mv / 6.2831853) * tsin(phase * mp));
+}
+
 //---------------------------------
 uint8_t CreateWave() {
+    // 波形を生成する
+#if ENABLE_FMSG
+    // double 演算で波形のフェーズを 0-255 で算出する
+    for (int i = 0; i < 3; i++) {
+      phase[i] += fst[i];
+      if (phase[i] >= 100000.0) phase[i] -= 100000.0;
+    }
+    double g = FmVoice(phase[0], 2.0, 0.5, 3.0);// * 0.5*volBase[0];
+//    g += FmVoice(phase[0] + 0.25, 1.0, 1.0, 1.0) * 0.3;
+//    g += FmVoice(phase[0] + 0.5, 0.5, 2.0, 1.0) * 0.3;
+    g *= volBase[0];
+#else
     // double 演算で波形のフェーズを 0-255 で算出する
     for (int i = 0; i < 3; i++) {
       phase[i] += fst[i];
       if (phase[i] >= 1.0) phase[i] -= 1.0;
     }
-    // 波形を生成する
-    //double g = Voice(phase);
     double g = Voice(phase[0]) * volBase[0] + Voice(phase[1]) * volBase[1] + Voice(phase[2]) * volBase[2];
-    
+#endif
     //ノイズ
     double n = ((double)rand() / RAND_MAX);
     double e = 150 * (g * (1-noise) + n * noise) * volReq + reverbBuffer[reverbPos];;
@@ -1638,12 +1705,15 @@ void setup() {
   Serial.begin(115200);
   SerialPrintLn("------");
 #endif
+  for (int i = 0; i < SIN_TABLE_COUNT; i++) {
+    sin_table[i] = sin(i * (3.141592653*2) / SIN_TABLE_COUNT);
+  }
 
   Wire.begin();
   SerialPrintLn("wire begin");
 
   ledcSetup(0, 12800, 8);
-  ledcAttachPin(A12, 0);
+  ledcAttachPin(33, 0);
 
   ledcWrite(0, 255);
   delay(500);
@@ -1652,7 +1722,7 @@ void setup() {
 
   const int portList[12] = { 13, 12, 14, 27, 26, 16, 17, 5,18, 19, 23, 3 };
   for (int i = 0; i < 12; i++) {
-    pinMode(portList[i], INPUT_PULLUP);
+    pinMode(portList[i], INPUT_PULLUP); // KEYS
   }
 
   BeginPreferences(); {

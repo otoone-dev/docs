@@ -22,6 +22,9 @@ namespace MyAfuueCreator
     /// </summary>
     public partial class MainWindow : Window
     {
+        private const Byte commVer1 = 0x15;
+        private const Byte commVer2 = 0x02;
+
         public class ToneSetting
         {
             public bool RequestSynchronize = true;
@@ -928,7 +931,7 @@ namespace MyAfuueCreator
                     {
                         int ver = receiveBuffer[1];
                         int protocol = receiveBuffer[2];
-                        if ((ver == 0x15) && (protocol == 0x01))
+                        if ((ver == commVer1) && (protocol == commVer2))
                         {
                             this.Dispatcher.Invoke((Action)(() =>
                             {
