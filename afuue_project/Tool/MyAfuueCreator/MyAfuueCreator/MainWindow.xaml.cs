@@ -863,6 +863,7 @@ namespace MyAfuueCreator
                             RadioButtonExp.IsChecked = (tp == 2);
                             RadioButtonAft.IsChecked = (tp == 3);
                             RadioButtonVol.IsChecked = (tp == 4);
+                            RadioButtonCutoff.IsChecked = (tp == 5);
                             saveData.GlobalSetting.MidiPgNo = pg;
                             MidiPgNoComboBox.SelectedIndex = pg;
                             RemoveFirstCommand();
@@ -1596,6 +1597,8 @@ namespace MyAfuueCreator
             if (RadioButtonExp.IsChecked == true) tp = 2;
             if (RadioButtonAft.IsChecked == true) tp = 3;
             if (RadioButtonVol.IsChecked == true) tp = 4;
+            if (RadioButtonCutoff.IsChecked == true) tp = 5;
+            Console.WriteLine("");
             saveData.GlobalSetting.MidiControlType = (byte)tp;
             AddCommandQueue(0xA9, (byte)saveData.GlobalSetting.MidiControlType, (byte)saveData.GlobalSetting.MidiPgNo);
         }

@@ -98,7 +98,7 @@ volatile int metronome_cnt = 0;
 #define ENABLE_MIDI (1)
 
 bool midiEnabled = false;
-byte midiMode = 2; // 1:BreathControl 2:Expression 3:AfterTouch 4:MainVolume
+byte midiMode = 5; // 1:BreathControl 2:Expression 3:AfterTouch 4:MainVolume 5:CUTOFF(for KORG NTS-1)
 byte midiPgNo = 51;
 uint8_t midiPacket[32];
 bool deviceConnected = false;
@@ -701,6 +701,9 @@ void MIDI_NoteOn(int note, int vol) {
       else if (midiMode == 4) {
         midiPacket[4] = 0x07; // main volume
       }
+      else if (midiMode == 5) {
+        midiPacket[5] = 43; // CUT OFF (for KORG NTS-1)
+      }
       midiPacket[5] = vol;
       SerialHW.write(midiPacket, 6);
     }
@@ -767,6 +770,9 @@ void MIDI_BreathControl(int vol) {
       }
       else if (midiMode == 4) {
         midiPacket[1] = 0x07; // main volume
+      }
+      else if (midiMode == 5) {
+        midiPacket[1] = 43; // CUTOFF (for KORG NTS-1)
       }
       midiPacket[2] = vol;
       SerialHW.write(midiPacket, 3);

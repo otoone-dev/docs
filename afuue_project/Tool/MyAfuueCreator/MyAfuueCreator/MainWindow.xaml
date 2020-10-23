@@ -87,6 +87,7 @@
                         <RadioButton Name="RadioButtonExp" Content="Exp" Foreground="White" Margin="5,0,5,0" Click="RadioButtonBC_Click"/>
                         <RadioButton Name="RadioButtonAft" Content="Aft" Foreground="White" Margin="5,0,5,0" Click="RadioButtonBC_Click"/>
                         <RadioButton Name="RadioButtonVol" Content="Vol" Foreground="White" Margin="5,0,5,0" Click="RadioButtonBC_Click"/>
+                        <RadioButton Name="RadioButtonCutoff" Content="CutOff" Foreground="White" Margin="5,0,5,0" Click="RadioButtonBC_Click"/>
                     </StackPanel>
                     <Grid Margin="0,15,0,0">
                         <Grid.ColumnDefinitions>
