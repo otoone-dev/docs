@@ -217,7 +217,7 @@ U 1 1 5E29C855
 P 6650 1050
 F 0 "P1" H 6650 1300 50  0000 C CNN
 F 1 "SENSOR" V 6750 1050 50  0000 C CNN
-F 2 "Socket_Strips:Socket_Strip_Angled_1x04_Pitch2.54mm" H 6650 1050 50  0001 C CNN
+F 2 "Socket_Strips:Socket_Strip_Angled_1x04_Pitch2.00mm" H 6650 1050 50  0001 C CNN
 F 3 "" H 6650 1050 50  0000 C CNN
 	1    6650 1050
 	0    -1   -1   0   
@@ -239,7 +239,7 @@ U 1 1 5E29EA6F
 P 3250 1850
 F 0 "P2" H 3250 2000 50  0000 C CNN
 F 1 "SPEAKER" V 3350 1850 50  0000 C CNN
-F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" H 3250 1850 50  0001 C CNN
+F 2 "UGSM30:USGM30" H 3250 1850 50  0001 C CNN
 F 3 "" H 3250 1850 50  0000 C CNN
 	1    3250 1850
 	1    0    0    -1  
@@ -306,7 +306,7 @@ U 1 1 5EAEB79B
 P 5750 1050
 F 0 "P7" H 5750 1350 50  0000 C CNN
 F 1 "I2C" V 5850 1050 50  0000 C CNN
-F 2 "Pin_Headers:Pin_Header_Straight_1x05_Pitch2.54mm" H 5750 1050 50  0001 C CNN
+F 2 "Pin_Headers:Pin_Header_Straight_1x05_Pitch2.00mm" H 5750 1050 50  0001 C CNN
 F 3 "" H 5750 1050 50  0000 C CNN
 	1    5750 1050
 	0    -1   -1   0   
@@ -361,47 +361,14 @@ F 3 "" H 3600 3250 50  0000 C CNN
 	0    1    1    0   
 $EndComp
 $Comp
-L Led_Small D2
+L Led_Small D1
 U 1 1 5F3D4A68
 P 3700 5150
-F 0 "D2" H 3650 5275 50  0000 L CNN
+F 0 "D1" H 3650 5275 50  0000 L CNN
 F 1 "Led_Small" H 3525 5050 50  0000 L CNN
 F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" V 3700 5150 50  0001 C CNN
 F 3 "" V 3700 5150 50  0000 C CNN
 	1    3700 5150
-	1    0    0    -1  
-$EndComp
-$Comp
-L Led_Small D4
-U 1 1 5F3D4B28
-P 3700 5550
-F 0 "D4" H 3650 5675 50  0000 L CNN
-F 1 "Led_Small" H 3525 5450 50  0000 L CNN
-F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" V 3700 5550 50  0001 C CNN
-F 3 "" V 3700 5550 50  0000 C CNN
-	1    3700 5550
-	1    0    0    -1  
-$EndComp
-$Comp
-L D D1
-U 1 1 5F3E8C46
-P 4150 5150
-F 0 "D1" H 4150 5250 50  0000 C CNN
-F 1 "D" H 4150 5050 50  0000 C CNN
-F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" H 4150 5150 50  0001 C CNN
-F 3 "" H 4150 5150 50  0000 C CNN
-	1    4150 5150
-	1    0    0    -1  
-$EndComp
-$Comp
-L D D3
-U 1 1 5F3E8CC2
-P 4150 5550
-F 0 "D3" H 4150 5650 50  0000 C CNN
-F 1 "D" H 4150 5450 50  0000 C CNN
-F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" H 4150 5550 50  0001 C CNN
-F 3 "" H 4150 5550 50  0000 C CNN
-	1    4150 5550
 	1    0    0    -1  
 $EndComp
 Wire Wire Line
@@ -713,51 +680,12 @@ Wire Wire Line
 Connection ~ 6200 3050
 Wire Wire Line
 	3600 5150 3500 5150
-Wire Wire Line
-	3500 4850 3500 5900
 Connection ~ 3500 4850
 Wire Wire Line
-	3500 5550 3600 5550
-Connection ~ 3500 5150
+	3800 5150 4450 5150
 Wire Wire Line
-	3800 5550 4000 5550
-Wire Wire Line
-	3800 5150 4000 5150
-Wire Wire Line
-	4450 5150 4300 5150
-Wire Wire Line
-	4300 5550 5500 5550
+	4450 5550 5500 5550
 Connection ~ 4450 5150
-$Comp
-L Led_Small D6
-U 1 1 5F478FDD
-P 3700 5900
-F 0 "D6" H 3650 6025 50  0000 L CNN
-F 1 "Led_Small" H 3525 5800 50  0000 L CNN
-F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" V 3700 5900 50  0001 C CNN
-F 3 "" V 3700 5900 50  0000 C CNN
-	1    3700 5900
-	1    0    0    -1  
-$EndComp
-$Comp
-L D D5
-U 1 1 5F479067
-P 4150 5900
-F 0 "D5" H 4150 6000 50  0000 C CNN
-F 1 "D" H 4150 5800 50  0000 C CNN
-F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" H 4150 5900 50  0001 C CNN
-F 3 "" H 4150 5900 50  0000 C CNN
-	1    4150 5900
-	1    0    0    -1  
-$EndComp
-Wire Wire Line
-	4800 5900 4300 5900
-Connection ~ 4800 5900
-Wire Wire Line
-	4000 5900 3800 5900
-Wire Wire Line
-	3500 5900 3600 5900
-Connection ~ 3500 5550
 Wire Wire Line
 	6000 3650 6400 3650
 Wire Wire Line
@@ -778,7 +706,7 @@ U 1 1 5F4D14A7
 P 2900 4000
 F 0 "P4" H 2900 4200 50  0000 C CNN
 F 1 "EXT-POWER" V 3000 4000 50  0000 C CNN
-F 2 "Socket_Strips:Socket_Strip_Straight_1x03_Pitch2.54mm" H 2900 4000 50  0001 C CNN
+F 2 "Socket_Strips:Socket_Strip_Straight_1x03_Pitch2.00mm" H 2900 4000 50  0001 C CNN
 F 3 "" H 2900 4000 50  0000 C CNN
 	1    2900 4000
 	-1   0    0    -1  
@@ -827,7 +755,6 @@ Wire Wire Line
 	6150 5750 5500 5750
 Wire Wire Line
 	5500 5750 5500 5550
-Connection ~ 4450 5550
 NoConn ~ 6000 2850
 Wire Wire Line
 	3100 4000 4800 4000
@@ -850,4 +777,6 @@ Connection ~ 3350 3250
 Wire Wire Line
 	3350 3650 2750 3650
 Connection ~ 2750 3650
+Wire Wire Line
+	3500 5150 3500 4850
 $EndSCHEMATC
