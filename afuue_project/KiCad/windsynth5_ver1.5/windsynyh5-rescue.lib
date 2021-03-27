@@ -1,141 +1,11 @@
 EESchema-LIBRARY Version 2.4
 #encoding utf-8
 #
-# Device_C
+# CONN_01X02
 #
-DEF Device_C C 0 10 N Y 1 F N
-F0 "C" 25 100 50 H V L CNN
-F1 "Device_C" 25 -100 50 H V L CNN
-F2 "" 38 -150 50 H I C CNN
-F3 "" 0 0 50 H I C CNN
-$FPLIST
- C_*
-$ENDFPLIST
-DRAW
-P 2 0 1 20 -80 -30 80 -30 N
-P 2 0 1 20 -80 30 80 30 N
-X ~ 1 0 150 110 D 50 50 1 1 P
-X ~ 2 0 -150 110 U 50 50 1 1 P
-ENDDRAW
-ENDDEF
-#
-# Device_R
-#
-DEF Device_R R 0 0 N Y 1 F N
-F0 "R" 80 0 50 V V C CNN
-F1 "Device_R" 0 0 50 V V C CNN
-F2 "" -70 0 50 V I C CNN
-F3 "" 0 0 50 H I C CNN
-$FPLIST
- R_*
-$ENDFPLIST
-DRAW
-S -40 -100 40 100 0 1 10 N
-X ~ 1 0 150 50 D 50 50 1 1 P
-X ~ 2 0 -150 50 U 50 50 1 1 P
-ENDDRAW
-ENDDEF
-#
-# Regulator_Linear_L7805
-#
-DEF Regulator_Linear_L7805 U 0 10 Y Y 1 F N
-F0 "U" -150 125 50 H V C CNN
-F1 "Regulator_Linear_L7805" 0 125 50 H V L CNN
-F2 "" 25 -150 50 H I L CIN
-F3 "" 0 -50 50 H I C CNN
-ALIAS L7806 L7808 L7885 L7809 L7812 L7815 L7818 L7824
-$FPLIST
- TO?252*
- TO?263*
- TO?220*
-$ENDFPLIST
-DRAW
-S -200 75 200 -200 0 1 10 f
-X IN 1 -300 0 100 R 50 50 1 1 W
-X GND 2 0 -300 100 U 50 50 1 1 W
-X OUT 3 300 0 100 L 50 50 1 1 w
-ENDDRAW
-ENDDEF
-#
-# Switch_SW_SPDT
-#
-DEF Switch_SW_SPDT SW 0 0 Y N 1 F N
-F0 "SW" 0 170 50 H V C CNN
-F1 "Switch_SW_SPDT" 0 -200 50 H V C CNN
-F2 "" 0 0 50 H I C CNN
-F3 "" 0 0 50 H I C CNN
-DRAW
-C -80 0 20 0 0 0 N
-C 80 -100 20 0 0 0 N
-C 80 100 20 0 1 0 N
-P 2 0 1 0 -60 10 65 90 N
-X A 1 200 100 100 L 50 50 1 1 P
-X B 2 -200 0 100 R 50 50 1 1 P
-X C 3 200 -100 100 L 50 50 1 1 P
-ENDDRAW
-ENDDEF
-#
-# power_+5V
-#
-DEF power_+5V #PWR 0 0 Y Y 1 F P
-F0 "#PWR" 0 -150 50 H I C CNN
-F1 "power_+5V" 0 140 50 H V C CNN
-F2 "" 0 0 50 H I C CNN
-F3 "" 0 0 50 H I C CNN
-DRAW
-P 2 0 1 0 -30 50 0 100 N
-P 2 0 1 0 0 0 0 100 N
-P 2 0 1 0 0 100 30 50 N
-X +5V 1 0 0 0 U 50 50 1 1 W N
-ENDDRAW
-ENDDEF
-#
-# power_+9V
-#
-DEF power_+9V #PWR 0 0 Y Y 1 F P
-F0 "#PWR" 0 -150 50 H I C CNN
-F1 "power_+9V" 0 140 50 H V C CNN
-F2 "" 0 0 50 H I C CNN
-F3 "" 0 0 50 H I C CNN
-DRAW
-P 2 0 1 0 -30 50 0 100 N
-P 2 0 1 0 0 0 0 100 N
-P 2 0 1 0 0 100 30 50 N
-X +9V 1 0 0 0 U 50 50 1 1 W N
-ENDDRAW
-ENDDEF
-#
-# power_GND
-#
-DEF power_GND #PWR 0 0 Y Y 1 F P
-F0 "#PWR" 0 -250 50 H I C CNN
-F1 "power_GND" 0 -150 50 H V C CNN
-F2 "" 0 0 50 H I C CNN
-F3 "" 0 0 50 H I C CNN
-DRAW
-P 6 0 1 0 0 0 0 -50 50 -50 0 -100 -50 -50 0 -50 N
-X GND 1 0 0 0 D 50 50 1 1 W N
-ENDDRAW
-ENDDEF
-#
-# power_PWR_FLAG
-#
-DEF power_PWR_FLAG #FLG 0 0 N N 1 F P
-F0 "#FLG" 0 75 50 H I C CNN
-F1 "power_PWR_FLAG" 0 150 50 H V C CNN
-F2 "" 0 0 50 H I C CNN
-F3 "" 0 0 50 H I C CNN
-DRAW
-P 6 0 1 0 0 0 0 50 -40 75 0 100 40 75 0 50 N
-X pwr 1 0 0 0 U 50 50 0 0 w
-ENDDRAW
-ENDDEF
-#
-# windsynyh5-rescue_CONN_01X02
-#
-DEF windsynyh5-rescue_CONN_01X02 P 0 40 Y N 1 F N
+DEF CONN_01X02 P 0 40 Y N 1 F N
 F0 "P" 0 150 50 H V C CNN
-F1 "windsynyh5-rescue_CONN_01X02" 100 0 50 V V C CNN
+F1 "CONN_01X02" 100 0 50 V V C CNN
 F2 "" 0 0 50 H V C CNN
 F3 "" 0 0 50 H V C CNN
 $FPLIST
@@ -153,11 +23,11 @@ X P2 2 -200 -50 150 R 50 50 1 1 P
 ENDDRAW
 ENDDEF
 #
-# windsynyh5-rescue_CONN_01X04
+# CONN_01X04
 #
-DEF windsynyh5-rescue_CONN_01X04 P 0 40 Y N 1 F N
+DEF CONN_01X04 P 0 40 Y N 1 F N
 F0 "P" 0 250 50 H V C CNN
-F1 "windsynyh5-rescue_CONN_01X04" 100 0 50 V V C CNN
+F1 "CONN_01X04" 100 0 50 V V C CNN
 F2 "" 0 0 50 H V C CNN
 F3 "" 0 0 50 H V C CNN
 $FPLIST
@@ -179,11 +49,11 @@ X P4 4 -200 -150 150 R 50 50 1 1 P
 ENDDRAW
 ENDDEF
 #
-# windsynyh5-rescue_CONN_01X05
+# CONN_01X05
 #
-DEF windsynyh5-rescue_CONN_01X05 P 0 40 Y N 1 F N
+DEF CONN_01X05 P 0 40 Y N 1 F N
 F0 "P" 0 300 50 H V C CNN
-F1 "windsynyh5-rescue_CONN_01X05" 100 0 50 V V C CNN
+F1 "CONN_01X05" 100 0 50 V V C CNN
 F2 "" 0 0 50 H V C CNN
 F3 "" 0 0 50 H V C CNN
 $FPLIST
@@ -207,11 +77,11 @@ X P5 5 -200 -200 150 R 50 50 1 1 P
 ENDDRAW
 ENDDEF
 #
-# windsynyh5-rescue_CONN_02X04
+# CONN_02X04
 #
-DEF windsynyh5-rescue_CONN_02X04 P 0 1 Y N 1 F N
+DEF CONN_02X04 P 0 1 Y N 1 F N
 F0 "P" 0 250 50 H V C CNN
-F1 "windsynyh5-rescue_CONN_02X04" 0 -250 50 H V C CNN
+F1 "CONN_02X04" 0 -250 50 H V C CNN
 F2 "" 0 -1200 50 H V C CNN
 F3 "" 0 -1200 50 H V C CNN
 $FPLIST
@@ -241,11 +111,11 @@ X P8 8 250 -150 150 L 50 50 1 1 P
 ENDDRAW
 ENDDEF
 #
-# windsynyh5-rescue_CheeyMX-Switch
+# CheeyMX-Switch
 #
-DEF windsynyh5-rescue_CheeyMX-Switch SW 0 40 Y Y 1 F N
+DEF CheeyMX-Switch SW 0 40 Y Y 1 F N
 F0 "SW" 0 -300 60 H V C CNN
-F1 "windsynyh5-rescue_CheeyMX-Switch" 0 -200 60 H V C CNN
+F1 "CheeyMX-Switch" 0 -200 60 H V C CNN
 F2 "" 0 0 60 H V C CNN
 F3 "" 0 0 60 H V C CNN
 DRAW
@@ -256,11 +126,11 @@ X ~ 3 200 -100 118 L 50 50 1 1 N
 ENDDRAW
 ENDDEF
 #
-# windsynyh5-rescue_ESP32-DEVKIT-C
+# ESP32-DEVKIT-C
 #
-DEF windsynyh5-rescue_ESP32-DEVKIT-C U 0 40 Y Y 1 F N
+DEF ESP32-DEVKIT-C U 0 40 Y Y 1 F N
 F0 "U" 0 1150 60 H V C CNN
-F1 "windsynyh5-rescue_ESP32-DEVKIT-C" 0 -950 60 H V C CNN
+F1 "ESP32-DEVKIT-C" 0 -950 60 H V C CNN
 F2 "" 0 0 60 H V C CNN
 F3 "" 0 0 60 H V C CNN
 DRAW
@@ -306,11 +176,11 @@ X IO25 9 -550 200 200 R 50 50 1 1 P
 ENDDRAW
 ENDDEF
 #
-# windsynyh5-rescue_Led_Small
+# Led_Small
 #
-DEF windsynyh5-rescue_Led_Small D 0 10 N N 1 F N
+DEF Led_Small D 0 10 N N 1 F N
 F0 "D" -50 125 50 H V L CNN
-F1 "windsynyh5-rescue_Led_Small" -175 -100 50 H V L CNN
+F1 "Led_Small" -175 -100 50 H V L CNN
 F2 "" 0 0 50 V V C CNN
 F3 "" 0 0 50 V V C CNN
 $FPLIST
@@ -327,11 +197,11 @@ X A 2 100 0 70 L 40 40 1 1 P
 ENDDRAW
 ENDDEF
 #
-# windsynyh5-rescue_POT
+# POT
 #
-DEF windsynyh5-rescue_POT RV 0 40 Y N 1 F N
+DEF POT RV 0 40 Y N 1 F N
 F0 "RV" 0 -100 50 H V C CNN
-F1 "windsynyh5-rescue_POT" 0 0 50 H V C CNN
+F1 "POT" 0 0 50 H V C CNN
 F2 "" 0 0 50 H V C CNN
 F3 "" 0 0 50 H V C CNN
 DRAW

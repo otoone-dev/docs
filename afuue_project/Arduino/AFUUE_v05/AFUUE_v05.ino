@@ -1,6 +1,19 @@
 #include <Wire.h>
 #include <Preferences.h>
-#include <nvs.h>
+//#include <nvs.h>
+
+#define ENABLE_ADXL345 (0)
+#if ENABLE_ADXL345
+#define ADXL345_DEVICE (0x53)    // ADXL345 device address
+#define ADXL345_RESO (0.0039) // 3.9mG
+#define ADXL345_POWER_CTL 0x2d
+#define ADXL345_DATAX0 0x32
+#endif
+
+#define ENABLE_SERIALOUTPUT (0)
+
+#define ENABLE_BLE_MIDI (0)
+#define ENABLE_MIDI (1)
 
 #define ENABLE_FMSG (0)
 
@@ -94,8 +107,6 @@ volatile int metronome_t = 90;
 volatile uint8_t metronome_v = 10;
 volatile int metronome_cnt = 0;
 
-#define ENABLE_BLE_MIDI (0)
-#define ENABLE_MIDI (1)
 
 bool midiEnabled = false;
 byte midiMode = 5; // 1:BreathControl 2:Expression 3:AfterTouch 4:MainVolume 5:CUTOFF(for KORG NTS-1)
@@ -108,8 +119,8 @@ int prevNoteNumber = -1;
 unsigned long activeNotifyTime = 0;
 
 void SerialPrintLn(char* text) {
-#if !ENABLE_MIDI
-  //Serial.println(text);
+#if ENABLE_SERIALOUTPUT
+  Serial.println(text);
 #endif
 }
 
@@ -178,19 +189,19 @@ class MyServerCallbacks: public BLEServerCallbacks {
 
 
 //---------------------------------
-char readBytes(unsigned char *values, char length)
+char readBytes(unsigned char addr, unsigned char *values, char length)
 // Read an array of bytes from device
 // values: external array to hold data. Put starting register in values[0].
 // length: number of bytes to read
 {
   char x;
 
-  Wire.beginTransmission(BMP180_ADDR);
+  Wire.beginTransmission(addr);
   Wire.write(values[0]);
   _error = Wire.endTransmission();
   if (_error == 0)
   {
-    Wire.requestFrom(BMP180_ADDR,length);
+    Wire.requestFrom(addr,length);
     while(Wire.available() != length) ; // wait until bytes are ready
     for(x=0;x<length;x++)
     {
@@ -207,7 +218,7 @@ char readInt(char address, int16_t &value)
   unsigned char data[2];
 
   data[0] = address;
-  if (readBytes(data,2))
+  if (readBytes(BMP180_ADDR, data,2))
   {
     value = (int16_t)((data[0]<<8)|data[1]);
     //if (*value & 0x8000) *value |= 0xFFFF0000; // sign extend if negative
@@ -220,7 +231,7 @@ char readUInt(char address, uint16_t &value) {
   unsigned char data[2];
 
   data[0] = address;
-  if (readBytes(data,2))
+  if (readBytes(BMP180_ADDR, data,2))
   {
     value = (uint16_t)((data[0]<<8)|data[1]);
     //if (*value & 0x8000) *value |= 0xFFFF0000; // sign extend if negative
@@ -231,11 +242,11 @@ char readUInt(char address, uint16_t &value) {
 }
 
 //---------------------------------
-char writeBytes(unsigned char *values, char length)
+char writeBytes(unsigned char addr, unsigned char *values, char length)
 {
   char x;
   
-  Wire.beginTransmission(BMP180_ADDR);
+  Wire.beginTransmission(addr);
   Wire.write(values,length);
   _error = Wire.endTransmission();
   if (_error == 0)
@@ -247,10 +258,10 @@ char writeBytes(unsigned char *values, char length)
 //---------------------------------
 uint16_t getPressure() {  // 16bit unsigned
   unsigned char wdata[2] = { BMP180_REG_CONTROL, BMP180_COMMAND_PRESSURE0 };
-  if (writeBytes(wdata, 2)) {
+  if (writeBytes(BMP180_ADDR, wdata, 2)) {
     delay(5);
     unsigned char rdata[3] = { BMP180_REG_RESULT, 0, 0 };
-    if (readBytes(rdata, 3)) {
+    if (readBytes(BMP180_ADDR, rdata, 3)) {
       return (((uint16_t)rdata[0]) << 8) | (uint16_t)rdata[1];
     }
   }
@@ -260,16 +271,30 @@ uint16_t getPressure() {  // 16bit unsigned
 //---------------------------------
 int16_t getTemperature() {  // 16bit singed
   unsigned char wdata[2] = { BMP180_REG_CONTROL, BMP180_COMMAND_TEMPERATURE };
-  if (writeBytes(wdata, 2)) {
+  if (writeBytes(BMP180_ADDR, wdata, 2)) {
     delay(5);
     unsigned char rdata[2] = { BMP180_REG_RESULT, 0 };
-    if (readBytes(rdata, 2)) {
+    if (readBytes(BMP180_ADDR, rdata, 2)) {
       return (int16_t)((((uint16_t)rdata[0]) << 8) | (uint16_t)rdata[1]);
     }
   }
   return 0;
 }
 
+#if ENABLE_ADXL345
+//---------------------------------
+void readXYZ(double* x, double* y, double* z) {
+  unsigned char _buff[8];
+    _buff[0] = ADXL345_DATAX0;
+    readBytes(ADXL345_DEVICE, _buff, 6);
+    short sx = (short)((((unsigned short)_buff[1]) << 8) | _buff[0]);
+    short sy = (short)((((unsigned short)_buff[3]) << 8) | _buff[2]);
+    short sz = (short)((((unsigned short)_buff[5]) << 8) | _buff[4]);
+    *x = ADXL345_RESO * (double)sx;
+    *y = ADXL345_RESO * (double)sy;
+    *z = ADXL345_RESO * (double)sz;
+}
+#endif
 
 //---------------------------------
 double getNoteNumber2(bool chordFlag) {
@@ -284,7 +309,7 @@ double getNoteNumber2(bool chordFlag) {
   bool keyA = digitalRead(27);
   bool keyB = digitalRead(26);
   bool octDown = digitalRead(23);
-  bool octUp = digitalRead(3);
+  bool octUp = digitalRead(3) && digitalRead(4); // before1.5:RXD0 after1.5:GPIO4
 
   int b = 0;
   if (keyLowC == LOW) b |= (1 << 7);
@@ -395,7 +420,7 @@ int getNoteNumber() {
   bool keyA = digitalRead(27);
   bool keyB = digitalRead(26);
   bool octDown = digitalRead(23);
-  bool octUp = digitalRead(3);
+  bool octUp = digitalRead(3) && digitalRead(4); // before1.5:RXD0 after1.5:GPIO4
 
   int bnote = 0;
   if (keyA == LOW) bnote = 1;
@@ -427,7 +452,7 @@ void getChord(int& n0, int& n1, int& n2) {
   bool keyLowCs = digitalRead(13);
   bool keyGs =digitalRead(12);
   bool octDown = digitalRead(23);
-  bool octUp = digitalRead(3);
+  bool octUp = digitalRead(3) && digitalRead(4); // before1.5:RXD0 after1.5:GPIO4
 
   double note = getNoteNumber2(true);
 
@@ -466,7 +491,7 @@ bool isAnyKeyDown() {
   bool keyA = digitalRead(27);
   bool keyB = digitalRead(26);
   bool octDown = digitalRead(23);
-  bool octUp = digitalRead(3);
+  bool octUp = digitalRead(3) && digitalRead(4); // before1.5:RXD0 after1.5:GPIO4
   if (keyLowC == LOW) return true;
   if (keyEb == LOW) return true;
   if (keyLowC == LOW) return true;
@@ -500,6 +525,16 @@ void loop() {
   const int maxPressure = 400;
   if (p > maxPressure) p = maxPressure;
   double pp = p / (double)maxPressure;
+
+#if ENABLE_ADXL345
+  {
+    double x, y, z;
+    readXYZ(&x, &y, &z);
+    //pp = 1 + y;
+  }
+#endif
+
+  if (pp < 0.0) pp = 0.0;
   if (pp > 1.0) pp = 1.0;
   if (initCnt > 0) {
     initCnt--;
@@ -566,17 +601,6 @@ void loop() {
   }
 
   double ppReq = pp*pp;
-
-#if 0
-  // デバッグ用ボリューム最大
-  {
-    bool octDown = digitalRead(3);
-    bool octUp = digitalRead(23);
-    if ((octDown == false) && (octUp == false)) {
-      ppReq = 1.0;
-    }
-  }
-#endif
 
   if (ppReq > vol) {
     vol += (ppReq - vol) * volumeRate;
@@ -655,7 +679,17 @@ void loop() {
     ftt[i] += (ft - ftt[i]) * portamentoRate;
     fst[i] = (ftt[i] / fs);
   }
-  ledcWrite(0, (uint8_t)(volReq * 255));
+
+  double ledRate = 0;
+  if (currentNote[0] > 36) {
+    ledRate = (currentNote[0] - 36) / 40.0;
+    if (ledRate > 1) ledRate = 1;
+  }
+  
+  //ledcWrite(0, (uint8_t)(255 * volReq * (1-ledRate)));
+  //ledcWrite(1, (uint8_t)(255 * volReq * ledRate));
+  ledcWrite(0, (uint8_t)(255 * volReq));
+  ledcWrite(1, 0);
 
   if (interruptCounter > 0) {
     portENTER_CRITICAL(&timerMux);
@@ -1707,7 +1741,7 @@ void IRAM_ATTR onTimer(){
 
 //---------------------------------
 void setup() {
-#if !ENABLE_MIDI
+#if ENABLE_SERIALOUTPUT
   Serial.begin(115200);
   SerialPrintLn("------");
 #endif
@@ -1720,15 +1754,21 @@ void setup() {
 
   ledcSetup(0, 12800, 8);
   ledcAttachPin(33, 0);
+  ledcSetup(1, 12800, 8);
+  ledcAttachPin(32, 1);
 
   ledcWrite(0, 255);
+  ledcWrite(1, 40);
   delay(500);
   ledcWrite(0, 40);
+  ledcWrite(1, 255);
   delay(500);
+  ledcWrite(0, 20);
+  ledcWrite(1, 20);
 
-  const int portList[12] = { 13, 12, 14, 27, 26, 16, 17, 5,18, 19, 23, 3 };
-  for (int i = 0; i < 12; i++) {
-    pinMode(portList[i], INPUT_PULLUP); // KEYS
+  const int keyPortList[13] = { 13, 12, 14, 27, 26, 16, 17, 5,18, 19, 23, 3, 4 };
+  for (int i = 0; i < 13; i++) {
+    pinMode(keyPortList[i], INPUT_PULLUP); // INPUT FOR SWITCHS
   }
 
   BeginPreferences(); {
@@ -1742,8 +1782,6 @@ void setup() {
     bool keyG = digitalRead(14);
     bool keyA = digitalRead(27);
     bool keyB = digitalRead(26);
-    bool octDown = digitalRead(3);
-    bool octUp = digitalRead(23);
     // play key setting
     bootBaseNote = 0;
   
@@ -1813,6 +1851,15 @@ void setup() {
   delay(100);
   defTemperature = getTemperature();
 
+#if ENABLE_ADXL345
+  {
+    unsigned char _buff[8];
+    _buff[0] = ADXL345_POWER_CTL;
+    _buff[1] = 8; // Measure ON
+    writeBytes(ADXL345_DEVICE, _buff, 2);
+  }
+#endif
+
   ledcWrite(0, 255);
   delay(500);
   ledcWrite(0, 0);
@@ -1872,7 +1919,7 @@ void setup() {
   }
   else
   {
-#if ENABLE_MIDI
+#if !ENABLE_SERIALOUTPUT
   Serial.begin(115200);
 #endif
     timerSemaphore = xSemaphoreCreateBinary();
@@ -1890,4 +1937,3 @@ void setup() {
   }
   SerialPrintLn("setup done");
 }
-

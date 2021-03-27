@@ -214,12 +214,12 @@ $EndComp
 $Comp
 L windsynyh5-rescue:CONN_01X05 P3
 U 1 1 5E29EC6C
-P 3800 2200
-F 0 "P3" H 3800 2500 50  0000 C CNN
-F 1 "HEADPHONE" V 3900 2200 50  0000 C CNN
-F 2 "HPJack_PJ307:PJ-307 AudioJack" H 3800 2200 50  0001 C CNN
-F 3 "" H 3800 2200 50  0000 C CNN
-	1    3800 2200
+P 3950 2200
+F 0 "P3" H 3950 2500 50  0000 C CNN
+F 1 "HEADPHONE" V 4050 2200 50  0000 C CNN
+F 2 "HPJack_PJ307:PJ-307 AudioJack" H 3950 2200 50  0001 C CNN
+F 3 "" H 3950 2200 50  0000 C CNN
+	1    3950 2200
 	1    0    0    -1  
 $EndComp
 NoConn ~ 4900 2550
@@ -252,7 +252,7 @@ $EndComp
 NoConn ~ 2700 2000
 NoConn ~ 2200 2100
 Text Notes 7150 6850 0    157  ~ 0
-AFUUE BOARD ver1.5B
+AFUUE BOARD ver1.6
 Text Notes 7200 7000 0    60   ~ 0
 OtooneDev (otoone.dev@gmail.com)
 $Comp
@@ -269,26 +269,25 @@ $EndComp
 $Comp
 L Device:R R3
 U 1 1 5F3D1BEC
+P 5900 5850
+F 0 "R3" V 5980 5850 50  0000 C CNN
+F 1 "47" V 5900 5850 50  0000 C CNN
+F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" V 5830 5850 50  0001 C CNN
+F 3 "" H 5900 5850 50  0000 C CNN
+	1    5900 5850
+	0    1    1    0   
+$EndComp
+$Comp
+L Device:R R2
+U 1 1 5F3D23AC
 P 5900 6150
-F 0 "R3" V 5980 6150 50  0000 C CNN
+F 0 "R2" V 5980 6150 50  0000 C CNN
 F 1 "47" V 5900 6150 50  0000 C CNN
 F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" V 5830 6150 50  0001 C CNN
 F 3 "" H 5900 6150 50  0000 C CNN
 	1    5900 6150
 	0    1    1    0   
 $EndComp
-$Comp
-L Device:R R2
-U 1 1 5F3D23AC
-P 5900 5950
-F 0 "R2" V 5980 5950 50  0000 C CNN
-F 1 "47" V 5900 5950 50  0000 C CNN
-F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" V 5830 5950 50  0001 C CNN
-F 3 "" H 5900 5950 50  0000 C CNN
-	1    5900 5950
-	0    1    1    0   
-$EndComp
-NoConn ~ 5400 5850
 NoConn ~ 5400 6050
 NoConn ~ 6000 4050
 NoConn ~ 6000 4150
@@ -303,17 +302,6 @@ F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" V 3530 3250 50  0001 C CN
 F 3 "" H 3600 3250 50  0000 C CNN
 	1    3600 3250
 	0    1    1    0   
-$EndComp
-$Comp
-L windsynyh5-rescue:Led_Small D1
-U 1 1 5F3D4A68
-P 3700 5150
-F 0 "D1" H 3650 5275 50  0000 L CNN
-F 1 "Led_Small" H 3525 5050 50  0000 L CNN
-F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" V 3700 5150 50  0001 C CNN
-F 3 "" V 3700 5150 50  0000 C CNN
-	1    3700 5150
-	1    0    0    -1  
 $EndComp
 NoConn ~ 4900 4050
 NoConn ~ 4900 2850
@@ -529,8 +517,6 @@ Wire Wire Line
 	3350 4700 3350 4850
 Connection ~ 3350 4850
 Wire Wire Line
-	3050 2400 3600 2400
-Wire Wire Line
 	3600 1500 3600 2000
 Wire Wire Line
 	2750 1900 3050 1900
@@ -557,10 +543,6 @@ Wire Wire Line
 Wire Wire Line
 	7200 4700 6600 4700
 Wire Wire Line
-	6600 4700 6600 6150
-Wire Wire Line
-	3050 2200 3050 2400
-Wire Wire Line
 	2700 2100 2850 2100
 Wire Wire Line
 	2850 2100 2850 1800
@@ -581,7 +563,6 @@ Wire Wire Line
 	4950 4350 4950 4450
 Wire Wire Line
 	4950 4450 5900 4450
-Connection ~ 3900 4250
 Wire Wire Line
 	3300 3900 3100 3900
 Wire Wire Line
@@ -596,22 +577,7 @@ Connection ~ 5400 4850
 Wire Wire Line
 	5400 6150 5750 6150
 Connection ~ 4800 2450
-Wire Wire Line
-	3600 2200 3050 2200
 Connection ~ 3050 2400
-Wire Wire Line
-	2900 2100 3350 2100
-Wire Wire Line
-	2900 2100 2900 2200
-Wire Wire Line
-	2900 2200 2700 2200
-Wire Wire Line
-	3600 2300 3350 2300
-Wire Wire Line
-	3350 2300 3350 2100
-Connection ~ 3350 2100
-Wire Wire Line
-	5400 5950 5750 5950
 Wire Wire Line
 	4100 2550 2700 2550
 Wire Wire Line
@@ -625,22 +591,11 @@ Wire Wire Line
 	3600 5150 3500 5150
 Connection ~ 3500 4850
 Wire Wire Line
-	3800 5150 4450 5150
-Wire Wire Line
 	4450 5550 5500 5550
-Connection ~ 4450 5150
 Wire Wire Line
 	6000 3650 6400 3650
 Wire Wire Line
 	6150 5500 5850 5500
-Wire Wire Line
-	4450 3150 4450 5150
-Wire Wire Line
-	6600 6150 6050 6150
-Wire Wire Line
-	6050 5950 6300 5950
-Wire Wire Line
-	6300 5950 6300 6400
 Wire Wire Line
 	6300 6400 4800 6400
 Connection ~ 3150 4850
@@ -772,13 +727,9 @@ Wire Wire Line
 Wire Wire Line
 	3050 2400 3050 3100
 Wire Wire Line
-	3350 2100 3600 2100
-Wire Wire Line
 	6200 3050 6200 4850
 Wire Wire Line
 	3500 4850 3350 4850
-Wire Wire Line
-	4450 5150 4450 5550
 Wire Wire Line
 	3150 4850 2750 4850
 Wire Wire Line
@@ -852,8 +803,6 @@ $EndComp
 Wire Wire Line
 	1950 4150 1950 4250
 Connection ~ 1950 4250
-Wire Wire Line
-	2550 4250 3900 4250
 $Comp
 L Switch:SW_SPDT SW1
 U 1 1 5FF202B1
@@ -865,4 +814,83 @@ F 3 "~" H 1550 4350 50  0001 C CNN
 	1    1550 4350
 	1    0    0    -1  
 $EndComp
+Wire Wire Line
+	3750 2100 3050 2100
+Wire Wire Line
+	3050 2100 3050 2400
+Wire Wire Line
+	3050 2400 3750 2400
+Wire Wire Line
+	2700 2200 3400 2200
+Wire Wire Line
+	3750 2300 3400 2300
+Wire Wire Line
+	3400 2300 3400 2200
+Connection ~ 3400 2200
+Wire Wire Line
+	3400 2200 3750 2200
+Wire Wire Line
+	3600 2000 3750 2000
+Wire Wire Line
+	6600 4700 6600 6150
+Wire Wire Line
+	6600 6150 6050 6150
+Wire Wire Line
+	6300 6400 6300 5850
+Wire Wire Line
+	6300 5850 6050 5850
+Wire Wire Line
+	5750 5850 5400 5850
+NoConn ~ 5400 5950
+$Comp
+L Diode:1N5822 D2
+U 1 1 6026CD17
+P 3450 4250
+F 0 "D2" H 3450 4467 50  0000 C CNN
+F 1 "1N5822" H 3450 4376 50  0000 C CNN
+F 2 "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical" H 3450 4075 50  0001 C CNN
+F 3 "http://www.vishay.com/docs/88526/1n5820.pdf" H 3450 4250 50  0001 C CNN
+	1    3450 4250
+	-1   0    0    -1  
+$EndComp
+Wire Wire Line
+	3900 4250 3750 4250
+Connection ~ 3900 4250
+Wire Wire Line
+	3300 4250 2550 4250
+Wire Wire Line
+	4450 3150 4450 5150
+Connection ~ 4450 5150
+Wire Wire Line
+	4450 5150 4450 5550
+Wire Wire Line
+	3800 5150 4450 5150
+$Comp
+L windsynyh5-rescue:Led_Small D1
+U 1 1 5F3D4A68
+P 3700 5150
+F 0 "D1" H 3650 5275 50  0000 L CNN
+F 1 "Led_Small" H 3525 5050 50  0000 L CNN
+F 2 "Pin_Headers:Pin_Header_Straight_1x02_Pitch2.54mm" V 3700 5150 50  0001 C CNN
+F 3 "" V 3700 5150 50  0000 C CNN
+	1    3700 5150
+	1    0    0    -1  
+$EndComp
+$Comp
+L power:PWR_FLAG #FLG0102
+U 1 1 60297D7D
+P 3750 4050
+F 0 "#FLG0102" H 3750 4125 50  0001 C CNN
+F 1 "PWR_FLAG" H 3750 4223 50  0000 C CNN
+F 2 "" H 3750 4050 50  0001 C CNN
+F 3 "~" H 3750 4050 50  0001 C CNN
+	1    3750 4050
+	1    0    0    -1  
+$EndComp
+Wire Wire Line
+	3750 4050 3750 4250
+Connection ~ 3750 4250
+Wire Wire Line
+	3750 4250 3600 4250
+NoConn ~ 4900 2650
 $EndSCHEMATC

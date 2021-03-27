@@ -1,5 +1,38 @@
-EESchema Schematic File Version 4
-EELAYER 30 0
+EESchema Schematic File Version 2
+LIBS:power
+LIBS:device
+LIBS:transistors
+LIBS:conn
+LIBS:linear
+LIBS:regul
+LIBS:74xx
+LIBS:cmos4000
+LIBS:adc-dac
+LIBS:memory
+LIBS:xilinx
+LIBS:microcontrollers
+LIBS:dsp
+LIBS:microchip
+LIBS:analog_switches
+LIBS:motorola
+LIBS:texas
+LIBS:intel
+LIBS:audio
+LIBS:interface
+LIBS:digital-audio
+LIBS:philips
+LIBS:display
+LIBS:cypress
+LIBS:siliconi
+LIBS:opto
+LIBS:atmel
+LIBS:contrib
+LIBS:valves
+LIBS:esp32-devkit-c
+LIBS:cheeymx-switch
+LIBS:tda1543
+LIBS:windsynyh5-cache
+EELAYER 25 0
 EELAYER END
 $Descr A4 11693 8268
 encoding utf-8
@@ -14,7 +47,7 @@ Comment3 ""
 Comment4 ""
 $EndDescr
 $Comp
-L windsynyh5-rescue:ESP32-DEVKIT-C U1
+L ESP32-DEVKIT-C U1
 U 1 1 5E29A3F4
 P 5450 3450
 F 0 "U1" H 5450 4600 60  0000 C CNN
@@ -25,7 +58,7 @@ F 3 "" H 5450 3450 60  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L windsynyh5-rescue:CheeyMX-Switch KeyLowC#1
+L CheeyMX-Switch KeyLowC#1
 U 1 1 5E29A443
 P 7650 1650
 F 0 "KeyLowC#1" H 7650 1350 60  0000 C CNN
@@ -36,7 +69,7 @@ F 3 "" H 7650 1650 60  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L windsynyh5-rescue:CheeyMX-Switch KeyG#1
+L CheeyMX-Switch KeyG#1
 U 1 1 5E29AD34
 P 7650 2150
 F 0 "KeyG#1" H 7650 1850 60  0000 C CNN
@@ -47,7 +80,7 @@ F 3 "" H 7650 2150 60  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L windsynyh5-rescue:CheeyMX-Switch KeyG1
+L CheeyMX-Switch KeyG1
 U 1 1 5E29AD57
 P 7650 2650
 F 0 "KeyG1" H 7650 2350 60  0000 C CNN
@@ -58,7 +91,7 @@ F 3 "" H 7650 2650 60  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L windsynyh5-rescue:CheeyMX-Switch KeyA1
+L CheeyMX-Switch KeyA1
 U 1 1 5E29AD8A
 P 7650 3150
 F 0 "KeyA1" H 7650 2850 60  0000 C CNN
@@ -69,7 +102,7 @@ F 3 "" H 7650 3150 60  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L windsynyh5-rescue:CheeyMX-Switch KeyB1
+L CheeyMX-Switch KeyB1
 U 1 1 5E29ADBD
 P 7650 3650
 F 0 "KeyB1" H 7650 3350 60  0000 C CNN
@@ -80,7 +113,7 @@ F 3 "" H 7650 3650 60  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L windsynyh5-rescue:CheeyMX-Switch KeyLowC1
+L CheeyMX-Switch KeyLowC1
 U 1 1 5E29ADEA
 P 9500 1650
 F 0 "KeyLowC1" H 9500 1350 60  0000 C CNN
@@ -91,7 +124,7 @@ F 3 "" H 9500 1650 60  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L windsynyh5-rescue:CheeyMX-Switch KeyEb1
+L CheeyMX-Switch KeyEb1
 U 1 1 5E29AE19
 P 9500 2150
 F 0 "KeyEb1" H 9500 1850 60  0000 C CNN
@@ -102,7 +135,7 @@ F 3 "" H 9500 2150 60  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L windsynyh5-rescue:CheeyMX-Switch KeyD1
+L CheeyMX-Switch KeyD1
 U 1 1 5E29AE54
 P 9500 2650
 F 0 "KeyD1" H 9500 2350 60  0000 C CNN
@@ -113,7 +146,7 @@ F 3 "" H 9500 2650 60  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L windsynyh5-rescue:CheeyMX-Switch KeyE1
+L CheeyMX-Switch KeyE1
 U 1 1 5E29AEDC
 P 9500 3150
 F 0 "KeyE1" H 9500 2850 60  0000 C CNN
@@ -124,7 +157,7 @@ F 3 "" H 9500 3150 60  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L windsynyh5-rescue:CheeyMX-Switch KeyF1
+L CheeyMX-Switch KeyF1
 U 1 1 5E29AF15
 P 9500 3650
 F 0 "KeyF1" H 9500 3350 60  0000 C CNN
@@ -135,7 +168,7 @@ F 3 "" H 9500 3650 60  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L windsynyh5-rescue:CheeyMX-Switch KeyUP1
+L CheeyMX-Switch KeyUP1
 U 1 1 5E29AF4C
 P 8600 5150
 F 0 "KeyUP1" H 8600 4850 60  0000 C CNN
@@ -146,7 +179,7 @@ F 3 "" H 8600 5150 60  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L windsynyh5-rescue:CheeyMX-Switch KeyDown1
+L CheeyMX-Switch KeyDown1
 U 1 1 5E29AF79
 P 8600 5650
 F 0 "KeyDown1" H 8600 5350 60  0000 C CNN
@@ -157,7 +190,7 @@ F 3 "" H 8600 5650 60  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L power:GND #PWR01
+L GND #PWR01
 U 1 1 5E29C29F
 P 4700 5100
 F 0 "#PWR01" H 4700 4850 50  0001 C CNN
@@ -168,7 +201,7 @@ F 3 "" H 4700 5100 50  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L power:+5V #PWR02
+L +5V #PWR02
 U 1 1 5E29C791
 P 3900 4050
 F 0 "#PWR02" H 3900 3900 50  0001 C CNN
@@ -179,7 +212,7 @@ F 3 "" H 3900 4050 50  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L windsynyh5-rescue:CONN_01X04 P1
+L CONN_01X04 P1
 U 1 1 5E29C855
 P 6650 1050
 F 0 "P1" H 6650 1300 50  0000 C CNN
@@ -190,7 +223,7 @@ F 3 "" H 6650 1050 50  0000 C CNN
 	0    -1   -1   0   
 $EndComp
 $Comp
-L windsynyh5-rescue:POT RV1
+L POT RV1
 U 1 1 5E29DB7A
 P 3050 3250
 F 0 "RV1" H 3050 3150 50  0000 C CNN
@@ -201,7 +234,7 @@ F 3 "" H 3050 3250 50  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L windsynyh5-rescue:CONN_01X02 P2
+L CONN_01X02 P2
 U 1 1 5E29EA6F
 P 3250 1850
 F 0 "P2" H 3250 2000 50  0000 C CNN
@@ -212,23 +245,24 @@ F 3 "" H 3250 1850 50  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L windsynyh5-rescue:CONN_01X05 P3
+L CONN_01X05 P3
 U 1 1 5E29EC6C
 P 3800 2200
 F 0 "P3" H 3800 2500 50  0000 C CNN
 F 1 "HEADPHONE" V 3900 2200 50  0000 C CNN
-F 2 "HPJack_PJ307:PJ-307 AudioJack" H 3800 2200 50  0001 C CNN
+F 2 "PJ325:PJ325" H 3800 2200 50  0001 C CNN
 F 3 "" H 3800 2200 50  0000 C CNN
 	1    3800 2200
 	1    0    0    -1  
 $EndComp
 NoConn ~ 4900 2550
+NoConn ~ 4900 2650
 NoConn ~ 4900 2750
 NoConn ~ 4900 3950
 NoConn ~ 6000 3950
 NoConn ~ 6000 3850
 $Comp
-L power:PWR_FLAG #FLG03
+L PWR_FLAG #FLG03
 U 1 1 5E2A0A26
 P 3350 4700
 F 0 "#FLG03" H 3350 4795 50  0001 C CNN
@@ -239,7 +273,18 @@ F 3 "" H 3350 4700 50  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L windsynyh5-rescue:CONN_01X04 P5
+L PWR_FLAG #FLG04
+U 1 1 5E36D7FF
+P 3650 3700
+F 0 "#FLG04" H 3650 3795 50  0001 C CNN
+F 1 "PWR_FLAG" H 3650 3880 50  0000 C CNN
+F 2 "" H 3650 3700 50  0000 C CNN
+F 3 "" H 3650 3700 50  0000 C CNN
+	1    3650 3700
+	1    0    0    -1  
+$EndComp
+$Comp
+L CONN_01X04 P5
 U 1 1 5E5A6264
 P 5650 5450
 F 0 "P5" H 5650 5700 50  0000 C CNN
@@ -256,18 +301,18 @@ AFUUE BOARD ver1.5B
 Text Notes 7200 7000 0    60   ~ 0
 OtooneDev (otoone.dev@gmail.com)
 $Comp
-L windsynyh5-rescue:CONN_01X05 P8
+L CONN_01X05 P8
 U 1 1 5F3D1763
 P 5200 5950
 F 0 "P8" H 5200 6250 50  0000 C CNN
 F 1 "TRS MIDI" V 5300 5950 50  0000 C CNN
-F 2 "HPJack_PJ307:PJ-307 AudioJack" H 5200 5950 50  0001 C CNN
+F 2 "PJ325:PJ325" H 5200 5950 50  0001 C CNN
 F 3 "" H 5200 5950 50  0000 C CNN
 	1    5200 5950
 	-1   0    0    -1  
 $EndComp
 $Comp
-L Device:R R3
+L R R3
 U 1 1 5F3D1BEC
 P 5900 6150
 F 0 "R3" V 5980 6150 50  0000 C CNN
@@ -278,7 +323,7 @@ F 3 "" H 5900 6150 50  0000 C CNN
 	0    1    1    0   
 $EndComp
 $Comp
-L Device:R R2
+L R R2
 U 1 1 5F3D23AC
 P 5900 5950
 F 0 "R2" V 5980 5950 50  0000 C CNN
@@ -294,7 +339,7 @@ NoConn ~ 6000 4050
 NoConn ~ 6000 4150
 NoConn ~ 6000 4250
 $Comp
-L Device:R R1
+L R R1
 U 1 1 5F3D371E
 P 3600 3250
 F 0 "R1" V 3680 3250 50  0000 C CNN
@@ -305,7 +350,7 @@ F 3 "" H 3600 3250 50  0000 C CNN
 	0    1    1    0   
 $EndComp
 $Comp
-L windsynyh5-rescue:Led_Small D1
+L Led_Small D1
 U 1 1 5F3D4A68
 P 3700 5150
 F 0 "D1" H 3650 5275 50  0000 L CNN
@@ -322,7 +367,7 @@ NoConn ~ 6000 3750
 Text Notes 6950 5150 0    60   ~ 0
 Modified : RXD0 -> IO4
 $Comp
-L windsynyh5-rescue:CONN_02X04 P6
+L CONN_02X04 P6
 U 1 1 5EA855D8
 P 2450 2150
 F 0 "P6" H 2450 2400 50  0000 C CNN
@@ -335,7 +380,7 @@ $EndComp
 NoConn ~ 6000 2850
 NoConn ~ 4900 4150
 $Comp
-L Device:C C1
+L C C1
 U 1 1 5F842C7A
 P 3350 3500
 F 0 "C1" H 3375 3600 50  0000 L CNN
@@ -346,7 +391,7 @@ F 3 "" H 3350 3500 50  0000 C CNN
 	1    0    0    -1  
 $EndComp
 $Comp
-L windsynyh5-rescue:CONN_01X04 P7
+L CONN_01X04 P7
 U 1 1 5FBB5EB4
 P 5800 1050
 F 0 "P7" H 5800 1300 50  0000 C CNN
@@ -455,20 +500,20 @@ Wire Wire Line
 Wire Wire Line
 	6300 5650 8300 5650
 Wire Wire Line
-	4700 1450 4700 3750
+	4700 1450 4700 5100
 Wire Wire Line
 	4700 3750 4900 3750
 Wire Wire Line
 	6000 2450 6200 2450
 Wire Wire Line
-	6200 2450 6200 3050
+	6200 2450 6200 4850
 Wire Wire Line
-	10000 4850 9200 4850
+	10000 4850 1050 4850
 Connection ~ 4700 4850
 Wire Wire Line
 	7950 1650 8200 1650
 Wire Wire Line
-	8200 1650 8200 2150
+	8200 1650 8200 4850
 Connection ~ 6200 4850
 Wire Wire Line
 	7950 2150 8200 2150
@@ -485,7 +530,7 @@ Connection ~ 8200 3650
 Wire Wire Line
 	9200 5650 8900 5650
 Wire Wire Line
-	9200 4850 9200 5150
+	9200 4850 9200 5650
 Connection ~ 8200 4850
 Wire Wire Line
 	8900 5150 9200 5150
@@ -493,7 +538,7 @@ Connection ~ 9200 5150
 Wire Wire Line
 	9800 1650 10000 1650
 Wire Wire Line
-	10000 1650 10000 2150
+	10000 1650 10000 4850
 Connection ~ 9200 4850
 Wire Wire Line
 	9800 3650 10000 3650
@@ -513,18 +558,18 @@ Connection ~ 4700 3750
 Wire Wire Line
 	2800 3250 2750 3250
 Wire Wire Line
-	2750 3250 2750 3650
+	2750 3250 2750 4850
 Connection ~ 2750 4850
 Wire Wire Line
-	1050 1500 2000 1500
+	1050 1500 3600 1500
 Wire Wire Line
 	1050 4850 1050 1500
 Wire Wire Line
 	4900 2450 4800 2450
 Wire Wire Line
-	4800 1350 4800 2450
+	4800 1350 4800 6400
 Wire Wire Line
-	4800 1350 5750 1350
+	4800 1350 6600 1350
 Wire Wire Line
 	3350 4700 3350 4850
 Connection ~ 3350 4850
@@ -534,6 +579,8 @@ Wire Wire Line
 	3600 1500 3600 2000
 Wire Wire Line
 	2750 1900 3050 1900
+Wire Wire Line
+	3300 4250 4900 4250
 Wire Wire Line
 	4950 4350 4850 4350
 Wire Wire Line
@@ -559,7 +606,7 @@ Wire Wire Line
 Wire Wire Line
 	6600 4700 6600 6150
 Wire Wire Line
-	3050 2200 3050 2400
+	3050 2200 3050 3100
 Wire Wire Line
 	2700 2100 2850 2100
 Wire Wire Line
@@ -581,9 +628,14 @@ Wire Wire Line
 	4950 4350 4950 4450
 Wire Wire Line
 	4950 4450 5900 4450
+Wire Wire Line
+	3650 3700 3650 4250
 Connection ~ 3900 4250
 Wire Wire Line
+	3300 4250 3300 3900
+Wire Wire Line
 	3300 3900 3100 3900
+Connection ~ 3650 4250
 Wire Wire Line
 	2200 2000 2200 1800
 Wire Wire Line
@@ -600,7 +652,7 @@ Wire Wire Line
 	3600 2200 3050 2200
 Connection ~ 3050 2400
 Wire Wire Line
-	2900 2100 3350 2100
+	2900 2100 3600 2100
 Wire Wire Line
 	2900 2100 2900 2200
 Wire Wire Line
@@ -634,7 +686,7 @@ Wire Wire Line
 Wire Wire Line
 	6150 5500 5850 5500
 Wire Wire Line
-	4450 3150 4450 5150
+	4450 3150 4450 5550
 Wire Wire Line
 	6600 6150 6050 6150
 Wire Wire Line
@@ -651,7 +703,7 @@ Wire Wire Line
 Wire Wire Line
 	6400 5150 8300 5150
 Wire Wire Line
-	3300 3250 3350 3250
+	3300 3250 3450 3250
 Wire Wire Line
 	6100 5400 6100 4550
 Wire Wire Line
@@ -679,15 +731,15 @@ Wire Wire Line
 Wire Wire Line
 	6500 1450 6500 1250
 Wire Wire Line
-	4700 1450 5650 1450
+	4700 1450 6500 1450
 Wire Wire Line
 	6800 2650 6000 2650
 Wire Wire Line
-	6800 1250 6800 1550
+	6800 1250 6800 2650
 Wire Wire Line
 	6700 2950 6000 2950
 Wire Wire Line
-	6700 1250 6700 1750
+	6700 1250 6700 2950
 Wire Wire Line
 	4100 2550 4100 4250
 Wire Wire Line
@@ -707,12 +759,12 @@ Wire Wire Line
 	5650 1250 5650 1450
 Connection ~ 5650 1450
 $Comp
-L windsynyh5-rescue:CONN_01X02 P4
+L CONN_01X02 P4
 U 1 1 5FBB8659
 P 2900 3950
 F 0 "P4" H 2900 4100 50  0000 C CNN
 F 1 "POWER" V 3000 3950 50  0000 C CNN
-F 2 "BH-9V-3P24:BH-9V-3P24" H 2900 3950 50  0001 C CNN
+F 2 "Socket_Strips:Socket_Strip_Angled_1x02_Pitch2.00mm" H 2900 3950 50  0001 C CNN
 F 3 "" H 2900 3950 50  0000 C CNN
 	1    2900 3950
 	-1   0    0    -1  
@@ -721,148 +773,4 @@ Wire Wire Line
 	3150 4850 3150 4000
 Wire Wire Line
 	3150 4000 3100 4000
-Wire Wire Line
-	4700 4850 4700 5100
-Wire Wire Line
-	4700 4850 3500 4850
-Wire Wire Line
-	6200 4850 6000 4850
-Wire Wire Line
-	8200 2150 8200 2650
-Wire Wire Line
-	8200 2650 8200 3150
-Wire Wire Line
-	8200 3150 8200 3650
-Wire Wire Line
-	8200 3650 8200 4850
-Wire Wire Line
-	8200 4850 6200 4850
-Wire Wire Line
-	9200 5150 9200 5650
-Wire Wire Line
-	9200 4850 8200 4850
-Wire Wire Line
-	10000 3650 10000 4850
-Wire Wire Line
-	10000 3150 10000 3650
-Wire Wire Line
-	10000 2650 10000 3150
-Wire Wire Line
-	10000 2150 10000 2650
-Wire Wire Line
-	4700 3750 4700 4850
-Wire Wire Line
-	3350 4850 3150 4850
-Wire Wire Line
-	4850 4250 4900 4250
-Wire Wire Line
-	6000 4850 5400 4850
-Wire Wire Line
-	2100 1500 3600 1500
-Wire Wire Line
-	2000 1500 2100 1500
-Wire Wire Line
-	4100 4250 4850 4250
-Wire Wire Line
-	3900 4250 4100 4250
-Wire Wire Line
-	5400 4850 4700 4850
-Wire Wire Line
-	4800 2450 4800 6400
-Wire Wire Line
-	3050 2400 3050 3100
-Wire Wire Line
-	3350 2100 3600 2100
-Wire Wire Line
-	6200 3050 6200 4850
-Wire Wire Line
-	3500 4850 3350 4850
-Wire Wire Line
-	4450 5150 4450 5550
-Wire Wire Line
-	3150 4850 2750 4850
-Wire Wire Line
-	3350 3250 3450 3250
-Wire Wire Line
-	2750 3650 2750 4850
-Wire Wire Line
-	6800 1550 6800 2650
-Wire Wire Line
-	6700 1750 6700 2950
-Wire Wire Line
-	5750 1350 6600 1350
-Wire Wire Line
-	5650 1450 6500 1450
-$Comp
-L Regulator_Linear:L7805 U2
-U 1 1 5FE28D39
-P 2250 4250
-F 0 "U2" H 2250 4492 50  0000 C CNN
-F 1 "L7805" H 2250 4401 50  0000 C CNN
-F 2 "Package_TO_SOT_THT:TO-220-3_Horizontal_TabDown" H 2275 4100 50  0001 L CIN
-F 3 "http://www.st.com/content/ccc/resource/technical/document/datasheet/41/4f/b3/b0/12/d4/47/88/CD00000444.pdf/files/CD00000444.pdf/jcr:content/translations/en.CD00000444.pdf" H 2250 4200 50  0001 C CNN
-	1    2250 4250
-	1    0    0    -1  
-$EndComp
-Wire Wire Line
-	2750 4850 2250 4850
-Wire Wire Line
-	2250 4550 2250 4850
-Connection ~ 2250 4850
-Wire Wire Line
-	2250 4850 1050 4850
-NoConn ~ 1750 4450
-Wire Wire Line
-	1750 4250 1850 4250
-Wire Wire Line
-	3300 3900 3300 3750
-Wire Wire Line
-	1250 3750 1250 4350
-Wire Wire Line
-	1250 4350 1350 4350
-Wire Wire Line
-	3300 3750 1250 3750
-$Comp
-L power:+9V #PWR0101
-U 1 1 5FED1FC1
-P 1850 4050
-F 0 "#PWR0101" H 1850 3900 50  0001 C CNN
-F 1 "+9V" H 1865 4223 50  0000 C CNN
-F 2 "" H 1850 4050 50  0001 C CNN
-F 3 "" H 1850 4050 50  0001 C CNN
-	1    1850 4050
-	1    0    0    -1  
-$EndComp
-Wire Wire Line
-	1850 4050 1850 4250
-Connection ~ 1850 4250
-Wire Wire Line
-	1850 4250 1950 4250
-$Comp
-L power:PWR_FLAG #FLG0101
-U 1 1 5FEDFD8D
-P 1950 4150
-F 0 "#FLG0101" H 1950 4225 50  0001 C CNN
-F 1 "PWR_FLAG" H 1950 4323 50  0000 C CNN
-F 2 "" H 1950 4150 50  0001 C CNN
-F 3 "~" H 1950 4150 50  0001 C CNN
-	1    1950 4150
-	1    0    0    -1  
-$EndComp
-Wire Wire Line
-	1950 4150 1950 4250
-Connection ~ 1950 4250
-Wire Wire Line
-	2550 4250 3900 4250
-$Comp
-L Switch:SW_SPDT SW1
-U 1 1 5FF202B1
-P 1550 4350
-F 0 "SW1" H 1550 4635 50  0000 C CNN
-F 1 "SW_SPDT" H 1550 4544 50  0000 C CNN
-F 2 "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical" H 1550 4350 50  0001 C CNN
-F 3 "~" H 1550 4350 50  0001 C CNN
-	1    1550 4350
-	1    0    0    -1  
-$EndComp
 $EndSCHEMATC
