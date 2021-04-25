@@ -5,6 +5,8 @@
 #include <Preferences.h>
 //#include <nvs.h>
 
+#define AFUUE_VER (106)
+
 #define CORE0 (0)
 #define CORE1 (1)
 
@@ -18,7 +20,8 @@
 
 #define ENABLE_CHORD_PLAY (0)
 #define ENABLE_COMMUNICATETOOL (0)
-#define ENABLE_SERIALOUTPUT (0)
+#define KEYDATACHECK (0)
+#define ENABLE_SERIALOUTPUT (KEYDATACHECK && 1)
 #define ENABLE_BLE_MIDI (0)
 #define ENABLE_MIDI (1)
 #define ENABLE_FMSG (0)

@@ -2,7 +2,7 @@
 #include "midi.h"
 
 bool midiEnabled = false;
-byte midiMode = 5; // 1:BreathControl 2:Expression 3:AfterTouch 4:MainVolume 5:CUTOFF(for KORG NTS-1)
+byte midiMode = 0; // 1:BreathControl 2:Expression 3:AfterTouch 4:MainVolume 5:CUTOFF(for KORG NTS-1)
 byte midiPgNo = 51;
 uint8_t midiPacket[32];
 bool deviceConnected = false;
@@ -117,20 +117,20 @@ void MIDI_NoteOn(int note, int vol) {
     midiPacket[0] = 0x90 + channelNo;
     midiPacket[1] = note;
     midiPacket[2] = 120;
-    if (midiMode == 3) { // after touch (channel pressure)
+    if (midiMode == MIDIMODE_AFTERTOUCH) { // after touch (channel pressure)
       midiPacket[3] = 0xD0 + channelNo;
       midiPacket[4] = vol;
       SerialHW.write(midiPacket, 5);
     } else {
       midiPacket[3] = 0xB0 + channelNo;
       midiPacket[4] = 0x0B; // expression
-      if (midiMode == 1) {
+      if (midiMode == MIDIMODE_BREATHCONTROL) {
         midiPacket[4] = 0x02; // breath control
       }
-      else if (midiMode == 4) {
+      else if (midiMode == MIDIMODE_MAINVOLUME) {
         midiPacket[4] = 0x07; // main volume
       }
-      else if (midiMode == 5) {
+      else if (midiMode == MIDIMODE_CUTOFF) {
         midiPacket[5] = 43; // CUT OFF (for KORG NTS-1)
       }
       midiPacket[5] = vol;
@@ -187,20 +187,20 @@ void MIDI_BreathControl(int vol) {
     pCharacteristic->notify();
 #endif
 #if ENABLE_MIDI
-    if (midiMode == 3) { // after touch (channel pressure)
+    if (midiMode == MIDIMODE_AFTERTOUCH) { // after touch (channel pressure)
       midiPacket[0] = 0xD0 + channelNo;
       midiPacket[1] = vol;
       SerialHW.write(midiPacket, 2);
     } else {
       midiPacket[0] = 0xB0 + channelNo;
       midiPacket[1] = 0x0B; // expression
-      if (midiMode == 1) {
+      if (midiMode == MIDIMODE_BREATHCONTROL) {
         midiPacket[1] = 0x02; // breath control
       }
-      else if (midiMode == 4) {
+      else if (midiMode == MIDIMODE_MAINVOLUME) {
         midiPacket[1] = 0x07; // main volume
       }
-      else if (midiMode == 5) {
+      else if (midiMode == MIDIMODE_CUTOFF) {
         midiPacket[1] = 43; // CUTOFF (for KORG NTS-1)
       }
       midiPacket[2] = vol;

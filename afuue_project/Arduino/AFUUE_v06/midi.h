@@ -1,6 +1,12 @@
 #ifndef MIDI_H
 #define MIDI_H
 
+#define MIDIMODE_BREATHCONTROL (1)
+#define MIDIMODE_EXPRESSION (2)
+#define MIDIMODE_AFTERTOUCH (3)
+#define MIDIMODE_MAINVOLUME (4)
+#define MIDIMODE_CUTOFF (5)
+
 extern bool midiEnabled;
 extern byte midiMode; // 1:BreathControl 2:Expression 3:AfterTouch 4:MainVolume 5:CUTOFF(for KORG NTS-1)
 extern byte midiPgNo;

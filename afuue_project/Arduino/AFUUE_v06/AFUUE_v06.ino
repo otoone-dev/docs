@@ -29,6 +29,7 @@ struct ToneSetting {
 
 static ToneSetting toneSettings[5];
 
+static bool testMode = false;
 static char _error;
 
 hw_timer_t * timer = NULL;
@@ -439,20 +440,7 @@ void GetChord(int& n0, int& n1, int& n2) {
 
 //---------------------------------
 bool IsAnyKeyDown() {
-  if (keyLowC == LOW) return true;
-  if (keyEb == LOW) return true;
-  if (keyLowC == LOW) return true;
-  if (keyD == LOW) return true;
-  if (keyE == LOW) return true;
-  if (keyF == LOW) return true;
-  if (keyLowCs == LOW) return true;
-  if (keyGs == LOW) return true;
-  if (keyG == LOW) return true;
-  if (keyA == LOW) return true;
-  if (keyB == LOW) return true;
-  if (octDown == LOW) return true;
-  if (octUp == LOW) return true;
-  return false;
+  return (GetKeyData() != 0);
 }
 
 //--------------------------
@@ -461,8 +449,7 @@ double CalcInvFrequency(double note) {
 }
 
 //---------------------------------
-void ConfigExec() {
-  static uint16_t keyCurrent = 0;
+uint16_t GetKeyData() {
   uint16_t keyData = 0;
   if (keyLowC == LOW) keyData |= (1 << 0);
   if (keyEb == LOW) keyData |= (1 << 1);
@@ -476,12 +463,28 @@ void ConfigExec() {
   if (keyB == LOW) keyData |= (1 << 9);
   if (octDown == LOW) keyData |= (1 << 10);
   if (octUp == LOW) keyData |= (1 << 11);
+  return keyData;
+}
+
+//---------------------------------
+void ConfigExec() {
+  static uint16_t keyCurrent = 0;
+  static int32_t testModeCnt = 0;
+  uint16_t keyData = GetKeyData();
 
   uint16_t keyPush = (keyData ^ keyCurrent) & keyData;
   keyCurrent = keyData;
 
   // # + b key down -------
   if ((keyData & (1<<5))&&(keyData & (1<<6))) {
+    if ((octUp == LOW) && (octDown == LOW)) {
+      if (testModeCnt++ > 100) {
+        testMode = true;
+      }
+    } else {
+      testModeCnt = 0;
+    }
+
     ToneSetting* ts = &toneSettings[toneNo];
     if (keyPush & (1<<0)) {
       ts->reverb = ((ts->reverb / 3)+1) * 3;  // 0, 3, 6, 9
@@ -581,7 +584,7 @@ void UpdateKeys() {
   keyA = digitalRead(27);
   keyB = digitalRead(26);
   octDown = digitalRead(23);
-  octUp = digitalRead(3) && digitalRead(4); // before1.5:RXD0 after1.5:GPIO4
+  octUp = digitalRead(3) && digitalRead(4); // before1.5:RXD0 after1.6:GPIO4
 }
 
 //---------------------------------
@@ -618,16 +621,33 @@ void Tick() {
     int n2;
     if ((channelVolume[1] > 0.0) || (channelVolume[2] > 0.0)) {
       GetChord(n0, n1, n2);
-#if 0
-      // play by pushing keys
-      bool anyKeyDown = IsAnyKeyDown();
-      if (anyKeyDown) {
-        pp = 0.8;
-      }
-#endif
     } else {
       n0 = GetNoteNumber(false);
       n1 = n2 = n0;
+    }
+    if (testMode) {
+      // play by pushing keys
+      if (IsAnyKeyDown()) {
+        pp = 0.8;
+        n0 = 60;
+        if (keyEb == LOW) n0 = 63;
+        if (keyD == LOW) n0 = 62;
+        if (keyE == LOW) n0 = 64;
+        if (keyF == LOW) n0 = 65;
+        if (keyLowCs == LOW) n0 = 61;
+        if (keyGs == LOW) n0 = 68;
+        if (keyG == LOW) n0 = 67;
+        if (keyA == LOW) n0 = 69;
+        if (keyB == LOW) n0 = 71;
+        if (octDown == LOW) n0 -= 12;
+        if (octUp == LOW) n0 += 12;
+        n1 = n2 = n0;
+        for (int i = 0; i < 3; i++) {
+          startNote[i] = n0;
+          currentNote[i] = n0;
+          targetNote[i] = n0;
+        }
+      }
     }
 
     if ((targetNote[0] != n0) || (targetNote[1] != n1) || (targetNote[2] != n2)) {
@@ -1057,8 +1077,6 @@ void loop() {
 
 //---------------------------------
 void setup() {
-  UpdateKeys();
-
 #if ENABLE_SERIALOUTPUT
   Serial.begin(115200);
   SerialPrintLn("------");
@@ -1086,12 +1104,42 @@ void setup() {
 
   const int keyPortList[13] = { 13, 12, 14, 27, 26, 16, 17, 5,18, 19, 23, 3, 4 };
   for (int i = 0; i < 13; i++) {
-    pinMode(keyPortList[i], INPUT_PULLUP); // INPUT FOR SWITCHS
+    pinMode(keyPortList[i], INPUT_PULLUP); // INPUT FOR SWITCHES
   }
+  UpdateKeys();
+
+#if KEYDATACHECK
+  int c = 0;
+  while (1) {
+    uint16_t keyData = GetKeyData();
+    char s[32];
+    sprintf(s, "%d:key=%04x", (c++)%2, keyData);
+    if (keyData & (1<<0)) sprintf(s, "%s LowC", s);
+    if (keyData & (1<<1)) sprintf(s, "%s Eb", s);
+    if (keyData & (1<<2)) sprintf(s, "%s D", s);
+    if (keyData & (1<<3)) sprintf(s, "%s E", s);
+    if (keyData & (1<<4)) sprintf(s, "%s F", s);
+    if (keyData & (1<<5)) sprintf(s, "%s LowCs", s);
+    if (keyData & (1<<6)) sprintf(s, "%s Gs", s);
+    if (keyData & (1<<7)) sprintf(s, "%s G", s);
+    if (keyData & (1<<8)) sprintf(s, "%s A", s);
+    if (keyData & (1<<9)) sprintf(s, "%s B", s);
+    if (keyData & (1<<10)) sprintf(s, "%s Down", s);
+    if (keyData & (1<<11)) sprintf(s, "%s Up", s);
+    SerialPrintLn(s);
+    delay(100);
+    UpdateKeys();
+  }
+#endif
+  testMode= false;
 
   BeginPreferences(); {
     bootBaseNote = 0;
-    pref.clear(); // CLEAR ALL FLASH MEMORY
+    int ver = pref.getInt("AfuueVer", -1);
+    if (ver != AFUUE_VER) {
+      pref.clear(); // CLEAR ALL FLASH MEMORY
+      pref.putInt("AfuueVer", AFUUE_VER);
+    }
 
     if (toneNo < 0) {
       toneNo = pref.getInt("ToneNo", 0);
@@ -1110,15 +1158,15 @@ void setup() {
     channelVolume[2] = 0.0;
 
 #if ENABLE_CHORD_PLAY
-    if (keyEb == LOW) {
+    if ((keyLowC == LOW) && (keyEb == LOW)) {
       channelVolume[0] = 0.5;
       channelVolume[1] = 0.5;
       channelVolume[2] = 0.5;
     }
 #endif
-    midiMode = pref.getInt("MidiMode", 2);
+    midiMode = pref.getInt("MidiMode", MIDIMODE_EXPRESSION);
     midiPgNo = pref.getInt("MidiPgNo", 64);
-    if (keyD == LOW) {
+    if ((keyLowCs == LOW)&&(keyGs == LOW)) {
       midiEnabled = true;
     }
   } EndPreferences();

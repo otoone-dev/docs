@@ -252,7 +252,7 @@ $EndComp
 NoConn ~ 2700 2000
 NoConn ~ 2200 2100
 Text Notes 7150 6850 0    157  ~ 0
-AFUUE BOARD ver1.6
+AFUUE BOARD ver1.6C
 Text Notes 7200 7000 0    60   ~ 0
 OtooneDev (otoone.dev@gmail.com)
 $Comp
@@ -832,14 +832,6 @@ Wire Wire Line
 Wire Wire Line
 	3600 2000 3750 2000
 Wire Wire Line
-	6600 4700 6600 6150
-Wire Wire Line
-	6600 6150 6050 6150
-Wire Wire Line
-	6300 6400 6300 5850
-Wire Wire Line
-	6300 5850 6050 5850
-Wire Wire Line
 	5750 5850 5400 5850
 NoConn ~ 5400 5950
 $Comp
@@ -893,4 +885,12 @@ Connection ~ 3750 4250
 Wire Wire Line
 	3750 4250 3600 4250
 NoConn ~ 4900 2650
+Wire Wire Line
+	6600 4700 6600 5850
+Wire Wire Line
+	6050 5850 6600 5850
+Wire Wire Line
+	6300 6400 6300 6150
+Wire Wire Line
+	6300 6150 6050 6150
 $EndSCHEMATC
