@@ -1,0 +1,26 @@
+(module ContactPad_4mm (layer F.Cu) (tedit 619BAE9F)
+  (fp_text reference Ref** (at 0 0.5) (layer F.SilkS)
+    (effects (font (size 1 1) (thickness 0.15)))
+  )
+  (fp_text value CP** (at 0 -2.4) (layer F.Fab)
+    (effects (font (size 1 1) (thickness 0.15)))
+  )
+  (pad 2 smd custom (at 2 0) (size 1 1) (layers F.Cu F.Mask)
+    (zone_connect 0)
+    (options (clearance outline) (anchor circle))
+    (primitives
+      (gr_poly (pts
+         (xy -0.6 -1.4) (xy 0 0) (xy -0.6 1.4) (xy -2.1 2) (xy -2.1 1.4)
+         (xy -1.2 1.4) (xy -1.2 0.3) (xy -2.9 0.3) (xy -2.9 -0.3) (xy -1.2 -0.3)
+         (xy -1.2 -1.4) (xy -2.1 -1.4) (xy -2.1 -2)) (width 0.1))
+    ))
+  (pad 1 smd custom (at -2 0) (size 1 1) (layers F.Cu F.Mask)
+    (zone_connect 0)
+    (options (clearance outline) (anchor circle))
+    (primitives
+      (gr_poly (pts
+         (xy 1.6 -1.1) (xy 2.5 -1.1) (xy 2.5 -0.6) (xy 0.8 -0.6) (xy 0.8 0.6)
+         (xy 2.5 0.6) (xy 2.5 1.1) (xy 1.6 1.1) (xy 1.6 1.9) (xy 0.6 1.4)
+         (xy 0 0) (xy 0.6 -1.4) (xy 1.6 -1.9)) (width 0.1))
+    ))
+)

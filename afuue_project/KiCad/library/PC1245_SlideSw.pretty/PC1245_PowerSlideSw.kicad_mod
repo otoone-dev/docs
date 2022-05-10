@@ -1,0 +1,20 @@
+(module PC1245_PowerSlideSw (layer F.Cu) (tedit 6197B838)
+  (fp_text reference "" (at 0 0.5) (layer F.SilkS)
+    (effects (font (size 1 1) (thickness 0.15)))
+  )
+  (fp_text value PS (at -1.1 10.7) (layer F.Fab)
+    (effects (font (size 1 1) (thickness 0.15)))
+  )
+  (pad 1 smd custom (at 0.4 -4.6) (size 1 1) (layers F.Cu F.Paste F.Mask)
+    (options (clearance outline) (anchor circle))
+    (primitives
+      (gr_poly (pts
+         (xy -0.4 0.6) (xy -2.4 0.6) (xy -2.4 -4.9) (xy -0.4 -4.9)) (width 0.1))
+    ))
+  (pad 2 smd custom (at 0.4 -2) (size 1 1) (layers F.Cu F.Paste F.Mask)
+    (options (clearance outline) (anchor circle))
+    (primitives
+      (gr_poly (pts
+         (xy -0.4 11.5) (xy -2.4 11.5) (xy -2.4 -0.5) (xy -0.4 -0.5)) (width 0.1))
+    ))
+)
