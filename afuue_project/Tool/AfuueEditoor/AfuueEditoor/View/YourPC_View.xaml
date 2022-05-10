@@ -1,0 +1,23 @@
+﻿<UserControl x:Class="AfuueEditoor.View.YourPC_View"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:AfuueEditoor.View"
+             mc:Ignorable="d" 
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+             d:DesignHeight="720" d:DesignWidth="500">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="auto"/>
+            <RowDefinition Height="auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Text="Your PC" Margin="10" FontSize="20" FontWeight="Bold"/>
+        <StackPanel Grid.Row="1" Orientation="Horizontal">
+            <Button Content="Load From PC" Margin="10" Style="{StaticResource LoadButtonSytle}"/>
+            <Button Content="Save To PC" Margin="10" Style="{StaticResource SaveButtonSytle}"/>
+        </StackPanel>
+        <local:AfuueEditView Grid.Row="2"/>
+    </Grid>
+</UserControl>
