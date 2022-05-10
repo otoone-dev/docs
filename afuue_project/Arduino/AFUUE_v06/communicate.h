@@ -3,5 +3,6 @@
 
 extern int ChangeSigned(int data);
 extern int ChangeUnsigned(int data);
+extern void SerialProc();
 
 #endif

@@ -87,13 +87,13 @@ namespace GcoLayoutTool
             G0 X57.883 Y57.6 F3120
             G1 X52.398 Y52.115 E9.51007 F1020
              */
-public string type;
+            public string type;
             public double x = double.NaN;
             public double y = double.NaN;
             public double z = double.NaN;
             public double e = double.NaN;
-            public int s = 0;
-            public int f = 0;
+            public double s = 0;
+            public double f = 0;
 
             public GcoCommand(string command)
             {
@@ -120,13 +120,13 @@ public string type;
                             z = double.Parse(sp1.Substring(1));
                             break;
                         case 'E':
-                            e = double.Parse(sp1.Substring(1));
+                            e = double.Parse(sp1.Substring(1)); // Extrude
                             break;
                         case 'F':
-                            f = int.Parse(sp1.Substring(1));
+                            f = double.Parse(sp1.Substring(1)); // Speed(Fast)
                             break;
                         case 'S':
-                            s = int.Parse(sp1.Substring(1));
+                            s = double.Parse(sp1.Substring(1)); // Temperature
                             break;
                         default:
                             System.Diagnostics.Debug.Assert(false);
@@ -160,7 +160,7 @@ public string type;
                 }
                 if (s > 0)
                 {
-                    ret += " S" + f;
+                    ret += " S" + s;
                 }
                 return ret;
             }
@@ -203,7 +203,8 @@ public string type;
             {
                 vy = new Vector3D(1, 0, 0);
                 vz = new Vector3D(0, 0, 1);
-            } else
+            }
+            else
             {
                 vz = Vector3D.CrossProduct(vx, new Vector3D(0, 1, 0));
                 vy = Vector3D.CrossProduct(vz, vx);
@@ -213,11 +214,11 @@ public string type;
             vy *= thickness;
             vz *= thickness;
             geo.Positions.Add(from + vy / 2 - vz / 2);
-            geo.Positions.Add(  to + vy / 2 - vz / 2);
+            geo.Positions.Add(to + vy / 2 - vz / 2);
             geo.Positions.Add(from + vy / 2 + vz / 2);
-            geo.Positions.Add(  to + vy / 2 + vz / 2);
+            geo.Positions.Add(to + vy / 2 + vz / 2);
             geo.Positions.Add(from + vy / 2 + vz / 2);
-            geo.Positions.Add(  to + vy / 2 - vz / 2);
+            geo.Positions.Add(to + vy / 2 - vz / 2);
             geo.Normals.Add(-vy);
             geo.Normals.Add(-vy);
             geo.Normals.Add(-vy);
@@ -225,11 +226,11 @@ public string type;
             geo.Normals.Add(-vy);
             geo.Normals.Add(-vy);
             geo.Positions.Add(from - vy / 2 - vz / 2);
-            geo.Positions.Add(  to - vy / 2 - vz / 2);
+            geo.Positions.Add(to - vy / 2 - vz / 2);
             geo.Positions.Add(from - vy / 2 + vz / 2);
-            geo.Positions.Add(  to - vy / 2 + vz / 2);
+            geo.Positions.Add(to - vy / 2 + vz / 2);
             geo.Positions.Add(from - vy / 2 + vz / 2);
-            geo.Positions.Add(  to - vy / 2 - vz / 2);
+            geo.Positions.Add(to - vy / 2 - vz / 2);
             geo.Normals.Add(vy);
             geo.Normals.Add(vy);
             geo.Normals.Add(vy);
@@ -237,11 +238,11 @@ public string type;
             geo.Normals.Add(vy);
             geo.Normals.Add(vy);
             geo.Positions.Add(from + vy / 2 + vz / 2);
-            geo.Positions.Add(  to + vy / 2 + vz / 2);
+            geo.Positions.Add(to + vy / 2 + vz / 2);
             geo.Positions.Add(from - vy / 2 + vz / 2);
-            geo.Positions.Add(  to - vy / 2 + vz / 2);
+            geo.Positions.Add(to - vy / 2 + vz / 2);
             geo.Positions.Add(from - vy / 2 + vz / 2);
-            geo.Positions.Add(  to + vy / 2 + vz / 2);
+            geo.Positions.Add(to + vy / 2 + vz / 2);
             geo.Normals.Add(vz);
             geo.Normals.Add(vz);
             geo.Normals.Add(vz);
@@ -249,11 +250,11 @@ public string type;
             geo.Normals.Add(vz);
             geo.Normals.Add(vz);
             geo.Positions.Add(from + vy / 2 - vz / 2);
-            geo.Positions.Add(  to + vy / 2 - vz / 2);
+            geo.Positions.Add(to + vy / 2 - vz / 2);
             geo.Positions.Add(from - vy / 2 - vz / 2);
-            geo.Positions.Add(  to - vy / 2 - vz / 2);
+            geo.Positions.Add(to - vy / 2 - vz / 2);
             geo.Positions.Add(from - vy / 2 - vz / 2);
-            geo.Positions.Add(  to + vy / 2 - vz / 2);
+            geo.Positions.Add(to + vy / 2 - vz / 2);
             geo.Normals.Add(-vz);
             geo.Normals.Add(-vz);
             geo.Normals.Add(-vz);
@@ -295,7 +296,7 @@ public string type;
             Camera.LookDirection.Normalize();
 
             hAngle += 0.05;
-            if (hAngle > Math.PI*2)
+            if (hAngle > Math.PI * 2)
             {
                 hAngle -= Math.PI * 2;
             }
@@ -309,12 +310,13 @@ public string type;
             OpenFileDialog openFileDialog = new OpenFileDialog();
             openFileDialog.DefaultExt = ".gco";
             bool? ret = openFileDialog.ShowDialog();
-            if ((ret != null) && (ret == true)) {
+            if ((ret != null) && (ret == true))
+            {
 
                 double extrudeLengthOffset = 0.0;
                 Point3D pointOffset = new Point3D(0, 0, 0);
                 GcoObject lastObj = null;
-                double eLast = 0.0;
+                //double eLast = 0.0;
                 Point3D pLast = new Point3D(0, 0, 0);
                 int gCount = 0;
                 if (gcoObjects.Count > 0)
@@ -357,7 +359,7 @@ public string type;
                         pointOffset.Y -= 0;
                         break;
                     case 8:
-                        pointOffset.X +s= 20;
+                        pointOffset.X += 20;
                         pointOffset.Y += 20;
                         break;
                 }
@@ -379,7 +381,8 @@ public string type;
                                     command.AddOffset(extrudeLengthOffset, pointOffset);
                                     gcoObject.Add(command);
                                     waitForFirstM106 = false;
-                                } else
+                                }
+                                else
                                 {
                                     if (lastObj == null)
                                     {

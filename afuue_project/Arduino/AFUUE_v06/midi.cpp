@@ -2,7 +2,7 @@
 #include "midi.h"
 
 bool midiEnabled = false;
-byte midiMode = 0; // 1:BreathControl 2:Expression 3:AfterTouch 4:MainVolume 5:CUTOFF(for KORG NTS-1)
+byte midiMode = 1; // 1:BreathControl 2:Expression 3:AfterTouch 4:MainVolume 5:CUTOFF(for KORG NTS-1)
 byte midiPgNo = 51;
 uint8_t midiPacket[32];
 bool deviceConnected = false;

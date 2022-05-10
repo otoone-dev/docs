@@ -25,6 +25,7 @@
 #define ENABLE_BLE_MIDI (0)
 #define ENABLE_MIDI (1)
 #define ENABLE_FMSG (0)
+#define ENABLE_ANALOGREAD_GPIO32 (1)
 
 extern int baseNote;
 extern void SerialPrintLn(char* text);

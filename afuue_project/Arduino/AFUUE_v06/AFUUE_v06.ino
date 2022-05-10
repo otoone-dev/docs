@@ -1,3 +1,4 @@
+#include <WiFi.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "afuue_common.h"
@@ -7,7 +8,7 @@
 
 static Preferences pref;
 
-const char* version = "AFUUE ver1.0.0.0";
+const char* version = "AFUUE ver1.0.0.1";
 const uint8_t commVer1 = 0x16;  // 1.6
 const uint8_t commVer2 = 0x02;  // protocolVer = 2
 
@@ -40,7 +41,8 @@ volatile bool enablePlay = false;
 
 static uint8_t forcePlayTime = 50;
 
-#define MAX_PRESSURE (400)
+#define MIN_PRESSURE (80)
+#define MAX_PRESSURE (450)
 volatile uint32_t normalPressure = 0;
 volatile double currentPressure = 0.0;
 volatile uint32_t rawPressure = 0;
@@ -52,6 +54,9 @@ volatile int16_t rawTemperature = 0;
 static double currentVolume = 0.0;
 volatile double channelVolume[3] = {1.0, 0.0, 0.0 };
 volatile double requestedVolume = 0.0;
+volatile double maxVolume = 0.0;
+
+bool lipSensorEnabled = false;
 
 volatile double shift = 0.0;
 volatile double noise = 0.0;
@@ -60,6 +65,7 @@ volatile double pitch = 0.0;
 #define CLOCK_DIVIDER (80)
 #define TIMER_ALARM (50)
 #define SAMPLING_RATE (20000) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (80*50) = 20kHz
+#define SAMPLING_TIME_LENGTH (1.0 / SAMPLING_RATE)
 static double currentWavelength[3] = { 0.0, 0.0, 0.0 };
 volatile double currentWavelengthTickCount[3] = { 0.0, 0.0, 0.0 };
 
@@ -68,7 +74,6 @@ static double startNote[3] = { 60, 64, 67 };
 static double targetNote[3] = { 60, 64, 67 };
 static double noteStep = 0;
 static double noteDiv = 0.5;
-static int noteOnTimeLength = 0;
 static double keyChangeCurve = 12;
 static int bendCounter = 0;
 const int BENDCOUNT_MAX = 7;
@@ -88,7 +93,9 @@ volatile uint8_t noiseTable[32];
 volatile uint8_t pitchTable[32];
 
 volatile double phase[3] = { 0.0, 0.0, 0.0 };
-#define REVERB_BUFFER_SIZE (9801)
+volatile double mphase = 0.0;
+volatile double noteOnTimeLength = 0.0;
+#define REVERB_BUFFER_SIZE (8801)
 volatile double reverbBuffer[REVERB_BUFFER_SIZE];
 volatile int reverbPos = 0;
 
@@ -118,6 +125,7 @@ void SerialPrintLn(char* text) {
 #endif
 }
 
+#if ENABLE_MIDI
 static uint8_t sendBuffer[600];
 static uint8_t receiveBuffer[1024];
 static int receivePos = 0;
@@ -127,6 +135,7 @@ void SerialSend(int sendSize) {
     Serial.write(sendBuffer, sendSize);
   }
 }
+#endif
 
 static int usePreferencesDepth = 0;
 void BeginPreferences() {
@@ -494,6 +503,14 @@ void ConfigExec() {
       reverbRate = ts->reverb * 0.02; // (default 0.152)
       forcePlayTime = 10;
     }
+    else if (keyPush & (1<<1)) {
+      ts->fineTune++;
+      if (ts->fineTune > 10) {
+        ts->fineTune = -10;
+      }
+      fineTune = 440 + ChangeSigned(ts->fineTune);
+      forcePlayTime = 10;
+    }
     else if (keyPush & (1<<4)) {
       if (toneNo >= 4) {
         toneNo = 0;
@@ -542,6 +559,10 @@ void ConfigExec() {
         metronome_cnt = 0;
       }
     }
+    else if ((keyData & (1<<8)) && (keyData & (1<<7))) {
+      metronome_t = 90;
+      metronome_cnt = 0;
+    }
     else if (keyPush & (1<<8)) {
       metronome_t += 5;
       metronome_cnt = 0;
@@ -553,19 +574,30 @@ void ConfigExec() {
       if (metronome_t < 40) metronome_t = 40;
     }
     else if (keyPush & (1<<3)) {
-      baseNote ++; // 49 61 73
-      if (baseNote > 73) baseNote = 73;
-      forcePlayTime = 2;
-      if ((baseNote == 49) || (baseNote == 61) || (baseNote == 73)) {
+      if (keyData & (1<<2)) {
+        baseNote = 61;
         forcePlayTime = 10;
+      }
+      else {
+        baseNote ++; // 49 61 73
+        if (baseNote > 73) baseNote = 73;
+        forcePlayTime = 2;
+        if ((baseNote == 49) || (baseNote == 61) || (baseNote == 73)) {
+          forcePlayTime = 10;
+        }
       }
     }
     if (keyPush & (1<<2)) {
-      baseNote --; // 49 61 73
-      if (baseNote < 49) baseNote = 49;
-      forcePlayTime = 2;
-      if ((baseNote == 49) || (baseNote == 61) || (baseNote == 73)) {
+      if (keyData & (1<<3)) {
+        baseNote = 61;
         forcePlayTime = 10;
+      } else {
+        baseNote --; // 49 61 73
+        if (baseNote < 49) baseNote = 49;
+        forcePlayTime = 2;
+        if ((baseNote == 49) || (baseNote == 61) || (baseNote == 73)) {
+          forcePlayTime = 10;
+        }
       }
     }
   }
@@ -585,6 +617,15 @@ void UpdateKeys() {
   keyB = digitalRead(26);
   octDown = digitalRead(23);
   octUp = digitalRead(3) && digitalRead(4); // before1.5:RXD0 after1.6:GPIO4
+}
+
+//---------------------------------
+double StepCalc(double step) {
+  int b = int(step * 18.9999);
+  double f = (step - (b / 19.0)) / (1 / 19.0);
+  double v0 = stepTable[b];
+  double v1 = stepTable[b+1];
+  return (v0 * (1-f)) + (v1 * f);
 }
 
 //---------------------------------
@@ -665,10 +706,8 @@ void Tick() {
         currentNote[i] = targetNote[i];
       }
       noteStep = 1.0;
-      noteOnTimeLength = 0;
     }
     else {
-      noteOnTimeLength++;
       if (noteStep >= 1.0) {
         
       } else {
@@ -677,6 +716,7 @@ void Tick() {
           noteStep = 1.0;
         }
         double t = pow(noteStep, keyChangeCurve);
+        //double t = StepCalc(noteStep);
         for (int i = 0; i < 3; i++) {
           currentNote[i] = startNote[i] + (targetNote[i] - startNote[i]) * t;
         }
@@ -685,6 +725,7 @@ void Tick() {
   }
 
   double bend = BendExec();
+  
   double ppReq = pp*pp * (1-bend);
 
   if (ppReq > currentVolume) {
@@ -730,7 +771,7 @@ void Tick() {
 #if 0
   {
     // 時間によるシフト
-    double k = noteOnTimeLength / 50.0;
+    double k = noteOnTimeLength / 10.0;
     if (k > 1) k = 1;
     shift = 1 - k;
   }
@@ -761,6 +802,30 @@ void Tick() {
 
   // ベンド (キー操作によるもの)
   double bendNoteShift = bend * BENDRATE;
+#if ENABLE_ANALOGREAD_GPIO32
+  if (lipSensorEnabled) {
+    // ベンド (感圧センサーによるもの)
+#if 0
+    int d = (4095 - analogRead(32));
+    if (d > 1000) d = 1000;
+    double a = (d / 1000.0);
+#else
+    // なんかどこかで値が変わってしまった
+    int d = (500 - analogRead(32));
+    if (d < 0) d = 0;
+    if (d > 70) d = 70;
+    double a = (d / 70.0);
+#endif
+    static double ana = 0.0;
+    ana += (a - ana)*0.5;
+    a = BENDRATE * (1-ana);
+    bendNoteShift += a;
+  }
+#endif
+  // ベンド (音量によるもの)
+  double bv = -(0.5 - currentVolume) * 0.02;
+  bendNoteShift += bv;
+  
   for (int i = 0; i < 3; i++) {
     double wavelength = CalcInvFrequency(currentNote[i] + bendNoteShift);
     currentWavelength[i] += (wavelength - currentWavelength[i]) * portamentoRate;
@@ -837,7 +902,6 @@ void LoadToneSetting(int idx) {
       for (int i = 0; i < 256; i++) ts->waveB[i] = waveAfuueBrass[i];
     }
     else if (idx == 1) {
-      ts->transpose = 3;
       for (int i = 0; i < 256; i++) ts->waveA[i] = waveAfuueCla[i];
       for (int i = 0; i < 256; i++) ts->waveB[i] = waveAfuueCla[i];
     }
@@ -874,7 +938,7 @@ void LoadToneSetting(int idx) {
     ts->fineTune = GetPreferenceInt(idx, "FineTune", ts->fineTune);
     ts->reverb = GetPreferenceInt(idx, "Reverb", ts->reverb);
     ts->portamento = GetPreferenceInt(idx, "Portamento", ts->portamento);
-    ts->keySense = GetPreferenceInt(idx, "KeySense", ts->keySense);
+    //ts->keySense = GetPreferenceInt(idx, "KeySense", ts->keySense);
     ts->breathSense = GetPreferenceInt(idx, "BreathSense", ts->breathSense);
     GetPreferenceBytes(idx, "WaveA", (uint8_t*)ts->waveA, 256*2);
     GetPreferenceBytes(idx, "WaveB", (uint8_t*)ts->waveB, 256*2);
@@ -929,6 +993,12 @@ void SaveToneSetting(int idx) {
 double SawWave(double p) {
   return -1.0 + 2 * p;
 }
+double SawWave2(double p) {
+  if (p < 0.25) {
+    return (0.125 - p) * 8;
+  }
+  return (p - 0.625) * (8/3);
+}
 #endif
 
 //---------------------------------
@@ -944,6 +1014,14 @@ double Voice(double p) {
   return (w / 32767.0);
 }
 
+double VoiceA(double p) {
+  double v = 255*p;
+  int t = (int)v;
+  double f = (v - t);
+  return (waveA[t] / 32767.0);
+}
+
+#if ENABLE_FMSG
 #define SIN_TABLE_COUNT (1000)
 double sin_table[SIN_TABLE_COUNT];
 //---------------------------------
@@ -957,9 +1035,20 @@ double FmVoice(double phase, double cp, double mv, double mp) {
 //  return 0.5 + 0.5 * sin(6.2831853 * phase * cp + mv * sin(6.2831853 * phase * mp));
   return 0.5 + 0.5 * tsin(phase * cp + (mv / 6.2831853) * tsin(phase * mp));
 }
+#endif
 
 //---------------------------------
 uint8_t CreateWave() {
+    if (requestedVolume < 0.01) {
+      noteOnTimeLength = 0;
+      maxVolume = 0.0;
+    }
+    else {
+      if (maxVolume < requestedVolume) {
+        maxVolume = requestedVolume;
+      }
+      noteOnTimeLength += SAMPLING_TIME_LENGTH;
+    }
     // 波形を生成する
 #if ENABLE_FMSG
     // double 演算で波形のフェーズを 0-255 で算出する
@@ -967,7 +1056,7 @@ uint8_t CreateWave() {
       phase[i] += currentWavelengthTickCount[i];
       if (phase[i] >= 100000.0) phase[i] -= 100000.0;
     }
-    double g = FmVoice(phase[0], 2.0, 0.5, 3.0);// * 0.5*channelVolume[0];
+    double g = FmVoice(phase[0], 2.0, 0.5, 3.0);// * 0.5*requestedVolume;
 //    g += FmVoice(phase[0] + 0.25, 1.0, 1.0, 1.0) * 0.3;
 //    g += FmVoice(phase[0] + 0.5, 0.5, 2.0, 1.0) * 0.3;
     g *= channelVolume[0];
@@ -977,13 +1066,22 @@ uint8_t CreateWave() {
       phase[i] += currentWavelengthTickCount[i];
       if (phase[i] >= 1.0) phase[i] -= 1.0;
     }
-    double g = Voice(phase[0]) * channelVolume[0] + Voice(phase[1]) * channelVolume[1] + Voice(phase[2]) * channelVolume[2];
+    //double g = Voice(phase[0]) * channelVolume[0] + Voice(phase[1]) * channelVolume[1] + Voice(phase[2]) * channelVolume[2];
+
+#if 1
+    // waveB でモジュレーション
+    mphase += (currentWavelengthTickCount[0] * 1.5);
+    if (mphase >= 1.0) mphase -= (int)mphase;
+    double s = (1.0 - noteOnTimeLength*30);//0.001 * shiftTable[(int)(32*requestedVolume)];
+    if (s < 0.0) s = 0.0;
+    s *= 0.2 * maxVolume;
+    double g = VoiceA(phase[0] + s*(waveB[(int)(255*mphase)] / 32767.0)) * channelVolume[0];
+#endif
 #endif
     //ノイズ
     double n = ((double)rand() / RAND_MAX);
     double e = 150 * (g * (1-noise) + n * noise) * requestedVolume + reverbBuffer[reverbPos];;
     //double e = 150 * n * requestedVolume + reverbBuffer[reverbPos];;
-    
     if ( (-0.005 < e) && (e < 0.005) ) {
       e = 0.0;
     }
@@ -1025,6 +1123,7 @@ uint8_t CreateWave() {
     uint8_t dac = (uint8_t)(e + 127);
     return dac;
 }
+
 //---------------------------------
 void IRAM_ATTR onTimer(){
   // Increment the counter and set the time of ISR
@@ -1047,7 +1146,7 @@ void SensorThread(void *pvParameters)
       if (enablePlay) {
         rawTemperature = GetTemperature();
         int32_t t = rawTemperature - normalTemperature;
-        uint32_t prsZero = 10 + normalPressure + (uint32_t)(t * TEMPERATURE_PRESSURE_RATE);
+        uint32_t prsZero = MIN_PRESSURE + normalPressure + (uint32_t)(t * TEMPERATURE_PRESSURE_RATE);
         rawPressure = GetPressure();
         int32_t p = 0;
         if (rawPressure > prsZero) p = (int32_t)(rawPressure - prsZero);
@@ -1081,17 +1180,31 @@ void setup() {
   Serial.begin(115200);
   SerialPrintLn("------");
 #endif
+
+#if ENABLE_FMSG
   for (int i = 0; i < SIN_TABLE_COUNT; i++) {
     sin_table[i] = sin(i * (3.141592653*2) / SIN_TABLE_COUNT);
   }
+#endif
+
+#if ENABLE_ANALOGREAD_GPIO32
+  pinMode(32, ANALOG);
+  analogSetAttenuation(ADC_11db);
+#if 0
+  for (;;) {
+    char s[32];
+    sprintf(s, "Analog:%d", analogRead(32));
+    SerialPrintLn(s);
+    delay(500);
+  }
+#endif
+#endif
 
   Wire.begin();
   SerialPrintLn("wire begin");
 
   ledcSetup(0, 12800, 8);
   ledcAttachPin(33, 0);
-  //ledcSetup(1, 12800, 8);
-  //ledcAttachPin(32, 1);
 
   ledcWrite(0, 255);
   //ledcWrite(1, 40);
@@ -1101,6 +1214,8 @@ void setup() {
   delay(500);
   ledcWrite(0, 20);
   //ledcWrite(1, 20);
+
+  WiFi.mode(WIFI_OFF); 
 
   const int keyPortList[13] = { 13, 12, 14, 27, 26, 16, 17, 5,18, 19, 23, 3, 4 };
   for (int i = 0; i < 13; i++) {
@@ -1134,6 +1249,7 @@ void setup() {
   testMode= false;
 
   BeginPreferences(); {
+     // pref.clear(); // CLEAR ALL FLASH MEMORY
     bootBaseNote = 0;
     int ver = pref.getInt("AfuueVer", -1);
     if (ver != AFUUE_VER) {
@@ -1157,18 +1273,23 @@ void setup() {
     channelVolume[1] = 0.0;
     channelVolume[2] = 0.0;
 
-#if ENABLE_CHORD_PLAY
     if ((keyLowC == LOW) && (keyEb == LOW)) {
+#if ENABLE_CHORD_PLAY
       channelVolume[0] = 0.5;
       channelVolume[1] = 0.5;
       channelVolume[2] = 0.5;
-    }
+#else
+      lipSensorEnabled = true;
 #endif
+    }
+
+#if ENABLE_MIDI
     midiMode = pref.getInt("MidiMode", MIDIMODE_EXPRESSION);
     midiPgNo = pref.getInt("MidiPgNo", 64);
     if ((keyLowCs == LOW)&&(keyGs == LOW)) {
       midiEnabled = true;
     }
+#endif
   } EndPreferences();
   
   //SerialPrintLn("---baseNote");
@@ -1191,21 +1312,24 @@ void setup() {
 
   ledcWrite(0, 255);
   delay(500);
-  xTaskCreatePinnedToCore(SensorThread, "SensorThread", 8192, NULL, 1, NULL, CORE1);
-  xTaskCreatePinnedToCore(TickThread, "TickThread", 8192, NULL, 1, NULL, CORE1);
+  xTaskCreatePinnedToCore(SensorThread, "SensorThread", 4096, NULL, 1, NULL, CORE1);
+  xTaskCreatePinnedToCore(TickThread, "TickThread", 4096, NULL, 1, NULL, CORE1);
 
   for (int i = 0; i < REVERB_BUFFER_SIZE; i++) {
     reverbBuffer[i] = 0.0;
   }
 
+#if ENABLE_MIDI
   if (midiEnabled) {
     MIDI_Initialize();
   }
   else
+#endif
   {
 #if !ENABLE_SERIALOUTPUT
   Serial.begin(115200);
 #endif
+
     timerSemaphore = xSemaphoreCreateBinary();
     timer = timerBegin(0, CLOCK_DIVIDER, true);
     timerAttachInterrupt(timer, &onTimer, true);
