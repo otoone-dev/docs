@@ -91,9 +91,9 @@ volatile double pitch = 0.0;
 static double currentWavelength[3] = { 0.0, 0.0, 0.0 };
 volatile double currentWavelengthTickCount[3] = { 0.0, 0.0, 0.0 };
 
-static double currentNote[3] = { 60, 64, 67 };
-static double startNote[3] = { 60, 64, 67 };
-static double targetNote[3] = { 60, 64, 67 };
+static double currentNote[2] = { 60, 64 };
+static double startNote[2] = { 60, 64 };
+static double targetNote[2] = { 60, 64 };
 static double noteStep = 0;
 static double noteDiv = 0.5;
 static double keyChangeCurve = 12;
@@ -540,7 +540,7 @@ bool IsAnyKeyDown() {
 }
 
 //--------------------------
-double CalcInvFrequency(double note) {
+double CalcFrequency(double note) {
   return fineTune * pow(2, (note - (69-12))/12);
 }
 
@@ -774,8 +774,7 @@ void Tick() {
     pp = 0.2;
     currentNote[0] = baseNote - 1;
     currentNote[1] = currentNote[0] + 4;
-    currentNote[2] = currentNote[0] + 7;
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 2; i++) {
       targetNote[i] = currentNote[i];
     }
     noteStep = 1;
@@ -784,13 +783,8 @@ void Tick() {
     
     int n0;
     int n1;
-    int n2;
-    if ((channelVolume[1] > 0.0) || (channelVolume[2] > 0.0)) {
-      GetChord(n0, n1, n2);
-    } else {
-      n0 = GetNoteNumber(false);
-      n1 = n2 = n0;
-    }
+    n0 = GetNoteNumber(false);
+    n1 = n0;
     if (testMode) {
       // play by pushing keys
       if (IsAnyKeyDown()) {
@@ -807,8 +801,8 @@ void Tick() {
         if (keyB == LOW) n0 = 71;
         if (octDown == LOW) n0 -= 12;
         if (octUp == LOW) n0 += 12;
-        n1 = n2 = n0;
-        for (int i = 0; i < 3; i++) {
+        n1 = n0;
+        for (int i = 0; i < 2; i++) {
           startNote[i] = n0;
           currentNote[i] = n0;
           targetNote[i] = n0;
@@ -816,18 +810,17 @@ void Tick() {
       }
     }
 
-    if ((targetNote[0] != n0) || (targetNote[1] != n1) || (targetNote[2] != n2)) {
+    if ((targetNote[0] != n0) || (targetNote[1] != n1)) {
       //double d = abs(note - currentNote);
       noteStep = 0.0;
-      for (int i = 0; i < 3; i++) {
+      for (int i = 0; i < 2; i++) {
         startNote[i] = currentNote[i];
       }
       targetNote[0] = n0;
       targetNote[1] = n1;
-      targetNote[2] = n2;
     }
     else if (pp < 0.01) {
-      for (int i = 0; i < 3; i++) {
+      for (int i = 0; i < 2; i++) {
         currentNote[i] = targetNote[i];
       }
       noteStep = 1.0;
@@ -841,7 +834,7 @@ void Tick() {
           noteStep = 1.0;
         }
         double t = pow(noteStep, keyChangeCurve);
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 2; i++) {
           currentNote[i] = startNote[i] + (targetNote[i] - startNote[i]) * t;
         }
       }
@@ -938,18 +931,66 @@ void Tick() {
     bendNoteShift += a;
   }
 #endif
-#if 1
+#if 0
   // ベンド (傾きにによるもの)
-  if (accy > 0) {
-    bendNoteShift -= accy*0.5;
+  if (accx > 1) {
+    bendNoteShift -= (accx - 1.0);
+  }
+  if (accx < -1) {
+    bendNoteShift += (accx + 1.0);
   }
 #endif
   // ベンド (音量によるもの)
   double bv = -(0.5 - currentVolume) * 0.02;
   bendNoteShift += bv;
+
+#if 0
+  // ファルセット
+  if (accy < -0.5) {
+    float a = -accy;
+    if (a > 1) a = 1;
+    a = (a - 0.5)*2; // 0 - 1
+    if (a < 0) a = 0;
+    if (a > 1) a = 1;
+    channelVolume[0] = (1 - a);
+    channelVolume[1] = a;
+  }
+  else {
+    channelVolume[0] = 1;
+    channelVolume[1] = 0;
+  }
+#endif
+
+#if 1
+  // ブレスノイズ
+  if (accy < 0) {
+    float a = -accy;
+    if (a > 1) a = 1;
+    if (noise < a) noise = a;
+    channelVolume[0] = 1 - noise;
+  }
+  else {
+    channelVolume[0] = 1;
+  }
+#endif
+
+#if 1
+  // がなり (傾きによるもの)
+  if (accy > 0) {
+    float a = accy;
+    if (a > 1) a = 1;
+    double wavelength = 240 - 200*a;
+    currentWavelength[2] += (wavelength - currentWavelength[2]) * portamentoRate;
+    currentWavelengthTickCount[2] = (currentWavelength[2] / (double)SAMPLING_RATE);
+    channelVolume[2] = a;
+  }
+  else {
+    channelVolume[2] = 0;
+  }
+#endif
   
-  for (int i = 0; i < 3; i++) {
-    double wavelength = CalcInvFrequency(currentNote[i] + bendNoteShift);
+  for (int i = 0; i < 2; i++) {
+    double wavelength = CalcFrequency(currentNote[i] + bendNoteShift);
     currentWavelength[i] += (wavelength - currentWavelength[i]) * portamentoRate;
     currentWavelengthTickCount[i] = (currentWavelength[i] / (double)SAMPLING_RATE);
   }
@@ -1111,7 +1152,7 @@ void SaveToneSetting(int idx) {
 }
 
 //---------------------------------
-#if 0
+#if 1
 double SawWave(double p) {
   return -1.0 + 2 * p;
 }
@@ -1195,7 +1236,7 @@ uint8_t CreateWave() {
       phase[i] += currentWavelengthTickCount[i];
       if (phase[i] >= 1.0) phase[i] -= 1.0;
     }
-    //double g = Voice(phase[0]) * channelVolume[0] + Voice(phase[1]) * channelVolume[1] + Voice(phase[2]) * channelVolume[2];
+    //double g = Voice(phase[0]) * channelVolume[0];// + Voice(phase[1]) * channelVolume[1] + Voice(phase[2]) * channelVolume[2];
 
 #if 1
     // waveB でモジュレーション
@@ -1203,11 +1244,27 @@ uint8_t CreateWave() {
     if (mphase >= 1.0) mphase -= (int)mphase;
     double s = (1.0 - noteOnTimeLength*30);//0.001 * shiftTable[(int)(32*requestedVolume)];
     if (s < 0.0) s = 0.0;
-    s *= 0.2 * maxVolume;
-    s -= accy * 0.1;
-    if (s < 0.0) s = 0.0;
     double g = VoiceA(phase[0] + s*(waveB[(int)(255*mphase)] / 32767.0)) * channelVolume[0];
 #endif
+
+#if 0
+    // ファルセット
+    g += tsin(phase[1]) * channelVolume[1];
+#endif
+
+#if 1
+    // がなり (オーバーシュート＋断続)
+    g *= (1.0 + channelVolume[2]);
+    if (g > 2) g = 2;
+    if (g < -2) g = -2;
+    if (g > 1) g = 2 - g;
+    if (g < -1) g = -2 - g;
+    double gn = 1;
+    if (phase[2] > 0.5) gn = 1 - channelVolume[2];
+    //g *= 0.5 + 0.5 * tsin(phase[2]) * channelVolume[2] + 0.5 * (1.0 - channelVolume[2]);
+    g *= gn;
+#endif
+
 #endif
     //ノイズ
     double n = ((double)rand() / RAND_MAX);
@@ -1359,7 +1416,7 @@ void setup() {
 #endif
 
   for (int i = 0; i < SIN_TABLE_COUNT; i++) {
-    sin_table[i] = sin(i * (3.141592653*2) / SIN_TABLE_COUNT);
+    sin_table[i] = 0.6 * sin(i * (3.141592653*2) / SIN_TABLE_COUNT) + 0.2 * sin(i * (2*3.141592653*2) / SIN_TABLE_COUNT) +  + 0.1 * sin(i * (3*3.141592653*2) / SIN_TABLE_COUNT);
   }
 
   Wire.begin();
@@ -1453,13 +1510,7 @@ void setup() {
     channelVolume[2] = 0.0;
 
     if ((keyLowC == LOW) && (keyEb == LOW)) {
-#if ENABLE_CHORD_PLAY
-      channelVolume[0] = 0.5;
-      channelVolume[1] = 0.5;
-      channelVolume[2] = 0.5;
-#else
       lipSensorEnabled = true;
-#endif
     }
 
 #if ENABLE_MIDI
