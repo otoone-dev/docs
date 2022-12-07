@@ -1,0 +1,144 @@
+EESchema Schematic File Version 4
+EELAYER 30 0
+EELAYER END
+$Descr A4 11693 8268
+encoding utf-8
+Sheet 1 1
+Title ""
+Date ""
+Rev ""
+Comp ""
+Comment1 ""
+Comment2 ""
+Comment3 ""
+Comment4 ""
+$EndDescr
+$Comp
+L Connector:Conn_01x02_Female J1
+U 1 1 62DC75BC
+P 5450 3650
+F 0 "J1" H 5478 3626 50  0000 L CNN
+F 1 "Conn_01x02_Female" H 5478 3535 50  0000 L CNN
+F 2 "ContactPad:ContactPad_4mm" H 5450 3650 50  0001 C CNN
+F 3 "~" H 5450 3650 50  0001 C CNN
+	1    5450 3650
+	1    0    0    -1  
+$EndComp
+$Comp
+L Device:LED D2
+U 1 1 62DC7B55
+P 4450 4150
+F 0 "D2" V 4397 4230 50  0000 L CNN
+F 1 "LED" V 4488 4230 50  0000 L CNN
+F 2 "LED_SMD:LED_0603_1608Metric" H 4450 4150 50  0001 C CNN
+F 3 "~" H 4450 4150 50  0001 C CNN
+	1    4450 4150
+	0    -1   -1   0   
+$EndComp
+$Comp
+L Connector:Conn_01x02_Female J2
+U 1 1 62DC8603
+P 5450 4200
+F 0 "J2" H 5478 4176 50  0000 L CNN
+F 1 "Conn_01x02_Female" H 5478 4085 50  0000 L CNN
+F 2 "ContactPad:ContactPad_4mm" H 5450 4200 50  0001 C CNN
+F 3 "~" H 5450 4200 50  0001 C CNN
+	1    5450 4200
+	1    0    0    -1  
+$EndComp
+$Comp
+L Device:LED D1
+U 1 1 62DC864D
+P 4450 3600
+F 0 "D1" V 4397 3680 50  0000 L CNN
+F 1 "LED" V 4488 3680 50  0000 L CNN
+F 2 "LED_SMD:LED_0603_1608Metric" H 4450 3600 50  0001 C CNN
+F 3 "~" H 4450 3600 50  0001 C CNN
+	1    4450 3600
+	0    -1   -1   0   
+$EndComp
+Wire Wire Line
+	5250 3750 5050 3750
+Wire Wire Line
+	5250 4300 5050 4300
+Wire Wire Line
+	5250 4200 4950 4200
+Wire Wire Line
+	4950 4200 4950 4000
+Wire Wire Line
+	4950 4000 4450 4000
+Wire Wire Line
+	4950 3650 4950 3450
+Wire Wire Line
+	4950 3450 4800 3450
+Wire Wire Line
+	4950 3650 4950 4000
+Connection ~ 4950 3650
+Connection ~ 4950 4000
+Wire Wire Line
+	5050 3750 5050 4300
+Connection ~ 5050 3750
+Wire Wire Line
+	5050 3750 4450 3750
+Connection ~ 5050 4300
+Wire Wire Line
+	5050 4300 4800 4300
+$Comp
+L power:GND #PWR0101
+U 1 1 62DCBC9D
+P 4800 4300
+F 0 "#PWR0101" H 4800 4050 50  0001 C CNN
+F 1 "GND" H 4805 4127 50  0000 C CNN
+F 2 "" H 4800 4300 50  0001 C CNN
+F 3 "" H 4800 4300 50  0001 C CNN
+	1    4800 4300
+	1    0    0    -1  
+$EndComp
+Connection ~ 4800 4300
+Wire Wire Line
+	4800 4300 4700 4300
+$Comp
+L power:VCC #PWR0102
+U 1 1 62DCC24A
+P 4800 3450
+F 0 "#PWR0102" H 4800 3300 50  0001 C CNN
+F 1 "VCC" H 4815 3623 50  0000 C CNN
+F 2 "" H 4800 3450 50  0001 C CNN
+F 3 "" H 4800 3450 50  0001 C CNN
+	1    4800 3450
+	1    0    0    -1  
+$EndComp
+Connection ~ 4800 3450
+Wire Wire Line
+	4800 3450 4450 3450
+Wire Wire Line
+	5250 3650 5100 3650
+$Comp
+L power:PWR_FLAG #FLG01
+U 1 1 62DCCFAB
+P 5100 3650
+F 0 "#FLG01" H 5100 3725 50  0001 C CNN
+F 1 "PWR_FLAG" H 5100 3823 50  0000 C CNN
+F 2 "" H 5100 3650 50  0001 C CNN
+F 3 "~" H 5100 3650 50  0001 C CNN
+	1    5100 3650
+	1    0    0    -1  
+$EndComp
+Connection ~ 5100 3650
+Wire Wire Line
+	5100 3650 4950 3650
+$Comp
+L power:PWR_FLAG #FLG02
+U 1 1 62DCD54E
+P 4700 4300
+F 0 "#FLG02" H 4700 4375 50  0001 C CNN
+F 1 "PWR_FLAG" H 4700 4473 50  0000 C CNN
+F 2 "" H 4700 4300 50  0001 C CNN
+F 3 "~" H 4700 4300 50  0001 C CNN
+	1    4700 4300
+	1    0    0    -1  
+$EndComp
+Connection ~ 4700 4300
+Wire Wire Line
+	4700 4300 4450 4300
+$EndSCHEMATC
