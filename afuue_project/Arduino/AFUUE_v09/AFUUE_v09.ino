@@ -1,13 +1,15 @@
-#include <M5StickCPlus.h>
 #include "afuue_common.h"
 #include "i2c.h"
-#include "midi.h"
-#include "communicate.h"
-#include "wavedata.h"
-#include "logo.h"
+//#include "midi.h"
+//#include "communicate.h"
+#include "menu.h"
+#include "wavePureSin.h"
+#ifdef _M5STICKC_H_
+#include "io_expander.h"
+#endif
 
+static Menu menu;
 static Preferences pref;
-
 const char* version = "AFUUE ver1.1.0.0";
 const uint8_t commVer1 = 0x16;  // 1.6
 const uint8_t commVer2 = 0x02;  // protocolVer = 2
@@ -18,19 +20,22 @@ volatile int interruptCounter = 0;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 volatile bool enablePlay = false;
 
+volatile const short* currentWaveTable = NULL;
 volatile double phase = 0.0;
-#define REVERB_BUFFER_SIZE (8801)
-volatile double reverbBuffer[REVERB_BUFFER_SIZE];
-volatile int reverbPos = 0;
+#define DELAY_BUFFER_SIZE (8000)
+volatile double delayBuffer[DELAY_BUFFER_SIZE];
+volatile int delayPos = 0;
 
 int baseNote = 61; // 49 61 73
 double fineTune = 440.0;
-double reverbRate = 0.152;
+volatile double delayRate = 0.15;
 double portamentoRate = 0.99;
+double keySenseTimeMs = 50.0;
+double breathSenseRate = 300.0;
 
 #define CLOCK_DIVIDER (80)
-#define TIMER_ALARM (50)
-#define SAMPLING_RATE (20000) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (80*50) = 20kHz
+#define TIMER_ALARM (40)
+#define SAMPLING_RATE (25000) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (80*40) = 25kHz // 80MHz / (80*50) = 20kHz
 //#define SAMPLING_TIME_LENGTH (1.0 / SAMPLING_RATE)
 static double currentWavelength = 0.0;
 volatile double currentWavelengthTickCount = 0.0;
@@ -38,12 +43,26 @@ volatile double requestedVolume = 0.0;
 volatile double targetNote = 60;
 volatile double currentNote = 60;
 volatile double startNote = 60;
-static double noteStep = 0;
-static double noteDiv = 0.2;
-static double keyChangeCurve = 12;
-static int forcePlayTime = 0;
+static double keyTimeMs = 0;
+//const double noteStep = 0.12;
+static double forcePlayTime = 0;
+const double FORCEPLAYTIME_LENGTH = 200; //ms
+static int bendCounter = 0;
+const double BENDRATE = -1.0;
+const double BENDDOWNTIME_LENGTH = 100; //ms
+volatile double bendNoteShift = 0.0;
+volatile double bendDownTime = 0.0;
+volatile double bendVolume = 0.0;
+volatile double noiseVolume = 0.0;
+volatile double noteOnTimeMs = 0.0;
+const double noiseLevel = 0.5;
+const double NOISETIME_LENGTH = 50; //ms
+volatile double growlVolume = 0;
+volatile double growlWavelength = 0;
+volatile double growlTickCount = 0;
+volatile double growlPhase = 0;
+volatile double falsettoVolume = 0;
 
-volatile uint16_t mcpKeys = 0;
 static bool keyLowC;
 static bool keyEb;
 static bool keyD;
@@ -93,31 +112,202 @@ void DrawCenterString(const char* str, int x, int y, int fontId) {
 
 //-------------------------------------
 void UpdateAcc() {
-  float ax, ay, az;
+  float ax = 0;
+  float ay = 0;
+  float az = 1;
+#ifdef _M5STICKC_H_
   M5.IMU.getAccelData(&ax,&ay,&az);
-#if 0
-  ay = asin(ay) / (1.571 - 0.1);
-  if (ay > 0.1) {
-    ay = ay - 0.1;
-  }
-  else if (ay < -0.1) {
-    ay = ay + 0.1;
-  }
-  else {
-    ay = 0.0;
-  }
 #endif
-  accx += (ax - accx) * 0.1;
-  accy += (ay - accy) * 0.1;
-  accz += (az - accz) * 0.1;
-#if 0
-  M5.Lcd.setCursor(10, 10);
-  char s[32];
-  sprintf(s, "%d, %d, %d", (int)(accx*1000), (int)(accy*1000), (int)(accz*1000));
-  M5.Lcd.println(s);
+  accx += (ax - accx) * 0.3f;
+  accy += (ay - accy) * 0.3f;
+  accz += (az - accz) * 0.3f;
+}
+
+//--------------------------
+double CalcFrequency(double note) {
+  return fineTune * pow(2, (note - (69-12))/12);
+}
+
+//---------------------------------
+void UpdateKeys(uint16_t mcpKeys) {
+#ifdef _M5STICKC_H_
+  keyLowC = ((mcpKeys & 0x0001) != 0);
+  keyEb = ((mcpKeys & 0x0002) != 0);
+  keyD = ((mcpKeys & 0x0004) != 0);
+  keyE = ((mcpKeys & 0x0008) != 0);
+  keyF = ((mcpKeys & 0x0010) != 0);
+  keyLowCs = ((mcpKeys & 0x0200) != 0);
+  keyGs = ((mcpKeys & 0x0400) != 0);
+  keyG = ((mcpKeys & 0x0800) != 0);
+  keyA = ((mcpKeys & 0x1000) != 0);
+  keyB = ((mcpKeys & 0x2000) != 0);
+  octDown = ((mcpKeys & 0x4000) != 0);
+  octUp = ((mcpKeys & 0x8000) != 0);
+#else
+  keyLowC = digitalRead(16);
+  keyEb = digitalRead(17);
+  keyD = digitalRead(5);
+  keyE = digitalRead(18);
+  keyF = digitalRead(19);
+  keyLowCs = digitalRead(13);
+  keyGs =digitalRead(12);
+  keyG = digitalRead(14);
+  keyA = digitalRead(27);
+  keyB = digitalRead(26);
+  octDown = digitalRead(23);
+  octUp = digitalRead(3) && digitalRead(4); // before1.5:RXD0 after1.6:GPIO4
 #endif
 }
+
+//---------------------------------
+double GetNoteNumber() {
+  int b = 0;
+  if (keyLowC == LOW) b |= (1 << 7);
+  if (keyD == LOW) b |= (1 << 6);
+  if (keyE == LOW) b |= (1 << 5);
+  if (keyF == LOW) b |= (1 << 4);
+  if (keyG == LOW) b |= (1 << 3);
+  if (keyA == LOW) b |= (1 << 2);
+  if (keyB == LOW) b |= (1 << 1);
+
+  double n = 0;
+
+  // 0:C 2:D 4:E 5:F 7:G 9:A 11:B 12:HiC
+  int g = (b & 0b00001110);  // keyG, keyA, keyB の組み合わせ
+  
+  if ((g == 0b00001110) || (g == 0b00001100)) {      // [*][*][*] or [*][*][ ]
+    if ((b & 0b11110000) == 0b11110000) {
+      n = 0.0; // C
+      if (keyEb == LOW) n = 2.0; // D
+    }
+    else if ((b & 0b11110000) == 0b01110000) {
+      n = 2.0; // D
+    }
+    else if ((b & 0b01110000) == 0b00110000) {
+      n = 4.0; // E
+      //if (b & 0b10000000) n -= 1.0;
+    }
+    else if ((b & 0b00110000) == 0b00010000) {
+      n = 5.0; // F
+      //if (b & 0b10000000) n -= 0.5;
+      //if (b & 0b01000000) n -= 1.0;
+    }
+    else if ((b & 0b00010000) == 0) {
+      n = 7.0; // G
+      //if (b & 0b10000000) n -= 0.5;
+      //if (b & 0b01000000) n -= 1.0;
+      if (b & 0b00100000) n -= 1.0;
+    }
+    if ((b & 0b00000010) == 0) {
+      n += 12.0;
+    }
+  }
+  else if (g == 0b00000110) { // [ ][*][*]
+    n = 9.0; // A
+    //if (b & 0b10000000) n -= 0.5;
+    //if (b & 0b01000000) n -= 1.0;
+    if (b & 0b00100000) n -= 1.0;
+    if (b & 0b00010000) n -= 1.0;
+  }
+  else if (g == 0b00000010) { // [ ][ ][*]
+    n = 11.0; // B
+    //if (b & 0b10000000) n -= 0.5;
+    //if (b & 0b01000000) n -= 1.0;
+    if (b & 0b00100000) n -= 1.0;
+    if (b & 0b00010000) n -= 1.0;
+  }
+  else if (g == 0b00000100) { // [ ][*][ ]
+    n = 12.0; // HiC
+    //if (b & 0b10000000) n -= 0.5;
+    //if (b & 0b01000000) n -= 1.0;
+    if (b & 0b00100000) n -= 1.0;
+    if (b & 0b00010000) n -= 1.0;
+  }
+  else if (g == 0b00001000) { // [*][ ][ ]
+    n = 20.0; // HiA
+    //if (b & 0b10000000) n -= 0.5;
+    //if (b & 0b01000000) n -= 1.0;
+    if (b & 0b00100000) n -= 1.0;
+    if (b & 0b00010000) n -= 1.0;
+  }
+  else if (g == 0b00001010) { // [*][ ][*]
+    n = 10.0; // A#
+    if (b & 0b10000000) n -= 0.5;
+    if (b & 0b01000000) n -= 1.0;
+    if (b & 0b00100000) n -= 1.0;
+    if (b & 0b00010000) n -= 1.0;
+  }
+  else if (g == 0b00000000) { // [ ][ ][ ]
+    n = 13.0; // HiC#
+    if (b & 0b10000000) n -= 0.5;
+    if (b & 0b01000000) n -= 1.0;
+    if (b & 0b00100000) n -= 1.0;
+    if (b & 0b00010000) n -= 1.0;
+  }
+
+  if ((keyEb == LOW)&&(keyLowC != LOW)) n += 1.0; // #
+  if (keyGs == LOW) n += 1.0; // #
+  if (keyLowCs == LOW) n -= 1.0; // b
+
+  if (octDown == LOW) n -= 12;
+  if (octUp == LOW) n += 12;
+
+  double bnote = baseNote - 13; // C
+  return bnote + n;
+}
+
+//---------------------------------
+uint16_t GetKeyData() {
+  uint16_t keyData = 0;
+  if (keyLowC == LOW) keyData |= (1 << 0);
+  if (keyEb == LOW) keyData |= (1 << 1);
+  if (keyD == LOW) keyData |= (1 << 2);
+  if (keyE == LOW) keyData |= (1 << 3);
+  if (keyF == LOW) keyData |= (1 << 4);
+  if (keyLowCs == LOW) keyData |= (1 << 5);
+  if (keyGs == LOW) keyData |= (1 << 6);
+  if (keyG == LOW) keyData |= (1 << 7);
+  if (keyA == LOW) keyData |= (1 << 8);
+  if (keyB == LOW) keyData |= (1 << 9);
+  if (octDown == LOW) keyData |= (1 << 10);
+  if (octUp == LOW) keyData |= (1 << 11);
+  return keyData;
+}
+
+//---------------------------------
+void BendExec(double td) {
+  // LowC + Eb down -------
+  if ((keyLowC == LOW) && (keyEb == LOW)) {
+    bendDownTime += td;
+    if (bendDownTime > BENDDOWNTIME_LENGTH) {
+      bendDownTime = BENDDOWNTIME_LENGTH;
+    }
+  }
+  else {
+    if (bendDownTime > 0.0) {
+      bendDownTime = -bendDownTime;
+    }
+    else {
+      bendDownTime += td;
+      if (bendDownTime > 0.0) {
+        bendDownTime = 0.0;
+      }
+    }
+  }
+  double bend = 0.0;
+  if (bendDownTime > 0) {
+    bend = bendDownTime / BENDDOWNTIME_LENGTH;
+    bendVolume = bend;
+  }
+  else if (bendDownTime < 0) {
+    bend = -(bendDownTime / BENDDOWNTIME_LENGTH);
+    bendVolume = bend;
+  }
+  bendNoteShift = bend * BENDRATE;
+}
+
 //-------------------------------------
+#if 0
 void SerialThread(void *pvParameters) {
     while (1) {
       char s[32];
@@ -126,44 +316,176 @@ void SerialThread(void *pvParameters) {
       delay(50);
     }
 }
+#endif
 
 //-------------------------------------
 void SynthesizerThread(void *pvParameters) {
+  unsigned long mloop = micros();
   while (1) {
     unsigned long m0 = micros();
+    double td = (m0 - mloop)/1000.0;
+    mloop = m0;
 
-    // ノート切り替えを滑らかにする処理
-    if (noteStep >= 1.0) {
-      
-    } else {
-      noteStep += noteDiv;
-      if (noteStep > 1.0) {
-        noteStep = 1.0;
+    // ノイズ
+    if (requestedVolume < 0.01) {
+      noteOnTimeMs = 0.0;
+    }
+    else {
+      noteOnTimeMs += td;
+    }
+    double n = (NOISETIME_LENGTH - noteOnTimeMs) / NOISETIME_LENGTH;
+    if (n < 0) n = 0;
+    if (n > 1) n = 1;
+    noiseVolume = n * requestedVolume * noiseLevel;
+
+    double portamento = portamentoRate;
+
+    // がなり (傾きによるもの)
+    if (menu.isAccControl) {
+      double a = accy;
+      if (accy > 0.5f) {
+        falsettoVolume = 0.0;
+        a = (a - 0.5)*2;
+        if (a > 1.0) a = 1.0;
+        float wavelength = 240.0f - 200.0f*a;
+        growlWavelength += (wavelength - growlWavelength) * 0.9;
+        growlTickCount = (growlWavelength / (double)SAMPLING_RATE);
+        growlVolume = a;
       }
-      double t = pow(noteStep, keyChangeCurve);
-      currentNote = startNote + (targetNote - startNote) * t;
+      else if (accy < -0.1f) {
+        growlVolume = 0.0;
+        if (a < -1.0) a = -1.0;
+        falsettoVolume = -a;
+      }
+      else {
+        growlVolume = 0.0;
+        falsettoVolume = 0.0;
+      }
+  
+      // 左右傾きによるポルタメント制御
+      if ((accx > 0.5) || (accx < -0.5)) {
+        portamento = 0.1;
+      }
+    }
+
+    // キー押されてもしばらくは反応しない処理（ピロ音防止）
+    if (keyTimeMs < 1000.0) {
+      keyTimeMs += td;
+      if (keyTimeMs >= keySenseTimeMs) {
+        keyTimeMs = 1000.0;
+        currentNote = targetNote;
+      }
+      else {
+        if (noiseVolume < 0.1) {
+          noiseVolume = 0.1; //キー切り替え中の謎のノイズ
+        }
+      }
     }
 
     // 現在の再生周波数から１サンプルあたりのフェーズの進みを計算
-    double wavelength = CalcFrequency(currentNote);
-    currentWavelength += (wavelength - currentWavelength) * portamentoRate;
+    double wavelength = CalcFrequency(currentNote + bendNoteShift);
+    currentWavelength += (wavelength - currentWavelength) * portamento;
     currentWavelengthTickCount = (currentWavelength / (double)SAMPLING_RATE);
-    
+
     unsigned long m1 = micros();
     int wait = 5;
     if (m1 > m0) {
       wait = 5-(int)((m1 - m0)/1000);
       if (wait < 1) wait = 1;
     }
-    //SerialPrintLn("Sensor");
     delay(wait);
   }
 }
 
 //-------------------------------------
-void SensorThread(void *pvParameters) {
+void GetMenuParams() {
+    fineTune = menu.fineTune;
+    baseNote = 61 + menu.transpose;
+    portamentoRate = 1 - (menu.portamentoRate * 0.01);
+    delayRate = menu.delayRate * 0.01;
+    keySenseTimeMs = menu.keySense;
+    breathSenseRate = menu.breathSense;
+}
+
+//-------------------------------------
+void TickThread(void *pvParameters) {
+  unsigned long loopTime = 0;
+  uint16_t keyCurrent = 0;
+  int keyRepeatCount = 0;
   while (1) {
-    delay(1000);
+    unsigned long t = micros();
+    double td = (t - loopTime)/1000.0;
+    loopTime = t;  
+
+    //気圧センサー
+    int averaged = 0;
+    for (int i = 0; i < 3; i++) {
+      averaged += analogRead(36);
+      delay(1);
+    }
+    averaged /= 3;
+    double vol = (averaged - 460) / breathSenseRate; // 0 - 1
+    if (vol < 0.0) vol = 0.0;
+    if (vol > 1.0) vol = 1.0;
+    requestedVolume = pow(vol,2) * (1-bendVolume);
+  
+    //キー操作や加速度センサー
+    uint16_t mcpKeys = readFromIOExpander();
+    UpdateKeys(mcpKeys);
+    UpdateAcc();
+
+    uint16_t keyData = GetKeyData();
+    uint16_t keyPush = (keyData ^ keyCurrent) & keyData;
+    if ((menu.isEnabled) && (keyData != 0) && (keyData == keyCurrent)) {
+      // メニュー用キーリピート
+      keyRepeatCount++;
+      if (keyRepeatCount > 100) {
+        if (keyRepeatCount % 2 == 0) {
+          keyPush = keyData;
+        }
+      }
+    }
+    else {
+      keyRepeatCount = 0;
+    }
+    keyCurrent = keyData;
+    if (menu.Update(keyPush, averaged)) {
+      BeginPreferences(); {
+        currentWaveTable = menu.waveData.GetWaveTable(menu.waveIndex);
+        menu.SavePreferences(pref);
+      } EndPreferences();
+      GetMenuParams();
+    }
+    if (menu.isEnabled == false) {
+      // perform mode
+    } else {
+      // menu mode
+      GetMenuParams();
+      if (menu.forcePlayNote >= 0) {
+        forcePlayTime = FORCEPLAYTIME_LENGTH;
+        currentNote = menu.forcePlayNote;
+        menu.forcePlayNote = -1;
+      }
+    }
+
+    BendExec(td);
+  
+    double n = GetNoteNumber();
+    if (forcePlayTime > 0) {
+      requestedVolume = 0.02;
+      forcePlayTime -= td;
+    } else {
+      if (targetNote != n) {
+        keyTimeMs = 0.0;
+        startNote = currentNote;
+        targetNote = n;
+      }
+    }
+    if (requestedVolume < 0.001) {
+      currentNote = targetNote;
+      keyTimeMs = 1000.0;
+    }
+    delay(5);
   }
 }
 
@@ -178,7 +500,12 @@ double Voice(double p) {
   int t = (int)v;
   double f = (v - t);
 #if 1
-  return (waveAfuueCla[t] / 32767.0);
+  double w0 = currentWaveTable[t];
+  t = (t + 1) % 256;
+  double w1 = currentWaveTable[t];
+  double w = (w0 * (1-f)) + (w1 * f);
+  return (w / 32767.0);
+  //return (currentWaveTable[t] / 32767.0);
 #else
   double w0 = (waveA[t] * (1-shift) + waveB[t] * shift);
   t = (t + 1) % 256;
@@ -188,6 +515,14 @@ double Voice(double p) {
 #endif
 }
 
+//---------------------------------
+double VoiceSin(double p) {
+  double v = 255*p;
+  int t = (int)v;
+  double f = (v - t);
+  return (wavePureSin[t] / 32767.0);
+}
+
 //-------------------------------------
 uint8_t CreateWave() {
     // 波形を生成する
@@ -195,17 +530,39 @@ uint8_t CreateWave() {
     if (phase >= 1.0) phase -= 1.0;
     double g = Voice(phase);
 
-    double e = 150*g*requestedVolume + reverbBuffer[reverbPos]; //150 * (g * (1-noise) + n * noise) * requestedVolume + reverbBuffer[reverbPos];
+    // がなり (オーバーシュート＋断続)
+    if (growlVolume > 0.1) {
+      growlPhase += growlTickCount;
+      if (growlPhase >= 1.0) growlPhase -= 1.0;
+      g *= (1.0 + growlVolume);
+      if (g > 2) g = 2;
+      if (g < -2) g = -2;
+      if (g > 1) g = 2 - g;
+      if (g < -1) g = -2 - g;
+      double gn = 1;
+      if (growlPhase > 0.5) gn = 1 - growlVolume;
+      //g *= 0.5 + 0.5 * tsin(phase[2]) * channelVolume[2] + 0.5 * (1.0 - channelVolume[2]);
+      g *= gn;
+    }
+
+    //ノイズ
+    double n = ((double)rand() / RAND_MAX);
+    g = (g * (1-noiseVolume) + n * noiseVolume);
+
+    // ファルセット
+    if (falsettoVolume > 0.1) {
+      double gs = VoiceSin(phase);
+      g = (g * (1-falsettoVolume) + gs * falsettoVolume);
+    }
+
+    double e = 150 * g * requestedVolume + delayBuffer[delayPos];;
+
     if ( (-0.005 < e) && (e < 0.005) ) {
       e = 0.0;
     }
-    reverbBuffer[reverbPos] = e * reverbRate;
-    reverbPos = (reverbPos + 1) % REVERB_BUFFER_SIZE;
+    delayBuffer[delayPos] = e * delayRate;
+    delayPos = (delayPos + 1) % DELAY_BUFFER_SIZE;
 
-#if 0
-    if (e < -127.0) e = -256 - e;
-    else if (e > 127.0) e = 256 - e;
-#endif
     if (e < -127.0) e = -127.0;
     else if (e > 127.0) e = 127.0;
 
@@ -274,10 +631,12 @@ void setup() {
 #ifdef _M5STICKC_H_
   M5.Lcd.fillScreen(BLACK);
   M5.Lcd.setCursor(10, 10);
-  DrawCenterString("Check MCP23017...", 67, 80, 2);
-  bool retMCP23017 = setupMCP23017();
-  if (retMCP23017 == false) {
-    DrawCenterString("[ NG ]", 67, 95, 2);
+  DrawCenterString("Check IOExpander...", 67, 80, 2);
+  int retIOEXP = setupIOExpander();
+  if (retIOEXP < 0) {
+    char s[16];
+    sprintf(s, "[ NG ] %d", retIOEXP);
+    DrawCenterString(s, 67, 95, 2);
     i2cError = true;
   }
 #else
@@ -307,32 +666,17 @@ void setup() {
   delay(500);
 
   BeginPreferences(); {
-     // pref.clear(); // CLEAR ALL FLASH MEMORY
-    //bootBaseNote = 0;
-    int ver = pref.getInt("AfuueVer", -1);
-    if (ver != AFUUE_VER) {
-      pref.clear(); // CLEAR ALL FLASH MEMORY
-      pref.putInt("AfuueVer", AFUUE_VER);
-    }
-
+    menu.Initialize(pref);
   } EndPreferences();
   
-  //SerialPrintLn("---baseNote");
-  //SerialPrintLn(baseNote);
-  //SerialPrintLn("---toneNo");
-  //SerialPrintLn(toneNo);
+  GetMenuParams();
 
-  //currentPressure = normalPressure = GetPressure();
-  delay(100);
-  //currentTemperature = normalTemperature = GetTemperature();
-
-  delay(100);
-  xTaskCreatePinnedToCore(SynthesizerThread, "SynthesizerThread", 4096, NULL, 1, NULL, CORE1);
-  xTaskCreatePinnedToCore(SerialThread, "SerialThread", 4096, NULL, 1, NULL, CORE1);
-
-  for (int i = 0; i < REVERB_BUFFER_SIZE; i++) {
-    reverbBuffer[i] = 0.0;
+  currentWaveTable = menu.waveData.GetWaveTable(menu.waveIndex);
+  for (int i = 0; i < DELAY_BUFFER_SIZE; i++) {
+    delayBuffer[i] = 0.0;
   }
+
+  delay(100);
 
   pinMode(36, INPUT);
   gpio_pulldown_dis(GPIO_NUM_25);
@@ -342,336 +686,26 @@ void setup() {
   SerialPrintLn("setup done");
 
 #ifdef _M5STICKC_H_
-  M5.Lcd.fillScreen(BLACK);
-  M5.Lcd.drawBitmap(0, 240-115, 120, 115, bitmap_logo);
+  menu.Display();
 #endif
 
-#if 1
-  {
-    timerSemaphore = xSemaphoreCreateBinary();
-    timer = timerBegin(0, CLOCK_DIVIDER, true);
-    timerAttachInterrupt(timer, &onTimer, true);
-    timerAlarmWrite(timer, TIMER_ALARM, true);
-    timerAlarmEnable(timer);
-    SerialPrintLn("timer begin");
-  }
-#endif
+  timerSemaphore = xSemaphoreCreateBinary();
+  timer = timerBegin(0, CLOCK_DIVIDER, true);
+  timerAttachInterrupt(timer, &onTimer, true);
+  timerAlarmWrite(timer, TIMER_ALARM, true);
+  timerAlarmEnable(timer);
+  SerialPrintLn("timer begin");
+
+  xTaskCreatePinnedToCore(SynthesizerThread, "SynthesizerThread", 4096, NULL, 1, NULL, CORE1);
+  xTaskCreatePinnedToCore(TickThread, "TickThread", 4096, NULL, 1, NULL, CORE1);
+
   enablePlay = true;
-}
-
-//---------------------------------
-void UpdateKeys() {
-  M5.update();
-#ifdef _M5STICKC_H_
-  //uint16_t data = readMCP23017();
-  keyLowC = ((mcpKeys & 0x0001) != 0);
-  keyEb = ((mcpKeys & 0x0002) != 0);
-  keyD = ((mcpKeys & 0x0004) != 0);
-  keyE = ((mcpKeys & 0x0008) != 0);
-  keyF = ((mcpKeys & 0x0010) != 0);
-  keyLowCs = ((mcpKeys & 0x0200) != 0);
-  keyGs = ((mcpKeys & 0x0400) != 0);
-  keyG = ((mcpKeys & 0x0800) != 0);
-  keyA = ((mcpKeys & 0x1000) != 0);
-  keyB = ((mcpKeys & 0x2000) != 0);
-  octDown = ((mcpKeys & 0x4000) != 0);
-  octUp = ((mcpKeys & 0x8000) != 0);
-#else
-  keyLowC = digitalRead(16);
-  keyEb = digitalRead(17);
-  keyD = digitalRead(5);
-  keyE = digitalRead(18);
-  keyF = digitalRead(19);
-  keyLowCs = digitalRead(13);
-  keyGs =digitalRead(12);
-  keyG = digitalRead(14);
-  keyA = digitalRead(27);
-  keyB = digitalRead(26);
-  octDown = digitalRead(23);
-  octUp = digitalRead(3) && digitalRead(4); // before1.5:RXD0 after1.6:GPIO4
-#endif
-}
-
-//---------------------------------
-double GetNoteNumber() {
-  int b = 0;
-  if (keyLowC == LOW) b |= (1 << 7);
-  if (keyD == LOW) b |= (1 << 6);
-  if (keyE == LOW) b |= (1 << 5);
-  if (keyF == LOW) b |= (1 << 4);
-  if (keyG == LOW) b |= (1 << 3);
-  if (keyA == LOW) b |= (1 << 2);
-  if (keyB == LOW) b |= (1 << 1);
-
-  double n = 0;
-
-  // 0:C 2:D 4:E 5:F 7:G 9:A 11:B 12:HiC
-  int g = (b & 0b00001110);  // keyG, keyA, keyB の組み合わせ
-  
-  if ((g == 0b00001110) || (g == 0b00001100)) {      // [*][*][*] or [*][*][ ]
-    if ((b & 0b11110000) == 0b11110000) {
-      n = 0.0; // C
-    }
-    else if ((b & 0b11110000) == 0b01110000) {
-      n = 2.0; // D
-    }
-    else if ((b & 0b01110000) == 0b00110000) {
-      n = 4.0; // E
-      if (b & 0b10000000) n -= 1.0;
-    }
-    else if ((b & 0b00110000) == 0b00010000) {
-      n = 5.0; // F
-      if (b & 0b10000000) n -= 0.5;
-      if (b & 0b01000000) n -= 1.0;
-    }
-    else if ((b & 0b00010000) == 0) {
-      n = 7.0; // G
-      if (b & 0b10000000) n -= 0.5;
-      if (b & 0b01000000) n -= 1.0;
-      if (b & 0b00100000) n -= 1.0;
-    }
-    if ((b & 0b00000010) == 0) {
-      n += 12.0;
-    }
-  }
-  else if (g == 0b00000110) { // [ ][*][*]
-    n = 9.0; // A
-    if (b & 0b10000000) n -= 0.5;
-    if (b & 0b01000000) n -= 1.0;
-    if (b & 0b00100000) n -= 1.0;
-    if (b & 0b00010000) n -= 1.0;
-  }
-  else if (g == 0b00000010) { // [ ][ ][*]
-    n = 11.0; // B
-    if (b & 0b10000000) n -= 0.5;
-    if (b & 0b01000000) n -= 1.0;
-    if (b & 0b00100000) n -= 1.0;
-    if (b & 0b00010000) n -= 1.0;
-  }
-  else if (g == 0b00000100) { // [ ][*][ ]
-    n = 12.0; // HiC
-    if (b & 0b10000000) n -= 0.5;
-    if (b & 0b01000000) n -= 1.0;
-    if (b & 0b00100000) n -= 1.0;
-    if (b & 0b00010000) n -= 1.0;
-  }
-  else if (g == 0b00001000) { // [*][ ][ ]
-    n = 20.0; // HiA
-    if (b & 0b10000000) n -= 0.5;
-    if (b & 0b01000000) n -= 1.0;
-    if (b & 0b00100000) n -= 1.0;
-    if (b & 0b00010000) n -= 1.0;
-  }
-  else if (g == 0b00001010) { // [*][ ][*]
-    n = 10.0; // A#
-    if (b & 0b10000000) n -= 0.5;
-    if (b & 0b01000000) n -= 1.0;
-    if (b & 0b00100000) n -= 1.0;
-    if (b & 0b00010000) n -= 1.0;
-  }
-  else if (g == 0b00000000) { // [ ][ ][ ]
-    n = 13.0; // HiC#
-    if (b & 0b10000000) n -= 0.5;
-    if (b & 0b01000000) n -= 1.0;
-    if (b & 0b00100000) n -= 1.0;
-    if (b & 0b00010000) n -= 1.0;
-  }
-
-  if (keyEb == LOW) n += 1.0; // #
-  if (keyGs == LOW) n += 1.0; // #
-  if (keyLowCs == LOW) n -= 1.0; // b
-
-  if (octDown == LOW) n -= 12;
-  if (octUp == LOW) n += 12;
-
-  double bnote = baseNote - 13; // C
-  return bnote + n;
-}
-
-//---------------------------------
-uint16_t GetKeyData() {
-  uint16_t keyData = 0;
-  if (keyLowC == LOW) keyData |= (1 << 0);
-  if (keyEb == LOW) keyData |= (1 << 1);
-  if (keyD == LOW) keyData |= (1 << 2);
-  if (keyE == LOW) keyData |= (1 << 3);
-  if (keyF == LOW) keyData |= (1 << 4);
-  if (keyLowCs == LOW) keyData |= (1 << 5);
-  if (keyGs == LOW) keyData |= (1 << 6);
-  if (keyG == LOW) keyData |= (1 << 7);
-  if (keyA == LOW) keyData |= (1 << 8);
-  if (keyB == LOW) keyData |= (1 << 9);
-  if (octDown == LOW) keyData |= (1 << 10);
-  if (octUp == LOW) keyData |= (1 << 11);
-  return keyData;
-}
-
-//---------------------------------
-void ConfigExec() {
-#if false
-  if (M5.BtnA.pressedFor(100)) {
-    toneNo = (toneNo + 1) % 5;
-    enablePlay = false;
-    delay(100);
-#if false
-    BeginPreferences(); {
-      pref.putInt("ToneNo", toneNo);
-      LoadToneSetting(toneNo);
-    } EndPreferences();
-#endif
-    forcePlayTime = 10;
-    enablePlay = true;
-
-    M5.Axp.ScreenBreath(15);
-    delay(1000);
-    M5.Axp.ScreenBreath(8);
-    while (1) {
-      delay(100);
-      M5.update();
-      if (M5.BtnA.isReleased()) break;
-    }
-  }
-#endif  
-  static uint16_t keyCurrent = 0;
-  uint16_t keyData = GetKeyData();
-
-  uint16_t keyPush = (keyData ^ keyCurrent) & keyData;
-  keyCurrent = keyData;
-
-  // # + b key down -------
-  if ((keyData & (1<<5))&&(keyData & (1<<6))) {
-#if false
-    if (keyPush & (1<<4)) {
-      if (toneNo >= 4) {
-        toneNo = 0;
-      } else {
-        toneNo++;
-      }
-      enablePlay = false;
-      delay(100);
-#if false
-      BeginPreferences(); {
-        pref.putInt("ToneNo", toneNo);
-        LoadToneSetting(toneNo);
-      } EndPreferences();
-#endif
-      forcePlayTime = 10;
-      enablePlay = true;
-    }
-    else if (keyPush & (1<<9)) {
-      if (metronome == false) {
-        metronome = true;
-        metronome_m = 1;
-        metronome_v = 10;
-        metronome_cnt = 0;
-      }
-      else {
-        switch (metronome_v) {
-          case 10:
-            metronome_v = 20;
-            break;
-          case 20:
-            metronome_v = 30;
-            break;
-          case 30:
-            metronome_v = 40;
-            break;
-          case 40:
-            metronome_m++;
-            //if (metronome_m >= 5) {
-            if (metronome_m >= 2) {
-              metronome_m = 1;
-              metronome = false;
-            }
-            break;
-        }
-        metronome_cnt = 0;
-      }
-    }
-    else if ((keyData & (1<<8)) && (keyData & (1<<7))) {
-      metronome_t = 90;
-      metronome_cnt = 0;
-    }
-    else if (keyPush & (1<<8)) {
-      metronome_t += 5;
-      metronome_cnt = 0;
-      if (metronome_t > 360) metronome_t = 360;
-    }
-    else if (keyPush & (1<<7)) {
-      metronome_t -= 5;
-      metronome_cnt = 0;
-      if (metronome_t < 40) metronome_t = 40;
-    }
-    else
-#endif
-    if (keyPush & (1<<3)) {
-      if (keyData & (1<<2)) {
-        baseNote = 61;
-        forcePlayTime = 10;
-      }
-      else {
-        baseNote ++; // 49 61 73
-        if (baseNote > 73) baseNote = 73;
-        forcePlayTime = 2;
-        if ((baseNote == 49) || (baseNote == 61) || (baseNote == 73)) {
-          forcePlayTime = 10;
-        }
-      }
-    }
-    if (keyPush & (1<<2)) {
-      if (keyData & (1<<3)) {
-        baseNote = 61;
-        forcePlayTime = 10;
-      } else {
-        baseNote --; // 49 61 73
-        if (baseNote < 49) baseNote = 49;
-        forcePlayTime = 2;
-        if ((baseNote == 49) || (baseNote == 61) || (baseNote == 73)) {
-          forcePlayTime = 10;
-        }
-      }
-    }
-  }
-}
-
-//--------------------------
-double CalcFrequency(double note) {
-  return fineTune * pow(2, (note - (69-12))/12);
 }
 
 //-------------------------------------
 void loop() {
-  int averaged = 0;
-  for (int i = 0; i < 10; i++) {
-    averaged += analogRead(36);
-    delay(1);
-  }
-  averaged /= 10;
-  double vol = (averaged - 460) / 300.0; // 0 - 1
-  if (vol < 0.0) vol = 0.0;
-  if (vol > 1.0) vol = 1.0;
-  requestedVolume = vol*vol;
-  if (forcePlayTime > 0) {
-    requestedVolume = 0.02;
-    forcePlayTime--;
-  }
-  delay(5);
-
-  mcpKeys = readMCP23017();
-  UpdateKeys();
-  UpdateAcc();
-  ConfigExec();
-  
-  double n = GetNoteNumber();
-  if (targetNote != n) {
-    noteStep = 0.0;
-    startNote = currentNote;
-    targetNote = n;
-  }
-  if (requestedVolume < 0.001) {
-    currentNote = targetNote;
-    noteStep = 1.0;
-  }
+  // Core0 は波形生成に専念している
+  delay(5000);
 }
 
 
@@ -746,8 +780,8 @@ volatile double currentWavelengthTickCount[3] = { 0.0, 0.0, 0.0 };
 static double currentNote[2] = { 60, 64 };
 static double startNote[2] = { 60, 64 };
 static double targetNote[2] = { 60, 64 };
-static double noteStep = 0;
-static double noteDiv = 0.5;
+static double noteTime = 0;
+static double noteStep = 0.5;
 static double keyChangeCurve = 12;
 static int bendCounter = 0;
 const int BENDCOUNT_MAX = 7;
@@ -1429,7 +1463,7 @@ void Tick() {
     for (int i = 0; i < 2; i++) {
       targetNote[i] = currentNote[i];
     }
-    noteStep = 1;
+    noteTime = 1;
     
   } else {
     
@@ -1464,7 +1498,7 @@ void Tick() {
 
     if ((targetNote[0] != n0) || (targetNote[1] != n1)) {
       //double d = abs(note - currentNote);
-      noteStep = 0.0;
+      noteTime = 0.0;
       for (int i = 0; i < 2; i++) {
         startNote[i] = currentNote[i];
       }
@@ -1475,17 +1509,17 @@ void Tick() {
       for (int i = 0; i < 2; i++) {
         currentNote[i] = targetNote[i];
       }
-      noteStep = 1.0;
+      noteTime = 1.0;
     }
     else {
-      if (noteStep >= 1.0) {
+      if (noteTime >= 1.0) {
         
       } else {
-        noteStep += noteDiv;
-        if (noteStep > 1.0) {
-          noteStep = 1.0;
+        noteTime += noteStep;
+        if (noteTime > 1.0) {
+          noteTime = 1.0;
         }
-        double t = pow(noteStep, keyChangeCurve);
+        double t = pow(noteTime, keyChangeCurve);
         for (int i = 0; i < 2; i++) {
           currentNote[i] = startNote[i] + (targetNote[i] - startNote[i]) * t;
         }
@@ -1516,7 +1550,7 @@ void Tick() {
         if (v == 0) {
             MIDI_NoteOff();
         } else {
-          if ((prevNoteNumber != note) && (noteStep > 0.8)) {
+          if ((prevNoteNumber != note) && (noteTime > 0.8)) {
             MIDI_ChangeNote(note, v);
   
           } else {
@@ -1770,7 +1804,7 @@ void LoadToneSetting(int idx) {
     fineTune = 440 + ChangeSigned(ts->fineTune);
     reverbRate = ts->reverb * 0.02; // (default 0.152)
     portamentoRate = 1 - (ts->portamento * 0.04); // (default 0.99)
-    noteDiv = 1.0 / (1 + (ts->keySense * 0.3)); // (default 1.0 / 3.0)
+    noteStep = 1.0 / (1 + (ts->keySense * 0.3)); // (default 1.0 / 3.0)
     volumeRate = 0.9 - (ts->breathSense * 0.04); // (default 0.5)
 
     for (int i = 0; i < 256; i++) {

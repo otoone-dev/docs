@@ -1,9 +1,7 @@
 #ifndef AFUUE_COMMON_H
 #define AFUUE_COMMON_H
 
-#ifdef _M5STICKC_H_
 #include <M5StickCPlus.h>
-#endif
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -23,7 +21,6 @@
 //#define ENABLE_SPEAKERHAT
 #define DACPIN (DAC2) // 26
 #define LEDPIN (10) // M5StickC
-#include "MCP23017.h"
 
 #else
 // ESP32 Devkit -------------
