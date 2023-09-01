@@ -76,6 +76,10 @@ void Menu::ReadPlaySettings(int widx) {
     transpose = waveSettings[widx].transpose;
     portamentoRate = waveSettings[widx].portamentoRate;
     delayRate = waveSettings[widx].delayRate;
+
+    distortion = waveSettings[widx].distortion;
+    flanger = waveSettings[widx].flanger;
+    flangerTime = waveSettings[widx].flangerTime;
 }
 
 //--------------------------
@@ -90,8 +94,12 @@ void Menu::WritePlaySettings(int widx) {
 //--------------------------
 void Menu::LoadPreferences(Preferences pref) {
   keySense = pref.getInt("KeySense", 45);
+#ifdef ENABLE_MCP3425
+  breathSense = pref.getInt("BreathSense", 0);
+#else
   breathSense = pref.getInt("BreathSense", 300);
-  
+#endif
+
   for (int i = 0; i < WAVE_MAX; i++) {
     if (waveData.GetWaveTable(i) == NULL) {
       break;
@@ -216,8 +224,13 @@ bool Menu::Update(uint16_t key, int pressure) {
           if (keySense < 0) keySense = 0;
           break;
         case MENUINDEX_BREATHSENSE:
+#ifdef ENABLE_MCP3425
+          breathSense -= 50;
+          if (breathSense < 0) breathSense = 0;
+#else
           breathSense -= 10;
           if (breathSense < 100) breathSense = 100;
+#endif
           break;
         case MENUINDEX_CLOCK:
           minute = (minute + 59) % 60;
@@ -263,8 +276,13 @@ bool Menu::Update(uint16_t key, int pressure) {
           if (keySense > 100) keySense = 100;
           break;
         case MENUINDEX_BREATHSENSE:
+#ifdef ENABLE_MCP3425
+          breathSense += 50;
+          if (breathSense > 500) breathSense = 500;
+#else
           breathSense += 10;
           if (breathSense > 500) breathSense = 500;
+#endif
           break;
         case MENUINDEX_CLOCK:
           minute = (minute + 1)%60;
@@ -412,7 +430,7 @@ std::string Menu::NoteNumberToStr() {
     "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
   };
   int n = testNote%12;
-  int o = (testNote/12 - 1);
+  int o = (testNote/12 - 1); //国際式 (ヤマハ式はさらに-1)
   return NoteName[n] + std::to_string(o);
 }
 

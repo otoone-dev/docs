@@ -8,7 +8,13 @@
 #include <Preferences.h>
 //#include <nvs.h>
 
-#define AFUUE_VER (109)
+//#define AFUUE_VER (109) // 8Bit-DAC ADC-Direct
+#define AFUUE_VER (110) // 16Bit-PWM ADC-MCP3425
+
+#if (AFUUE_VER == 110)
+#define SOUND_TWOPWM
+#define ENABLE_MCP3425
+#endif
 
 #define CORE0 (0)
 #define CORE1 (1)
@@ -21,7 +27,6 @@
 #define _M5DISPLAY_H_
 #define ENABLE_IMU
 //#define ENABLE_SPEAKERHAT
-#define SOUND_TWOPWM
 #ifdef SOUND_TWOPWM
 #define PWMPIN_LOW (0)
 #define PWMPIN_HIGH (26)
@@ -49,8 +54,7 @@
 #endif
 
 #define ENABLE_BMP180 (0)
-#define ENABLE_MCP3425 (1)
-#if ENABLE_MCP3425
+#ifdef ENABLE_MCP3425
 #define MCP3425_ADDR (0x68)
 #endif
 #define ENABLE_CHORD_PLAY (0)

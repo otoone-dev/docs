@@ -12,6 +12,10 @@ struct WaveSettings {
   int transpose = 0;
   int portamentoRate = 15;
   int delayRate = 15;
+
+  int distortion = 0;
+  int flanger = 80; // 0 - 50
+  int flangerTime = 50; // 0 - 100
 };
 
 class Menu {
@@ -56,6 +60,10 @@ public:
   int delayRate = 0;
   int keySense = 0;
   int breathSense = 0;
+
+  int distortion = 0;
+  int flanger = 0;
+  int flangerTime = 0;
 
   WaveSettings waveSettings[WAVE_MAX];
   int forcePlayNote = -1;

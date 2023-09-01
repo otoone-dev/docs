@@ -22,9 +22,16 @@ volatile bool enablePlay = false;
 
 volatile const short* currentWaveTable = NULL;
 volatile double phase = 0.0;
+volatile double currentWaveLevel = 0.0;
 #define DELAY_BUFFER_SIZE (8000)
 volatile double delayBuffer[DELAY_BUFFER_SIZE];
 volatile int delayPos = 0;
+#define FLANGER_BUFFER_SIZE (1250) // 25000Hz で 20Hz(E0くらい)
+volatile double flangerBuffer[FLANGER_BUFFER_SIZE];
+volatile double flanger = 0.0;
+volatile int flangerPos = 0;
+volatile float flangerTime = 0.0f;
+volatile int flangerLength = 0;
 volatile int fracTickCount = 0;
 volatile int fracValue = 0;
 
@@ -34,14 +41,18 @@ volatile double delayRate = 0.15;
 float portamentoRate = 0.99f;
 float keySenseTimeMs = 50.0f;
 float breathSenseRate = 300.0f;
+float distortion = 0.0f;
+double distortionVol = 0.0f;
 
 #define CLOCK_DIVIDER (80)
 #define TIMER_ALARM (40)
-#define SAMPLING_RATE (25000) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (80*40) = 25kHz // 80MHz / (80*50) = 20kHz
+//#define SAMPLING_RATE (20000) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (80*50) = 20kHz
+#define SAMPLING_RATE (25000) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (80*40) = 25kHz
 //#define SAMPLING_TIME_LENGTH (1.0f / SAMPLING_RATE)
 static float currentWavelength = 0.0f;
 volatile double currentWavelengthTickCount = 0.0;
 volatile double requestedVolume = 0.0;
+static float maximumVolume = 0.0f;
 volatile float targetNote = 60.0f;
 volatile float currentNote = 60.0f;
 volatile float startNote = 60.0f;
@@ -61,13 +72,13 @@ volatile double noiseVolume = 0.0;
 volatile float noteOnTimeMs = 0.0f;
 const float noiseLevel = 0.5f;
 const float NOISETIME_LENGTH = 50.0f; //ms
-volatile float growlVolume = 0.0f;
-volatile float growlWavelength = 0.0f;
-volatile float growlTickCount = 0.0f;
-volatile float growlPhase = 0.0f;
-volatile float falsettoVolume = 0.0f;
-volatile float modTickCount = 0.0f;
-volatile float modPhase = 0.0f;
+volatile double growlVolume = 0.0f;
+volatile double growlWavelength = 0.0f;
+volatile double growlTickCount = 0.0f;
+volatile double growlPhase = 0.0f;
+volatile double falsettoVolume = 0.0f;
+volatile double modTickCount = 0.0f;
+volatile double modPhase = 0.0f;
 
 static bool keyLowC;
 static bool keyEb;
@@ -83,6 +94,7 @@ static bool octDown;
 static bool octUp;
 
 volatile float accx, accy, accz;
+volatile float noteOnAccX, noteOnAccY, noteOnAccZ;
 
 //-------------------------------------
 void SerialPrintLn(const char* text) {
@@ -195,12 +207,12 @@ float GetNoteNumber() {
     }
     else if ((b & 0b00110000) == 0b00010000) {
       n = 5.0f; // F
-      //if (b & 0b10000000) n -= 0.5f;
+      if (b & 0b10000000) n -= 2.0f;
       //if (b & 0b01000000) n -= 1.0f;
     }
     else if ((b & 0b00010000) == 0) {
       n = 7.0f; // G
-      //if (b & 0b10000000) n -= 0.5f;
+    if (b & 0b10000000) n -= 2.0f;
       //if (b & 0b01000000) n -= 1.0f;
       if (b & 0b00100000) n -= 1.0f;
     }
@@ -210,43 +222,43 @@ float GetNoteNumber() {
   }
   else if (g == 0b00000110) { // [ ][*][*]
     n = 9.0f; // A
-    //if (b & 0b10000000) n -= 0.5f;
+    if (b & 0b10000000) n -= 2.0f;
     //if (b & 0b01000000) n -= 1.0f;
     if (b & 0b00100000) n -= 1.0f;
-    if (b & 0b00010000) n -= 1.0f;
+    if (b & 0b00010000) n += 1.0f; // SideBb 相当
   }
   else if (g == 0b00000010) { // [ ][ ][*]
     n = 11.0f; // B
-    //if (b & 0b10000000) n -= 0.5f;
+    if (b & 0b10000000) n -= 2.0f;
     //if (b & 0b01000000) n -= 1.0f;
-    if (b & 0b00100000) n -= 1.0f;
+    if (b & 0b00100000) n -= 1.0f; // Flute Bb
     if (b & 0b00010000) n -= 1.0f;
   }
   else if (g == 0b00000100) { // [ ][*][ ]
     n = 12.0f; // HiC
-    //if (b & 0b10000000) n -= 0.5f;
-    //if (b & 0b01000000) n -= 1.0f;
+    if (b & 0b10000000) n -= 2.0f;
+    if (b & 0b01000000) n += 2.0f; // HiD トリル用
     if (b & 0b00100000) n -= 1.0f;
     if (b & 0b00010000) n -= 1.0f;
   }
   else if (g == 0b00001000) { // [*][ ][ ]
     n = 20.0f; // HiA
-    //if (b & 0b10000000) n -= 0.5f;
-    //if (b & 0b01000000) n -= 1.0f;
+    if (b & 0b10000000) n -= 2.0f;
+    if (b & 0b01000000) n += 2.0f;
     if (b & 0b00100000) n -= 1.0f;
     if (b & 0b00010000) n -= 1.0f;
   }
   else if (g == 0b00001010) { // [*][ ][*]
     n = 10.0f; // A#
-    if (b & 0b10000000) n -= 0.5f;
-    if (b & 0b01000000) n -= 1.0f;
+    if (b & 0b10000000) n -= 2.0f;
+    if (b & 0b01000000) n += 2.0f;
     if (b & 0b00100000) n -= 1.0f;
     if (b & 0b00010000) n -= 1.0f;
   }
   else if (g == 0b00000000) { // [ ][ ][ ]
     n = 13.0f; // HiC#
-    if (b & 0b10000000) n -= 0.5f;
-    if (b & 0b01000000) n -= 1.0f;
+    //if (b & 0b10000000) n -= 0.5f;
+    if (b & 0b01000000) n += 2.0f; // HiEb トリル用
     if (b & 0b00100000) n -= 1.0f;
     if (b & 0b00010000) n -= 1.0f;
   }
@@ -335,43 +347,48 @@ void SynthesizerThread(void *pvParameters) {
     // ノイズ
     if (requestedVolume < 0.01f) {
       noteOnTimeMs = 0.0f;
+      noteOnAccX = accx;
+      noteOnAccY = accy;
+      noteOnAccZ = accz;
     }
     else {
       noteOnTimeMs += td;
+      if (requestedVolume < 0.2f) {
+        maximumVolume = 0.0f;
+        growlVolume = 0.0f;
+      }
+      else if (requestedVolume > maximumVolume) {
+        maximumVolume = requestedVolume;
+      }
+      else {
+        if (maximumVolume > 0.8f) {
+          float a = (maximumVolume - 0.8f) * 5.0f; // 0 - 1
+          float wavelength = 40.0f;//240.0f - 200.0f*a;
+          growlWavelength += (wavelength - growlWavelength) * 0.9f;
+          growlTickCount = (growlWavelength / (float)SAMPLING_RATE);
+          growlVolume = a * requestedVolume;
+        }
+      }
     }
     float n = (NOISETIME_LENGTH - noteOnTimeMs) / NOISETIME_LENGTH;
     if (n < 0.0f) n = 0.0f;
     if (n > 1.0f) n = 1.0f;
+
+#if 1
     noiseVolume = n * requestedVolume * noiseLevel;
+#else
+    noiseVolume = 0.0;
+    // ディストーション利用のアタックじゃりじゃり
+    if (distortion > 0.0f) {
+      distortionVol = 1.0f + n * distortion;
+    }
+    else {
+      distortionVol = 0.0;
+    }
+#endif
 
-    float portamento = portamentoRate;
-
-    // がなり (傾きによるもの)
     if (menu.isAccControl) {
-      float a = accy;
-      if (accy > 0.5f) {
-        falsettoVolume = 0.0f;
-        a = (a - 0.5f)*2.0f;
-        if (a > 1.0f) a = 1.0f;
-        float wavelength = 240.0f - 200.0f*a;
-        growlWavelength += (wavelength - growlWavelength) * 0.9f;
-        growlTickCount = (growlWavelength / (float)SAMPLING_RATE);
-        growlVolume = a;
-      }
-      else if (accy < -0.1f) {
-        growlVolume = 0.0f;
-        if (a < -1.0f) a = -1.0f;
-        falsettoVolume = -a;
-      }
-      else {
-        growlVolume = 0.0f;
-        falsettoVolume = 0.0f;
-      }
-  
-      // 左右傾きによるポルタメント制御
-      if ((accx > 0.5f) || (accx < -0.5f)) {
-        portamento = 0.1f;
-      }
+      //atan2f(accy, accz);
     }
 
     // キー押されてもしばらくは反応しない処理（ピロ音防止）
@@ -382,15 +399,15 @@ void SynthesizerThread(void *pvParameters) {
         currentNote = targetNote;
       }
       else {
-        if (noiseVolume < 0.1f) {
-          noiseVolume = 0.1f; //キー切り替え中の謎のノイズ
+        if (noiseVolume < 0.05f) {
+          noiseVolume = 0.05f; //キー切り替え中の謎のノイズ
         }
       }
     }
 
     // 現在の再生周波数から１サンプルあたりのフェーズの進みを計算
     float wavelength = CalcFrequency(currentNote + bendNoteShift);
-    currentWavelength += (wavelength - currentWavelength) * portamento;
+    currentWavelength += (wavelength - currentWavelength) * portamentoRate;
     currentWavelengthTickCount = (currentWavelength / (float)SAMPLING_RATE);
 
     modTickCount = (currentWavelength) / (float)SAMPLING_RATE;
@@ -413,12 +430,16 @@ void GetMenuParams() {
     delayRate = menu.delayRate * 0.01f;
     keySenseTimeMs = menu.keySense;
     breathSenseRate = menu.breathSense;
+
+    distortion = menu.distortion;
+    flanger = menu.flanger/100.0;
+    flangerTime = menu.flangerTime / 100.0f;
 }
 
 //-------------------------------------
 #define PRESSURE_AVERAGE_COUNT (3)
 int GetPressureValue() {
-#if ENABLE_MCP3425
+#ifdef ENABLE_MCP3425
     Wire.requestFrom(MCP3425_ADDR, 2);
     return (Wire.read() << 8 ) | Wire.read();
 #else
@@ -431,6 +452,19 @@ int GetPressureValue() {
 }
 
 //-------------------------------------
+void FlangerExec() {
+    if ((flanger > 0.0) && (currentWavelengthTickCount > 0.0f)) {
+      flangerLength = (int)((flangerTime * currentWavelengthTickCount) * SAMPLING_RATE);
+      if (flangerLength > FLANGER_BUFFER_SIZE-2) {
+        flangerLength = FLANGER_BUFFER_SIZE-2;
+      }
+    }
+    else {
+      flangerLength = 0;
+    }
+}
+
+//-------------------------------------
 void TickThread(void *pvParameters) {
   unsigned long loopTime = 0;
   while (1) {
@@ -440,8 +474,8 @@ void TickThread(void *pvParameters) {
 
     //気圧センサー
     pressureValue = GetPressureValue();
-#if ENABLE_MCP3425
-    float vol = (pressureValue - defaultPressureValue) / (2047.0f-defaultPressureValue); // 0 - 1
+#ifdef ENABLE_MCP3425
+    float vol = (pressureValue - defaultPressureValue) / ((2047.0f-breathSenseRate)-defaultPressureValue); // 0 - 1
     if (vol < 0.0f) vol = 0.0f;
     if (vol > 1.0f) vol = 1.0f;
     requestedVolume = pow(vol,2.0f) * (1.0f-bendVolume);
@@ -458,7 +492,13 @@ void TickThread(void *pvParameters) {
     UpdateAcc();
 
     BendExec(td);
-  
+
+    // ディストーション
+    //if (distortion > 0.0f) {
+      //distortionVol = 1.0f + distortion * vol * vol;
+    //}
+    //FlangerExec();
+
     float n = GetNoteNumber();
     if (forcePlayTime > 0.0f) {
       requestedVolume = 0.02f;
@@ -542,7 +582,7 @@ double Voice(double p) {
   t = (t + 1) % 256;
   double w1 = (waveA[t] * (1.0-shift) + waveB[t] * shift);
   double w = (w0 * (1.0-f)) + (w1 * f);
-  return (w / 32767.0);
+  return w;
 #endif
 }
 
@@ -560,9 +600,13 @@ uint16_t CreateWave() {
     // 波形を生成する
     phase += currentWavelengthTickCount;
     if (phase >= 1.0) phase -= 1.0;
-    double g = Voice(phase);
 
-#if 0
+#if 1
+    double g = Voice(phase);
+    //double g1 = (Voice(phase) - currentWaveLevel) * (0.1 + 0.9 * filterLevel);
+    //currentWaveLevel += g1;
+    //double g = currentWaveLevel;
+#else
     // FM
     modPhase += modTickCount;
     if (modPhase >= 1.0) modPhase -= 1.0;
@@ -578,16 +622,19 @@ uint16_t CreateWave() {
     if (growlVolume > 0.1) {
       growlPhase += growlTickCount;
       if (growlPhase >= 1.0) growlPhase -= 1.0;
-      g *= (1.0 + growlVolume);
-      if (g > 2.0) g = 2.0;
-      if (g < -2.0) g = -2.0;
-      if (g > 1.0) g = 2.0 - g;
-      if (g < -1.0) g = -2.0 - g;
-      double gn = 1.0;
-      if (growlPhase > 0.5) gn = 1.0 - growlVolume;
-      //g *= 0.5 + 0.5 * tsin(phase[2]) * channelVolume[2] + 0.5 * (1.0 - channelVolume[2]);
-      g *= gn;
+      if (growlPhase > 0.5) {
+        g *= 1.0 - growlVolume;
+      }
     }
+#endif
+
+    // ディストーション
+#if 0
+  if (distortionVol > 1.0) {
+    g *= distortionVol;
+    if (g > 32700.0) g = 32700.0;
+    else if (g < -32700.0) g = -32700.0;
+  }
 #endif
 
 #if 1
@@ -600,7 +647,18 @@ uint16_t CreateWave() {
     // ファルセット
     if (falsettoVolume > 0.1) {
       double gs = VoiceSin(phase);
-      g = (g * (1.0-falsettoVolume) + gs * falsettoVolume);
+      g = g * (1.0-falsettoVolume) + gs * falsettoVolume;
+    }
+#endif
+
+#if 0
+    // フランジャー
+    if (flanger > 0) {
+      flangerBuffer[flangerPos] = g;
+      flangerPos = (flangerPos + 1) % FLANGER_BUFFER_SIZE;
+
+      g = g + flangerBuffer[(flangerPos + FLANGER_BUFFER_SIZE - flangerLength) % FLANGER_BUFFER_SIZE] * flanger;
+
     }
 #endif
 
@@ -725,7 +783,7 @@ void setup() {
   }
 #endif
 
-#if ENABLE_MCP3425
+#ifdef ENABLE_MCP3425
   DrawCenterString("Check BrthSensor...", 67, 120, 2);
   Wire.beginTransmission(MCP3425_ADDR);
   int error = Wire.endTransmission();
