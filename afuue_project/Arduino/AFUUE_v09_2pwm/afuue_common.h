@@ -1,32 +1,45 @@
 #ifndef AFUUE_COMMON_H
 #define AFUUE_COMMON_H
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include <WiFi.h>
 #include <Wire.h>
 #include <Preferences.h>
-//#include <nvs.h>
 
-//#define AFUUE_VER (109) // 8Bit-DAC ADC-Direct
-#define AFUUE_VER (110) // 16Bit-PWM ADC-MCP3425
+#include <M5Unified.h>
 
-#if (AFUUE_VER == 110)
+//#define AFUUE_VER (109) // 8Bit-DAC ADC-Direct (AFUUE2 First)
+//#define AFUUE_VER (110) // 16Bit-PWM ADC-MCP3425 (AFUUE2 Second)
+#define AFUUE_VER (111) // 16Bit-PWM ADCx2     (AFUUE2R)
+
+
+
+#if (AFUUE_VER == 109)
+// AFUUE2 初代
+#define _M5STICKC_H_
+
+#elif (AFUUE_VER == 110)
+// AFUUE2 改良版
+#define _M5STICKC_H_
 #define SOUND_TWOPWM
 #define ENABLE_MCP3425
+
+#elif (AFUUE_VER == 111)
+// AFUUE2R
+#define _STAMPS3_H_
+#include <Arduino.h>
+#include <Adafruit_TinyUSB.h>
+#include <MIDI.h>
+#define SOUND_TWOPWM
+#define ENABLE_ADC2
 #endif
 
 #define CORE0 (0)
 #define CORE1 (1)
 
-#include <M5Unified.h>
-#define _M5STICKC_H_ (1)
-
 #ifdef _M5STICKC_H_
 // M5StickC Plus ------------
 #define _M5DISPLAY_H_
 #define ENABLE_IMU
-//#define ENABLE_SPEAKERHAT
 #ifdef SOUND_TWOPWM
 #define PWMPIN_LOW (0)
 #define PWMPIN_HIGH (26)
@@ -37,8 +50,25 @@
 #define LEDPIN (10) // M5StickC
 #define ADCPIN (ADC2) // 36
 #define ENABLE_RTC
+#endif //--------------
 
+#ifdef _STAMPS3_H_
+// STAMPS3 -------------
+#ifdef SOUND_TWOPWM
+#define PWMPIN_LOW (39)
+#define PWMPIN_HIGH (40)
 #else
+#define DACPIN (39)
+#endif
+#ifdef ENABLE_ADC2
+#define ADCPIN (11)
+#define ADCPIN2 (12)
+#endif //ENABLE_ADC2
+#define MIDI_IN_PIN (42)
+#define MIDI_OUT_PIN (41)
+#endif //--------------
+
+#if 0
 // ESP32 Devkit -------------
 #define DACPIN (DAC1) // 25
 #define LEDPIN (33) // ESP32-Devkit
@@ -49,24 +79,19 @@
 #define ADXL345_RESO (0.0039f) // 3.9mG
 #define ADXL345_POWER_CTL 0x2d
 #define ADXL345_DATAX0 0x32
-#endif
-//---------------------------
-#endif
+#endif //ENABLE_ADXL345
+#endif //--------------
 
-#define ENABLE_BMP180 (0)
+
 #ifdef ENABLE_MCP3425
 #define MCP3425_ADDR (0x68)
 #endif
-#define ENABLE_CHORD_PLAY (0)
-#define ENABLE_COMMUNICATETOOL (0)
-#define KEYDATACHECK (0)
-#define ENABLE_SERIALOUTPUT (0)//(KEYDATACHECK && 1)
+//#define ENABLE_COMMUNICATETOOL (0)
 #define ENABLE_BLE_MIDI (0)
-#define ENABLE_MIDI (0)
-#define ENABLE_FMSG (0)
-#define ENABLE_ANALOGREAD_GPIO32 (0)
+#define ENABLE_MIDI (1)
+#define ENABLE_SERIALOUTPUT (0)//(0 && !ENABLE_MIDI)
 
 extern int baseNote;
-extern void SerialPrintLn(char* text);
+extern void SerialPrintLn(const char* text);
 
 #endif // AFUUE_COMMON_H

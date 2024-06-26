@@ -13,6 +13,8 @@ struct WaveSettings {
   int portamentoRate = 15;
   int delayRate = 15;
 
+  int preparation = 5;
+
   int distortion = 0;
   int flanger = 80; // 0 - 50
   int flangerTime = 50; // 0 - 100
@@ -27,8 +29,6 @@ private:
   std::string TransposeToStr();
   std::string TimeToStr();
   std::string NoteNumberToStr();
-  void DrawBattery(int x, int y);
-  void DrawString(const char* str, int sx, int sy);
   void DisplayLine(int line, bool selected, const std::string& title, const std::string& value);
   void DisplayMenu();
   void DisplayPerform(bool onlyRefreshTime = false);
@@ -44,10 +44,13 @@ private:
 public:
   Menu();
   void Initialize(Preferences pref);
+  void SetNextWave();
   bool Update(uint16_t key, int pressure);
   void SavePreferences(Preferences pref);
   void LoadPreferences(Preferences pref);
   void Display();
+  void DrawBattery(int x, int y);
+  void DrawString(const char* str, int sx, int sy);
 
   WaveData waveData;
   int waveIndex = 0;
@@ -61,6 +64,7 @@ public:
   int keySense = 0;
   int breathSense = 0;
 
+  int preparation = 0;
   int distortion = 0;
   int flanger = 0;
   int flangerTime = 0;

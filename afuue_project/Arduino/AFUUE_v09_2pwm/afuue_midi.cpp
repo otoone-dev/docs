@@ -1,21 +1,20 @@
 #include "afuue_common.h"
-#include "midi.h"
+#include "afuue_midi.h"
 
-bool midiEnabled = false;
-byte midiMode = 0; // 1:BreathControl 2:Expression 3:AfterTouch 4:MainVolume 5:CUTOFF(for KORG NTS-1)
+#ifdef _STAMPS3_H_
+Adafruit_USBD_MIDI usb_midi;
+MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usb_midi, MIDI);
+#endif
+
+MIDIMODE midiMode = MIDIMODE::BREATHCONTROL; // 0:BreathControl 1:Expression 2:AfterTouch 3:MainVolume 4:CUTOFF(for KORG NTS-1)
 byte midiPgNo = 51;
 uint8_t midiPacket[32];
 bool deviceConnected = false;
 bool playing = false;
-int channelNo = 0;
+int channelNo = 1;
 int prevNoteNumber = -1;
 unsigned long activeNotifyTime = 0;
-
-
-#if ENABLE_MIDI
-#include <HardwareSerial.h>
-HardwareSerial SerialHW(0);
-#endif
+bool isUSBMounted = false;
 
 #if ENABLE_BLE_MIDI
 #include <BLEDevice.h>
@@ -33,9 +32,9 @@ class MyServerCallbacks: public BLEServerCallbacks {
       deviceConnected = true;
       SerialPrintLn("connected");
 
-      MIDI_NoteOn(baseNote + 1, 50);
+      AFUUEMIDI_NoteOn(baseNote + 1, 50);
       delay(500);
-      MIDI_NoteOff();
+      AFUUEMIDI_NoteOff();
     };
 
     void onDisconnect(BLEServer* pServer) {
@@ -46,24 +45,26 @@ class MyServerCallbacks: public BLEServerCallbacks {
 #endif
 
 
-
 //---------------------------------
-void MIDI_Initialize() {
+bool AFUUEMIDI_Initialize() {
 #if ENABLE_MIDI
-    SerialPrintLn("hardware serial begin");
-    pinMode(1, OUTPUT);
-    pinMode(4, INPUT);
-    SerialHW.begin(31250, SERIAL_8N1, 4, 1);
+#ifdef _STAMPS3_H_
+    usb_midi.setStringDescriptor("AFUUE2R");
+    MIDI.begin(MIDI_CHANNEL_OMNI); //すべてのチャンネルを受信
+    delay(1000);
+    isUSBMounted = TinyUSBDevice.mounted();
+    if (isUSBMounted) {
+      // USB MIDI
+    } else {
+      // MIDI TRS out
+      Serial2.begin(31250, SERIAL_8N1, MIDI_OUT_PIN, MIDI_IN_PIN);
+    }
+#endif
     deviceConnected = true;
 
-    delay(100);
-    MIDI_ProgramChange(midiPgNo);
-    MIDI_NoteOn(baseNote + 1, 10);
-    delay(500);
-    MIDI_NoteOff();
 #endif
 #if ENABLE_BLE_MIDI
-    BLEDevice::init(version);
+    BLEDevice::init("AFUUE2");
       
     // Create the BLE Server
     BLEServer *pServer = BLEDevice::createServer();
@@ -95,11 +96,25 @@ void MIDI_Initialize() {
   
     SerialPrintLn("BLE MIDI begin");
 #endif
+  return isUSBMounted;
 }
 
 //---------------------------------
-void MIDI_NoteOn(int note, int vol) {
-    if (playing != false) return;
+void SerialSend(uint8_t* midiPacket, size_t size) {
+  if (isUSBMounted) {
+    return;
+  }
+#ifdef _STAMPS3_H_
+  Serial2.write(midiPacket, size);
+#endif
+}
+
+//---------------------------------
+void AFUUEMIDI_NoteOn(int note, int vol) {
+    if (playing) {
+      AFUUEMIDI_NoteOff();
+    }
+    //if (playing != false) return;
 #if ENABLE_BLE_MIDI
     midiPacket[0] = 0x80; // header
     midiPacket[1] = 0x80; // timestamp, not implemented
@@ -117,41 +132,38 @@ void MIDI_NoteOn(int note, int vol) {
     midiPacket[0] = 0x90 + channelNo;
     midiPacket[1] = note;
     midiPacket[2] = 120;
-    if (midiMode == MIDIMODE_AFTERTOUCH) { // after touch (channel pressure)
+    if (midiMode == MIDIMODE::AFTERTOUCH) { // after touch (channel pressure)
       midiPacket[3] = 0xD0 + channelNo;
       midiPacket[4] = vol;
-      SerialHW.write(midiPacket, 5);
+      SerialSend(midiPacket, 5);
     } else {
       midiPacket[3] = 0xB0 + channelNo;
       midiPacket[4] = 0x0B; // expression
-      if (midiMode == MIDIMODE_BREATHCONTROL) {
+      if (midiMode == MIDIMODE::BREATHCONTROL) {
         midiPacket[4] = 0x02; // breath control
       }
-      else if (midiMode == MIDIMODE_MAINVOLUME) {
+      else if (midiMode == MIDIMODE::MAINVOLUME) {
         midiPacket[4] = 0x07; // main volume
       }
-      else if (midiMode == MIDIMODE_CUTOFF) {
+      else if (midiMode == MIDIMODE::CUTOFF) {
         midiPacket[5] = 43; // CUT OFF (for KORG NTS-1)
       }
       midiPacket[5] = vol;
-      SerialHW.write(midiPacket, 6);
+      SerialSend(midiPacket, 6);
     }
+#ifdef _STAMPS3_H_
+    if (isUSBMounted) {
+      MIDI.sendNoteOn(note, 120, channelNo);
+    }
+#endif
 #endif
     playing = true;
     prevNoteNumber = note;
-    delay(8);
 }
 
 //---------------------------------
-void MIDI_ChangeNote(int note, int vol) {
-    if ((playing == false) || (prevNoteNumber < 0)) return;
-    MIDI_NoteOff();
-    
-    MIDI_NoteOn(note, vol);
-}
-
-//---------------------------------
-void MIDI_NoteOff() {
+void AFUUEMIDI_NoteOff() {
+  // vol=0 で NoteOn というのもアリらしい (PSS-A50調べ)
     if ((playing == false) || (prevNoteNumber < 0)) return;
 #if ENABLE_BLE_MIDI
     midiPacket[0] = 0x80; // header
@@ -167,15 +179,50 @@ void MIDI_NoteOff() {
     midiPacket[1] = prevNoteNumber;
     midiPacket[2] = 0;
       
-    SerialHW.write(midiPacket, 3);
+    SerialSend(midiPacket, 3);
+
+#ifdef _STAMPS3_H_
+    if (isUSBMounted) {
+      MIDI.sendNoteOff(prevNoteNumber, 0, channelNo);
+    }
+#endif
 #endif
     playing = false;
     prevNoteNumber = -1;
-    delay(4);
 }
 
 //---------------------------------
-void MIDI_BreathControl(int vol) {
+void AFUUEMIDI_PicthBendControl(int bend) {
+    if (playing == false) return;
+
+    uint16_t value = static_cast<uint16_t>(bend + 0x8000) >> 2; // 14bit
+    uint8_t d0 = value & 0x7F;
+    uint8_t d1 = (value >> 7) & 0x7F;
+#if ENABLE_BLE_MIDI
+    midiPacket[0] = 0x80; // header
+    midiPacket[1] = 0x80; // timestamp, not implemented
+    midiPacket[2] = 0xE0 + channelNo; 
+    midiPacket[3] = d0;
+    midiPacket[4] = d1;
+    pCharacteristic->setValue(midiPacket, 5); // packet, length in bytes)
+    pCharacteristic->notify();
+#endif
+#if ENABLE_MIDI
+    midiPacket[0] = 0xE0 + channelNo;
+    midiPacket[1] = d0;
+    midiPacket[2] = d1;
+    SerialSend(midiPacket, 3);
+
+#ifdef _STAMPS3_H_
+    if (isUSBMounted) {
+      MIDI.sendPitchBend(bend, channelNo);
+    }
+#endif
+#endif
+}
+
+//---------------------------------
+void AFUUEMIDI_BreathControl(int vol) {
 #if ENABLE_BLE_MIDI
     midiPacket[0] = 0x80; // header
     midiPacket[1] = 0x80; // timestamp, not implemented
@@ -187,44 +234,72 @@ void MIDI_BreathControl(int vol) {
     pCharacteristic->notify();
 #endif
 #if ENABLE_MIDI
-    if (midiMode == MIDIMODE_AFTERTOUCH) { // after touch (channel pressure)
+    if (midiMode == MIDIMODE::AFTERTOUCH) { // after touch (channel pressure)
       midiPacket[0] = 0xD0 + channelNo;
       midiPacket[1] = vol;
-      SerialHW.write(midiPacket, 2);
+      SerialSend(midiPacket, 2);
     } else {
       midiPacket[0] = 0xB0 + channelNo;
       midiPacket[1] = 0x0B; // expression
-      if (midiMode == MIDIMODE_BREATHCONTROL) {
+      if (midiMode == MIDIMODE::BREATHCONTROL) {
         midiPacket[1] = 0x02; // breath control
       }
-      else if (midiMode == MIDIMODE_MAINVOLUME) {
+      else if (midiMode == MIDIMODE::MAINVOLUME) {
         midiPacket[1] = 0x07; // main volume
       }
-      else if (midiMode == MIDIMODE_CUTOFF) {
+      else if (midiMode == MIDIMODE::CUTOFF) {
         midiPacket[1] = 43; // CUTOFF (for KORG NTS-1)
       }
       midiPacket[2] = vol;
-      SerialHW.write(midiPacket, 3);
+      SerialSend(midiPacket, 3);
+    }
+#ifdef _STAMPS3_H_
+    if (isUSBMounted) {
+      if (midiMode == MIDIMODE::AFTERTOUCH) {
+          MIDI.sendAfterTouch(vol, channelNo);
+      }
+      else {
+          MIDI.sendControlChange(midiPacket[1], vol, channelNo);
+      }
     }
 #endif
-    delay(4);
+#endif
 }
 
 //---------------------------------
-void MIDI_ProgramChange(int no) {
+void AFUUEMIDI_ProgramChange(int no) {
 #if ENABLE_BLE_MIDI
+    midiPacket[0] = 0x80; // header
+    midiPacket[1] = 0x80; // timestamp, not implemented
+    midiPacket[2] = 0xC0 + channelNo;
+    midiPacket[3] = no;
+    pCharacteristic->setValue(midiPacket, 4); // packet, length in bytes
+    pCharacteristic->notify();
 #endif
 #if ENABLE_MIDI
     midiPacket[0] = 0xC0 + channelNo;
     midiPacket[1] = no;
       
-    SerialHW.write(midiPacket, 2);
+    SerialSend(midiPacket, 2);
+
+#ifdef _STAMPS3_H_
+    if (isUSBMounted) {
+      MIDI.sendProgramChange(no, channelNo);
+    }
 #endif
-    delay(2);
+#endif
 }
 
 //---------------------------------
-void MIDI_ActiveNotify() {
+void AFUUEMIDI_ChangeBreathControlMode() {
+  AFUUEMIDI_BreathControl(127);
+  midiMode = (MIDIMODE)(((int)midiMode + 1) % (int)MIDIMODE::MAX);
+  AFUUEMIDI_NoteOn(60, 30);
+  delay(100);
+}
+
+//---------------------------------
+void AFUUEMIDI_ActiveNotify() {
 #if ENABLE_BLE_MIDI
     midiPacket[0] = 0x80; // header
     midiPacket[1] = 0x80; // timestamp, not implemented
@@ -235,7 +310,12 @@ void MIDI_ActiveNotify() {
 #if ENABLE_MIDI
     midiPacket[0] = 0xFE;
       
-    SerialHW.write(midiPacket, 1);
+    SerialSend(midiPacket, 1);
+
+#ifdef _STAMPS3_H_
+    if (isUSBMounted) {
+      MIDI.sendActiveSensing();
+    }
 #endif
-    delay(1);
+#endif
 }

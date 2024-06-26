@@ -3,8 +3,9 @@
 
 class WaveData {
 public:
-  const short* GetWaveTable(int index);
+  const double* GetWaveTable(int index, int side);
   const char* GetWaveName(int index);
+  double GetWaveShiftLevel(int index);
 };
 
 #endif //WAVEDATA_H

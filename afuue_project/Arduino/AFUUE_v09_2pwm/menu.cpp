@@ -45,11 +45,9 @@ void Menu::Initialize(Preferences pref) {
 
 //--------------------------
 void Menu::SavePreferences(Preferences pref) {
-  pref.putInt("KeySense", keySense);
-  pref.putInt("BreathSense", breathSense);
-  
+#ifdef _M5STICKC_H_
   for (int i = 0; i < WAVE_MAX; i++) {
-    if (waveData.GetWaveTable(i) == NULL) {
+    if (waveData.GetWaveTable(i, 0) == NULL) {
       break;
     }
 
@@ -65,7 +63,13 @@ void Menu::SavePreferences(Preferences pref) {
     sprintf(s, "DelayRate%d", i);
     pref.putInt(s, waveSettings[i].delayRate);
   }
-
+#endif
+  pref.putInt("KeySense", keySense);
+#ifdef ENABLE_MCP3425
+  pref.putInt("BreathSense", breathSense);
+#else
+  pref.putInt("BreathSense2", breathSense);
+#endif
   pref.putInt("WaveIndex", waveIndex);
 }
 
@@ -77,6 +81,7 @@ void Menu::ReadPlaySettings(int widx) {
     portamentoRate = waveSettings[widx].portamentoRate;
     delayRate = waveSettings[widx].delayRate;
 
+    preparation = waveSettings[widx].preparation;
     distortion = waveSettings[widx].distortion;
     flanger = waveSettings[widx].flanger;
     flangerTime = waveSettings[widx].flangerTime;
@@ -97,11 +102,11 @@ void Menu::LoadPreferences(Preferences pref) {
 #ifdef ENABLE_MCP3425
   breathSense = pref.getInt("BreathSense", 0);
 #else
-  breathSense = pref.getInt("BreathSense", 300);
+  breathSense = pref.getInt("BreathSense2", 250);
 #endif
 
   for (int i = 0; i < WAVE_MAX; i++) {
-    if (waveData.GetWaveTable(i) == NULL) {
+    if (waveData.GetWaveTable(i, 0) == NULL) {
       break;
     }
 
@@ -147,6 +152,17 @@ void Menu::ReadRtc() {
 #endif
 
 //--------------------------
+void Menu::SetNextWave() {
+    waveIndex++;
+    if (waveData.GetWaveTable(waveIndex, 0) == NULL) {
+      waveIndex = 0;
+    }
+#ifdef _M5STICKC_H_
+    ReadPlaySettings(waveIndex);
+#endif
+}
+
+//--------------------------
 bool Menu::Update(uint16_t key, int pressure) {
 #ifdef _M5STICKC_H_
   M5.update();
@@ -159,14 +175,11 @@ bool Menu::Update(uint16_t key, int pressure) {
       M5.Lcd.setBrightness(127);
       M5.Lcd.setRotation(0);
       isEnabled = false;
+      ReadPlaySettings(waveIndex);
     }
     else {
-      waveIndex++;
+      SetNextWave();
     }
-    if (waveData.GetWaveTable(waveIndex) == NULL) {
-      waveIndex = 0;
-    }
-    ReadPlaySettings(waveIndex);
     Display();
     while (1) {
       delay(100);
@@ -194,7 +207,6 @@ bool Menu::Update(uint16_t key, int pressure) {
       if (M5.BtnB.isReleased()) break;
     }
   }
-#endif
   if (isEnabled) {
     bool octDown = ((key & (1 << 10)) != 0);
     bool octUp = ((key & (1 << 11)) != 0);
@@ -325,6 +337,7 @@ bool Menu::Update(uint16_t key, int pressure) {
     }
 #endif
   }
+#endif // _M5STICKC_H_
   return false;
 }
 
