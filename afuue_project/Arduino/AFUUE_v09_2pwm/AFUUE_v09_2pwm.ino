@@ -548,27 +548,64 @@ void GetMenuParams() {
     breathSenseRate = menu.breathSense;
 }
 
+#ifdef ENABLE_LPS33
+//-------------------------------------
+// todo: アドレス違いに対応すべし
+void InitPressureLPS33(int side) {
+  BARO.begin();
+}
+
+//-------------------------------------
+// todo: アドレス違いに対応すべし
+int32_t GetPressureValueLPS33(int side) {
+  int d = static_cast<int32_t>(BARO.readPressure() * 40960.0f);
+  return d >> 1;
+}
+#endif
+
 //-------------------------------------
 #define PRESSURE_AVERAGE_COUNT (20)
+#ifdef ENABLE_ADC
+int GetPressureValueADC(int index) {
+    int averaged = 0;
+    for (int i = 0; i < PRESSURE_AVERAGE_COUNT; i++) {
+#ifdef ENABLE_ADC2
+      if (index == 1) {
+        averaged += analogRead(ADCPIN2);
+      }
+      else
+#endif
+      {
+        averaged += analogRead(ADCPIN);
+      }
+    }
+    return averaged / PRESSURE_AVERAGE_COUNT;
+}
+#endif
+
+//-------------------------------------
 int GetPressureValue(int index) {
+#ifdef ENABLE_ADC2
+  // ADC x 2
+#ifdef ENABLE_LPS33
+    return GetPressureValueLPS33(index);
+#else
+    return GetPressureValueADC(index);
+#endif
+#else
+  // ADC x 1
 #ifdef ENABLE_MCP3425
     Wire.requestFrom(MCP3425_ADDR, 2);
     return (Wire.read() << 8 ) | Wire.read();
-#else
-    int averaged = 0;
-#ifdef ENABLE_ADC2
-    if (index == 1) {
-      for (int i = 0; i < PRESSURE_AVERAGE_COUNT; i++) {
-        averaged += analogRead(ADCPIN2);
-      }
-    }
-    else
 #endif
-    for (int i = 0; i < PRESSURE_AVERAGE_COUNT; i++) {
-      averaged += analogRead(ADCPIN);
-    }
-    return averaged / PRESSURE_AVERAGE_COUNT;
-#endif  
+#ifdef ENABLE_LPS33
+    return GetPressureValueLPS33(0);
+#endif
+#ifdef ENABLE_ADC
+    return GetPressureValueADC(0);
+#endif
+  // ----
+#endif
 }
 
 //-------------------------------------
@@ -604,10 +641,17 @@ void TickThread(void *pvParameters) {
     if (vol > 1.0f) vol = 1.0f;
     requestedVolume = pow(vol,2.0f) * (1.0f-bendVolume);
 #else
+#ifdef ENABLE_LPS33
+    float vol = (pressureValue - defaultPressureValue) / 70000.0f; // 0 - 1
+    if (vol < 0.0f) vol = 0.0f;
+    if (vol > 1.0f) vol = 1.0f;
+    requestedVolume = pow(vol,2.0f);// * (1.0f-bendVolume);
+#else
     float vol = (pressureValue - defaultPressureValue) / breathSenseRate; // 0 - 1
     if (vol < 0.0f) vol = 0.0f;
     if (vol > 1.0f) vol = 1.0f;
     requestedVolume = pow(vol,2.0f) * (1.0f-bendVolume);
+#endif
 #endif
     //キー操作や加速度センサー
 #ifdef _M5STICKC_H_
@@ -1023,8 +1067,6 @@ void IRAM_ATTR onTimer(){
 #ifdef SOUND_TWOPWM
       ledcWrite(0, dac & 0xFF);
       ledcWrite(1, (dac >> 8) & 0xFF); // HHHH HHHH LLLL LLLL
-      //ledcWrite(0, (dac >> 2) & 0xFF);
-      //ledcWrite(1, (dac >> 10) & 0x3F); // HHHH HHLL LLLL 0000
 #else
       dacWrite(DACPIN, dac >> 8);
 #endif
@@ -1032,7 +1074,6 @@ void IRAM_ATTR onTimer(){
     interruptCounter++;
   }
   portEXIT_CRITICAL_ISR(&timerMux);
-  //xSemaphoreGiveFromISR(timerSemaphore, NULL);
 }
 
 //-------------------------------------
@@ -1139,7 +1180,14 @@ void setup() {
   Wire.write(0b10010011); // 0,1:Gain(1x,2x,4x,8x) 2,3:SampleRate(0:12bit,1:14bit,2:16bit) 4:Continuous 5,6:NotDefined 7:Ready
   Wire.endTransmission();
 #else
+#ifdef ENABLE_LPS33
+  InitPressureLPS33(0);
+#ifdef ENABLE_ADC2
+  InitPressureLPS33(1);
+#endif
+#else
   pinMode(ADCPIN, INPUT);
+#endif
 #endif
 
 #ifdef _M5STICKC_H_
@@ -1163,21 +1211,27 @@ void setup() {
 
   int pressure = 0;
   int lowestPressure = 70;
-#ifdef ENABLE_MCP3425
-  lowestPressure = 50;
+#ifdef ENABLE_LPS33
+  lowestPressure = 2000;
+  delay(1000);
+  defaultPressureValue = GetPressureValue(0) + lowestPressure;
+#ifdef ENABLE_ADC2
+  defaultPressureValue2 = GetPressureValue(1) + lowestPressure;
 #endif
+#else
   for (int i = 0; i < 10; i++) {
     pressure += GetPressureValue(0);
-    delay(10);
+    delay(30);
   }
   defaultPressureValue = (pressure / 10) + lowestPressure;
 #ifdef ENABLE_ADC2
   pressure = 0;
   for (int i = 0; i < 10; i++) {
     pressure += GetPressureValue(1);
-    delay(10);
+    delay(30);
   }
   defaultPressureValue2 = (pressure / 10) + lowestPressure;
+#endif
 #endif
 
   BeginPreferences(); {
