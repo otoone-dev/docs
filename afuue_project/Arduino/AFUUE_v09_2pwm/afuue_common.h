@@ -8,11 +8,12 @@
 #include <M5Unified.h>
 
 //#define AFUUE_VER (109) // 8Bit-DAC ADC-Direct    (AFUUE2 First)
-#define AFUUE_VER (110) // 16Bit-PWM ADC-MCP3425  (AFUUE2 Second)
+//#define AFUUE_VER (110) // 16Bit-PWM ADC-MCP3425  (AFUUE2 Second)
 //#define AFUUE_VER (112)   // 16Bit-PWM LPS33        (AFUUE2 Test)
-//#define AFUUE_VER (111) // 16Bit-PWM ADCx2        (AFUUE2R First)
+#define AFUUE_VER (111) // 16Bit-PWM ADCx2        (AFUUE2R First)
 //#define AFUUE_VER (113)   // 16Bit-PWM LPS33        (AFUUE2R Secod)
 
+// AFUUE2R は USB デバイスとして動作させるために USB-MODE:USB-OTG などを設定する必要がある。書き込み時はボタンを押しながら USB ケーブルを PC に接続する。
 
 #if (AFUUE_VER == 109)
 // AFUUE2 初代
@@ -24,7 +25,6 @@
 #define _M5STICKC_H_
 #define SOUND_TWOPWM
 #define ENABLE_MCP3425
-#define ENABLE_ADC
 
 #elif (AFUUE_VER == 111)
 // AFUUE2R 初代
@@ -33,6 +33,7 @@
 #include <Adafruit_TinyUSB.h>
 #include <MIDI.h>
 #define SOUND_TWOPWM
+#define ENABLE_ADC
 #define ENABLE_ADC2
 
 #elif (AFUUE_VER == 112)
@@ -45,6 +46,17 @@
 #elif (AFUUE_VER == 113)
 // AFUUE2R 改良版
 #define _STAMPS3_H_
+/*
+https://qiita.com/tomoto335/items/d20aa668a62ad49cda36
+USB-MIDI についてはこちらの記事を参考にさせていただきました
+Adafruit TinyUSB Library 3.1.3 使用
+USB CDC On Boot  : "Enabled"
+USB DFU On Boot  : "Disabled"
+JTAG Adapter     : "Disabled"
+USB Firmware MSC On Boot: "Disabled"
+Upload Mode      : "UART0/Hardware CDC"
+USB Mode         : "USB-OTG (TinyUSB)"
+*/
 #include <Arduino.h>
 #include <Adafruit_TinyUSB.h>
 #include <MIDI.h>

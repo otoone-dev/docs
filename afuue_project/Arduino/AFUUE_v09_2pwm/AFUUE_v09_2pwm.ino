@@ -21,49 +21,46 @@ const uint8_t commVer1 = 0x16;  // 1.6
 const uint8_t commVer2 = 0x02;  // protocolVer = 2
 
 hw_timer_t * timer = NULL;
-volatile SemaphoreHandle_t timerSemaphore;
-volatile int interruptCounter = 0;
-portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
+#define QUEUE_LENGTH 1
+QueueHandle_t xQueue;
+TaskHandle_t taskHandle;
 volatile bool enablePlay = false;
 
-volatile const double* currentWaveTableA = NULL;
-volatile const double* currentWaveTableB = NULL;
-volatile double currentWaveShiftLevel = 0.0;
-volatile double phase = 0.0;
-volatile double currentWaveLevel = 0.0;
+volatile const float* currentWaveTableA = NULL;
+volatile const float* currentWaveTableB = NULL;
+volatile float currentWaveShiftLevel = 0.0f;
+volatile float phase = 0.0f;
+volatile float currentWaveLevel = 0.0f;
 #define DELAY_BUFFER_SIZE (8000)
-volatile double delayBuffer[DELAY_BUFFER_SIZE];
+volatile float delayBuffer[DELAY_BUFFER_SIZE];
 volatile int delayPos = 0;
-#define FLANGER_BUFFER_SIZE (1250) // 25000Hz で 20Hz(E0くらい)
-volatile double flangerBuffer[FLANGER_BUFFER_SIZE];
-volatile double flanger = 0.0;
-volatile int flangerPos = 0;
-volatile float flangerTime = 0.0f;
-volatile int flangerLength = 0;
-volatile int fracTickCount = 0;
-volatile int fracValue = 0;
 
 int baseNote = 61; // 49 61 73
 float fineTune = 440.0f;
-volatile double delayRate = 0.15;
+volatile float delayRate = 0.15f;
 float portamentoRate = 0.99f;
 float keySenseTimeMs = 50.0f;
 float breathSenseRate = 300.0f;
-#define ENABLE_PREPARATION (0)
-float preparation = 1.2f;
-const float PREPARATIONTIME_LENGTH = 10.0f;
-float distortion = 0.0f;
-double distortionVol = 0.0f;
+float breathZero = 0.0f;
+const float NOTESHIFTTIME_LENGTH = 10.0f;
+volatile float lowPassP = 0.1f;
+volatile float lowPassR = 5.0f;
+volatile float lowPassQ = 0.5f;
 
 #define CLOCK_DIVIDER (80)
 #define TIMER_ALARM (40)
 //#define SAMPLING_RATE (20000) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (80*50) = 20kHz
-#define SAMPLING_RATE (25000) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (80*40) = 25kHz
+#define SAMPLING_RATE (25000.0f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (80*40) = 25kHz
+//#define SAMPLING_RATE (32000) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (50*50) = 32kHz
+//#define SAMPLING_RATE (48019.2f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (49*34) = 48kHz
 //#define SAMPLING_TIME_LENGTH (1.0f / SAMPLING_RATE)
 static float currentWavelength = 0.0f;
-volatile double currentWavelengthTickCount = 0.0;
-volatile double requestedVolume = 0.0;
-volatile double waveShift = 0.0f;
+volatile float currentWavelengthTickCount = 0.0f;
+volatile float requestedVolume = 0.0f;
+volatile float waveShift = 0.0f;
+volatile uint8_t outH = 0;
+volatile uint8_t outL = 0;
+volatile float lowPassValue = 0.0f;
 static float maximumVolume = 0.0f;
 volatile float targetNote = 60.0f;
 volatile float currentNote = 60.0f;
@@ -82,17 +79,10 @@ const float BENDDOWNTIME_LENGTH = 100.0f; //ms
 volatile float bendNoteShift = 0.0f;
 volatile float bendDownTime = 0.0f;
 volatile float bendVolume = 0.0f;
-volatile double noiseVolume = 0.0;
+volatile float noiseVolume = 0.0f;
 volatile float noteOnTimeMs = 0.0f;
 const float noiseLevel = 0.5f;
 const float NOISETIME_LENGTH = 50.0f; //ms
-volatile double growlVolume = 0.0f;
-volatile double growlWavelength = 0.0f;
-volatile double growlTickCount = 0.0f;
-volatile double growlPhase = 0.0f;
-volatile double falsettoVolume = 0.0f;
-volatile double modTickCount = 0.0f;
-volatile double modPhase = 0.0f;
 
 static bool keyLowC = HIGH;
 static bool keyEb = HIGH;
@@ -106,6 +96,9 @@ static bool keyA = HIGH;
 static bool keyB = HIGH;
 static bool octDown = HIGH;
 static bool octUp = HIGH;
+#ifdef _STAMPS3_H_
+static int funcDownCount = 0;
+#endif
 
 volatile float accx, accy, accz;
 volatile float noteOnAccX, noteOnAccY, noteOnAccZ;
@@ -338,7 +331,7 @@ void BendExec(float td, float vol) {
 #ifdef ENABLE_ADC2
     int bendMode = ctrlMode % 2;
     if (bendMode > 0) {
-      float b2 = (pressureValue2 - defaultPressureValue2) / breathSenseRate;
+      float b2 = (pressureValue2 - (defaultPressureValue2 + breathZero)) / breathSenseRate;
       if (b2 < 0.0f) b2 = 0.0f;
       if (b2 > vol) b2 = vol;
       float bendNoteShiftTarget = 0.0f;
@@ -416,109 +409,31 @@ void SynthesizerThread(void *pvParameters) {
     }
     else {
       noteOnTimeMs += td;
-      if (requestedVolume < 0.2f) {
-        maximumVolume = 0.0f;
-        growlVolume = 0.0f;
-      }
-      else if (requestedVolume > maximumVolume) {
-        maximumVolume = requestedVolume;
-      }
-      else {
-        if (maximumVolume > 0.8f) {
-          float a = 0.0f; // (maximumVolume - 0.8f) * 5.0f; // 0 - 1
-          if (octDown == LOW && octUp == LOW) {
-            a = 1.0f;
-          }
-          float wavelength = 60.0 + (rand() % 20);//240.0f - 200.0f*a;
-          growlWavelength += (wavelength - growlWavelength) * 0.9f;
-          growlTickCount = (growlWavelength / (float)SAMPLING_RATE);
-          growlVolume = a * requestedVolume;
-        }
-      }
     }
     float n = (NOISETIME_LENGTH - noteOnTimeMs) / NOISETIME_LENGTH;
     if (n < 0.0f) n = 0.0f;
     if (n > 1.0f) n = 1.0f;
 
-#if ENABLE_PREPARATION
-    float p = (PREPARATIONTIME_LENGTH*2 - noteOnTimeMs) / (PREPARATIONTIME_LENGTH*2);
-    if (p < 0.0f) p = 0.0f;
-    if (p > 1.0f) p = 1.0f;
-    float rnd = -((rand()%10000)/10000.0f)/10000.0f; // -1.0f - 0.0f
-    float preparationShift = -p * preparation + (1.0f - p) * (rnd * 6);
-    if (p == 0.0f) {
-      p = (PREPARATIONTIME_LENGTH - keyTimeMs) / PREPARATIONTIME_LENGTH;
-      if (p < 0.0f) p = 0.0f;
-      if (p > 1.0f) p = 1.0f;
-      if (currentNote < targetNote) {
-        // preparation
-        float d = targetNote - currentNote;
-        float s = 1.0f;
-        
-        if (d > 12.0f) {
-          s = 2.0f;
-        }
-        else if (d > 4.0f) {
-          s = 2.0f * (d - 4.0f) / 8.0f;
-        }
-        preparationShift = -s*p * preparation;
-      }
-      else {
-        // overshoot
-        float d = currentNote - targetNote;
-        float s = 1.0f;
-        if (d > 12.0f) {
-          s = 2.0f;
-        }
-        else if (d > 4.0f) {
-          s = 1.5f;
-        }
-        preparationShift = s*p * preparation;
-      }
-    }
-#endif
-
-#if 1
-    double noteOnShift = 0.0;
+    float noteOnShift = 0.0f;
     if (currentWaveTableA == currentWaveTableB) {
       noiseVolume = n * requestedVolume * noiseLevel;
     }
     else {
-      float p = 0.5f * (PREPARATIONTIME_LENGTH*2 - noteOnTimeMs) / (PREPARATIONTIME_LENGTH*2);
+      float p = 0.5f * (NOTESHIFTTIME_LENGTH*2 - noteOnTimeMs) / (NOTESHIFTTIME_LENGTH*2);
       if (p < 0.0f) p = 0.0f;
       if (p > 1.0f) p = 1.0f;
-      noteOnShift = (1.0 - requestedVolume) * p;
+      noteOnShift = (1.0f - requestedVolume) * p;
     }
-#else
-    noiseVolume = 0.0;
-    // ディストーション利用のアタックじゃりじゃり
-    if (distortion > 0.0f) {
-      distortionVol = 1.0f + n * distortion;
-    }
-    else {
-      distortionVol = 0.0;
-    }
-#endif
 
-    double ab = requestedVolume + currentWaveShiftLevel;
-    if (ab < 0.0) ab = 0.0;
-    if (ab > 1.0) ab = 1.0;
+    float ab = requestedVolume + currentWaveShiftLevel;
+    if (ab < 0.0f) ab = 0.0f;
+    if (ab > 1.0f) ab = 1.0f;
     waveShift = ab;
 
-    if (menu.isAccControl) {
-      //atan2f(accy, accz);
-    }
-
     // 現在の再生周波数から１サンプルあたりのフェーズの進みを計算
-    float wavelength = CalcFrequency(currentNote + bendNoteShift + noteOnShift
-#if ENABLE_PREPARATION
-     + preparationShift
-#endif
-     );
+    float wavelength = CalcFrequency(currentNote + bendNoteShift + noteOnShift);
     currentWavelength += (wavelength - currentWavelength) * portamentoRate;
-    currentWavelengthTickCount = (currentWavelength / (float)SAMPLING_RATE);
-
-    modTickCount = (currentWavelength) / (float)SAMPLING_RATE;
+    currentWavelengthTickCount = (currentWavelength / SAMPLING_RATE);
 
     unsigned long m1 = micros();
     int wait = 5;
@@ -532,27 +447,25 @@ void SynthesizerThread(void *pvParameters) {
 
 //-------------------------------------
 void GetMenuParams() {
+    lowPassP = menu.lowPassP / 10.0f;
+    lowPassR = menu.lowPassR;
+    lowPassQ = menu.lowPassQ / 10.0f;
 #ifdef _M5STICKC_H_
     fineTune = menu.fineTune;
     baseNote = 61 + menu.transpose;
     portamentoRate = 1 - (menu.portamentoRate * 0.01f);
     delayRate = menu.delayRate * 0.01f;
-
-    preparation = menu.preparation / 10.0f;
-    //overshoot = menu.overshoot / 10.0f;
-    distortion = menu.distortion;
-    flanger = menu.flanger/100.0;
-    flangerTime = menu.flangerTime / 100.0f;
 #endif
     keySenseTimeMs = menu.keySense;
     breathSenseRate = menu.breathSense;
+    breathZero = menu.breathZero;
 }
 
 #ifdef ENABLE_LPS33
 //-------------------------------------
 // todo: アドレス違いに対応すべし
-void InitPressureLPS33(int side) {
-  BARO.begin();
+bool InitPressureLPS33(int side) {
+  return BARO.begin();
 }
 
 //-------------------------------------
@@ -609,19 +522,6 @@ int GetPressureValue(int index) {
 }
 
 //-------------------------------------
-void FlangerExec() {
-    if ((flanger > 0.0) && (currentWavelengthTickCount > 0.0f)) {
-      flangerLength = (int)((flangerTime * currentWavelengthTickCount) * SAMPLING_RATE);
-      if (flangerLength > FLANGER_BUFFER_SIZE-2) {
-        flangerLength = FLANGER_BUFFER_SIZE-2;
-      }
-    }
-    else {
-      flangerLength = 0;
-    }
-}
-
-//-------------------------------------
 void TickThread(void *pvParameters) {
   unsigned long loopTime = 0;
   while (1) {
@@ -635,19 +535,20 @@ void TickThread(void *pvParameters) {
     //気圧センサー (ピッチベンド用)
     pressureValue2 = GetPressureValue(1);
 #endif
+    int defPressure = defaultPressureValue + breathZero;
 #ifdef ENABLE_MCP3425
-    float vol = (pressureValue - defaultPressureValue) / ((2047.0f-breathSenseRate)-defaultPressureValue); // 0 - 1
+    float vol = (pressureValue - defPressure) / ((2047.0f-breathSenseRate)-defPressure); // 0 - 1
     if (vol < 0.0f) vol = 0.0f;
     if (vol > 1.0f) vol = 1.0f;
     requestedVolume = pow(vol,2.0f) * (1.0f-bendVolume);
 #else
 #ifdef ENABLE_LPS33
-    float vol = (pressureValue - defaultPressureValue) / 70000.0f; // 0 - 1
+    float vol = (pressureValue - defPressure) / 70000.0f; // 0 - 1
     if (vol < 0.0f) vol = 0.0f;
     if (vol > 1.0f) vol = 1.0f;
     requestedVolume = pow(vol,2.0f);// * (1.0f-bendVolume);
 #else
-    float vol = (pressureValue - defaultPressureValue) / breathSenseRate; // 0 - 1
+    float vol = (pressureValue - defPressure) / breathSenseRate; // 0 - 1
     if (vol < 0.0f) vol = 0.0f;
     if (vol > 1.0f) vol = 1.0f;
     requestedVolume = pow(vol,2.0f) * (1.0f-bendVolume);
@@ -662,12 +563,6 @@ void TickThread(void *pvParameters) {
     UpdateKeys(0);
 #endif
     BendExec(td, vol);
-
-    // ディストーション
-    //if (distortion > 0.0f) {
-      //distortionVol = 1.0f + distortion * vol * vol;
-    //}
-    //FlangerExec();
 
     float n = GetNoteNumber();
     if (forcePlayTime > 0.0f) {
@@ -731,8 +626,16 @@ void MenuThread(void *pvParameters) {
     keyCurrent = keyData;
 
     {
-      if (menu.Update(keyPush, pressureValue)) {
+      if (menu.Update(pref, keyPush, pressureValue)) {
         BeginPreferences(); {
+          if (menu.factoryResetRequested) {
+            //出荷時状態に戻す
+            M5.Lcd.fillScreen(BLACK);
+            menu.DrawString("FACTORY RESET", 10, 10);
+            pref.clear(); // CLEAR ALL FLASH MEMORY
+            delay(2000);
+            ESP.restart();
+          }
           currentWaveTableA = menu.waveData.GetWaveTable(menu.waveIndex, 0);
           currentWaveTableB = menu.waveData.GetWaveTable(menu.waveIndex, 1);
           currentWaveShiftLevel = menu.waveData.GetWaveShiftLevel(menu.waveIndex);
@@ -761,15 +664,18 @@ void MenuThread(void *pvParameters) {
       bool keyD_Push = ((keyPush & (1 << 2)) != 0);
       bool keyE_Push = ((keyPush & (1 << 3)) != 0);
       bool keyF_Push = ((keyPush & (1 << 4)) != 0);
+      bool keyG_Push = ((keyPush & (1 << 7)) != 0);
       bool keyA_Push = ((keyPush & (1 << 8)) != 0);
       bool keyB_Push = ((keyPush & (1 << 9)) != 0);
       bool keyDown_Push = ((keyPush & (1 << 10)) != 0);
       bool keyUp_Push = ((keyPush & (1 << 11)) != 0);
       bool func_Push = ((keyPush & (1 << 12)) != 0);
+      bool func_Down = ((keyData & (1 << 12)) != 0);
 
       if ((keyLowCs == LOW) && (keyGs == LOW)) {
         // Config
         if (keyF_Push) {
+          // Change wave index or MIDI:Send Program Change
 #if ENABLE_MIDI || ENABLE_BLE_MIDI
           if (midiEnabled) 
           {
@@ -797,6 +703,7 @@ void MenuThread(void *pvParameters) {
           }
         }
         else if (keyD_Push) {
+          // Transpose--
           if (keyE == LOW) {
             baseNote = 61;
           } else {
@@ -817,6 +724,7 @@ void MenuThread(void *pvParameters) {
           }
         }
         else if (keyE_Push) {
+          // Transpose++
           if (keyD == LOW) {
             baseNote = 61;
           } else {
@@ -836,7 +744,20 @@ void MenuThread(void *pvParameters) {
             forcePlayTime = baseNote == 61 ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH;
           }
         }
+        else if (keyG_Push) {
+          // LowPassQ (Resonance)
+          bool ret = menu.SetNextLowPassQ();
+          forcePlayTime = FORCEPLAYTIME_LENGTH;
+          if (ret) {
+            forcePlayTime = FORCEPLAYTIME_LENGTH * 2;
+          }
+          BeginPreferences(); {
+            menu.SavePreferences(pref); // 記憶する
+          } EndPreferences();
+          GetMenuParams();
+        }
         else if (keyA_Push) {
+          // Breath sensitivity
           menu.breathSense -= 50;
           if (menu.breathSense < 150) {
             menu.breathSense = 350;
@@ -851,40 +772,47 @@ void MenuThread(void *pvParameters) {
           GetMenuParams();
         }
         else if (keyB_Push) {
+          // Change MIDI Breath Control Mode
           AFUUEMIDI_ChangeBreathControlMode();
         }
         else if (keyDown_Push) {
+          // Fine Tune
           switch ((int)fineTune) {
             default:
-              fineTune = 440;
+              fineTune = 440.0f;
               break;
             case 440:
-              fineTune = 442;
+              fineTune = 442.0f;
               break;
             case 442:
-              fineTune = 438;
+              fineTune = 438.0f;
               break;
           }
           forcePlayTime = fineTune == 440 ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH;
         }
         else if (keyUp_Push) {
+          // Delay Rate
           switch ((int)(delayRate*100)) {
             default:
-              delayRate = 15 * 0.01f;
+              delayRate = 0.15f;
               break;
+            case 14:
             case 15:
-              delayRate = 30 * 0.01f;
+              delayRate = 0.3f;
               break;
+            case 29:
             case 30:
-              delayRate = 0;
+              delayRate = 0.0f;
               break;
           }
-          forcePlayTime = delayRate == 15 * 0.01f ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH;
+          forcePlayTime = delayRate == 0.15f ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH;
         }
         else if (keyLowC_Push) {
+          // MIDI: Add Program Number +1
           pgNumLow  = (pgNumLow + 1) % 10;
         }
         else if (keyEb_Push) {
+          // MIDI: Add Program Number +10
           pgNumHigh  = (pgNumHigh + 1) % 10;
         }
       }
@@ -902,6 +830,21 @@ void MenuThread(void *pvParameters) {
 #endif
         currentNote = baseNote-1;
         forcePlayTime = FORCEPLAYTIME_LENGTH;
+      }
+      if (func_Down) {
+        funcDownCount++;
+        if (funcDownCount > 20*4) {
+          forcePlayTime = FORCEPLAYTIME_LENGTH;
+        }
+        if (funcDownCount >= 20*5) {
+          BeginPreferences(); {
+            pref.clear(); // CLEAR ALL FLASH MEMORY
+          } EndPreferences();
+          ESP.restart();
+        }
+      }
+      else {
+        funcDownCount = 0;
       }
     }
 #endif
@@ -942,138 +885,130 @@ void MIDI_Exec() {
 }
 #endif
 
+
 //-------------------------------------
-double SawWave(double p) {
-  return -1.0 + 2.0 * p;
+//float sigmoid(float value) {
+//  return 1.0f / (1.0f + exp(-value));
+//}
+
+//-------------------------------------
+float LowPass(float value, float freq, float q) {
+	float omega = 2.0f * 3.14159265f * freq / SAMPLING_RATE;
+	float alpha = sin(omega) / (2.0f * q);
+ 
+  float cosv = cos(omega);
+  float one_minus_cosv = 1.0f - cosv;
+	float a0 =  1.0f + alpha;
+	float a1 = -2.0f * cosv;
+	float a2 =  1.0f - alpha;
+	float b0 = one_minus_cosv / 2.0f;
+	float b1 = one_minus_cosv;
+	float b2 = b0;//one_minus_cosv / 2.0f;
+ 
+	// フィルタ計算用のバッファ変数。
+	static float in1  = 0.0f;
+	static float in2  = 0.0f;
+	static float out1 = 0.0f;
+	static float out2 = 0.0f;
+
+  float lp = b0/a0 * value + b1/a0 * in1  + b2/a0 * in2 - a1/a0 * out1 - a2/a0 * out2;
+
+  in2  = in1;
+  in1  = value;
+  out2 = out1;
+  out1 = lp;
+  return lp;
 }
 
 //---------------------------------
-double Voice(double p, double shift) {
-  double v = 255.99*p;
+float Voice(float p, float shift) {
+  float v = 255.99f*p;
   int t = (int)v;
   //double f = (v - t);
   v -= t;
 #if 0
-  double w0 = currentWaveTableA[t];
+  float w0 = currentWaveTableA[t];
   t = (t + 1) % 256;
-  double w1 = currentWaveTableA[t];
-  return (w0 * (1.0-v)) + (w1 * v);
+  float w1 = currentWaveTableA[t];
+  return (w0 * (1.0f-v)) + (w1 * v);
 #else
-  double w0 = (currentWaveTableA[t] * (1.0-shift) + currentWaveTableB[t] * shift);
+  float w0 = (currentWaveTableA[t] * (1.0f-shift) + currentWaveTableB[t] * shift);
   t = (t + 1) % 256;
-  double w1 = (currentWaveTableA[t] * (1.0-shift) + currentWaveTableB[t] * shift);
-  double w = (w0 * (1.0-v)) + (w1 * v);
+  float w1 = (currentWaveTableA[t] * (1.0f-shift) + currentWaveTableB[t] * shift);
+  float w = (w0 * (1.0f-v)) + (w1 * v);
   return w;
 #endif
 }
 
-//---------------------------------
-double VoiceSin(double p) {
-  double v = 255.0*p;
-  int t = (int)v;
-  double f = (v - t);
-  return (wavePureSin[t] / 32767.0);
-}
-
-#define FRAC_DIV (4)
 //-------------------------------------
 uint16_t CreateWave() {
     // 波形を生成する
     phase += currentWavelengthTickCount;
-    if (phase >= 1.0) phase -= 1.0;
+    if (phase >= 1.0f) phase -= 1.0f;
 
-#if 1
-    double g = Voice(phase, waveShift);
-    //double g1 = (Voice(phase) - currentWaveLevel) * (0.1 + 0.9 * filterLevel);
-    //currentWaveLevel += g1;
-    //double g = currentWaveLevel;
-#else
-    // FM
-    modPhase += modTickCount;
-    if (modPhase >= 1.0) modPhase -= 1.0;
+    float g = Voice(phase, waveShift) / 32767.0f;
 
-    double p = phase + 0.1*SawWave(modPhase);
-    while (p >= 1.0) p -= 1.0;
-    while (p < 0.0) p += 1.0;
-    double g = Voice(p);
-#endif
-
-    // がなり (オーバーシュート＋断続)
-#if 1
-    if (growlVolume > 0.1) {
-      growlPhase += growlTickCount;
-      if (growlPhase >= 1.0) growlPhase -= 1.0;
-      if (growlPhase > 0.5) {
-        g *= 1.0 - growlVolume;
-      }
-    }
-#endif
-
-    // ディストーション
 #if 0
-  if (distortionVol > 1.0) {
-    g *= distortionVol;
-    if (g > 32700.0) g = 32700.0;
-    else if (g < -32700.0) g = -32700.0;
-  }
-#endif
-
-#if 1
     //ノイズ
-    double n = ((double)rand() / RAND_MAX);
-    g = (g * (1.0-noiseVolume) + 32767.0 * n * noiseVolume);
+    float n = (static_cast<float>(rand()) / RAND_MAX);
+    g = (g * (1.0f-noiseVolume) + 32767.0f * n * noiseVolume);
 #endif
-
-#if 0
-    // ファルセット
-    if (falsettoVolume > 0.1) {
-      double gs = VoiceSin(phase);
-      g = g * (1.0-falsettoVolume) + gs * falsettoVolume;
+#if 1
+    if (lowPassQ > 0.0f) {
+      float a = (tanh(lowPassR*(requestedVolume-lowPassP)) + 1.0f) * 0.5f;
+      float lp = 100.0f + 20000.0f * a;
+      if (lp > 12000.0f) {
+        lp = 12000.0f;
+      }
+      lowPassValue += (lp - lowPassValue) * 0.2f;
+      g = LowPass(g, lowPassValue, lowPassQ);
     }
 #endif
 
-#if 0
-    // フランジャー
-    if (flanger > 0) {
-      flangerBuffer[flangerPos] = g;
-      flangerPos = (flangerPos + 1) % FLANGER_BUFFER_SIZE;
+    float e = g * requestedVolume + delayBuffer[delayPos];;
 
-      g = g + flangerBuffer[(flangerPos + FLANGER_BUFFER_SIZE - flangerLength) % FLANGER_BUFFER_SIZE] * flanger;
-
-    }
-#endif
-
-    double e = g * requestedVolume + delayBuffer[delayPos];;
-
-    if ( (-0.00002 < e) && (e < 0.00002) ) {
+    if ( (-0.00002f < e) && (e < 0.00002f) ) {
       e = 0.0f;
     }
     delayBuffer[delayPos] = e * delayRate;
     delayPos = (delayPos + 1) % DELAY_BUFFER_SIZE;
 
-    if (e < -32700.0) e = -32700.0;
-    else if (e > 32700.0) e = 32700.0;
+    e *= 32000.0f;
+    if (e < -32700.0f) e = -32700.0f;
+    else if (e > 32700.0f) e = 32700.0f;
 
-    return (uint16_t)(e + 32767.0);
+    return static_cast<uint16_t>(e + 32767.0f);
 }
 
 //---------------------------------
 void IRAM_ATTR onTimer(){
-  // Increment the counter and set the time of ISR
-  portENTER_CRITICAL_ISR(&timerMux);
-  {
+#ifdef SOUND_TWOPWM
+      ledcWrite(0, outL);
+      ledcWrite(1, outH);
+#else
+      dacWrite(DACPIN, outH);
+#endif
+
+  int8_t data;
+  xQueueSendFromISR(xQueue, &data, 0); // キューを送信
+}
+
+//---------------------------------
+void task(void *pvParameters) {
+  while (1) {
+    int8_t data;
+    xQueueReceive(xQueue, &data, portMAX_DELAY); // キューを受信するまで待つ
+
     if (enablePlay && !midiEnabled) {
       uint16_t dac = CreateWave();
-#ifdef SOUND_TWOPWM
-      ledcWrite(0, dac & 0xFF);
-      ledcWrite(1, (dac >> 8) & 0xFF); // HHHH HHHH LLLL LLLL
-#else
-      dacWrite(DACPIN, dac >> 8);
-#endif
+      outH = (dac >> 8) & 0xFF; // HHHH HHHH LLLL LLLL
+      outL = dac & 0xFF;
     }
-    interruptCounter++;
+    else {
+      outH = 0;
+      outL = 0;
+    }
   }
-  portEXIT_CRITICAL_ISR(&timerMux);
 }
 
 //-------------------------------------
@@ -1181,10 +1116,13 @@ void setup() {
   Wire.endTransmission();
 #else
 #ifdef ENABLE_LPS33
-  InitPressureLPS33(0);
+  bool success = InitPressureLPS33(0);
 #ifdef ENABLE_ADC2
-  InitPressureLPS33(1);
+  success &= InitPressureLPS33(1);
 #endif
+  if (!success) {
+    i2cError = true;
+  }
 #else
   pinMode(ADCPIN, INPUT);
 #endif
@@ -1205,12 +1143,18 @@ void setup() {
       digitalWrite(LEDPIN, LOW);
       delay(500);
 #endif
+#ifdef _STAMPS3_H_
+      SetLedColor(60, 30, 0);
+      delay(300);
+      SetLedColor(0, 60, 30);
+      delay(300);
+#endif
       delay(500);
     }
   }
 
   int pressure = 0;
-  int lowestPressure = 70;
+  int lowestPressure = 0;
 #ifdef ENABLE_LPS33
   lowestPressure = 2000;
   delay(1000);
@@ -1253,7 +1197,9 @@ void setup() {
 #endif
 
   if (!isUSBMidiMounted) {
-    timerSemaphore = xSemaphoreCreateBinary();
+    xQueue = xQueueCreate(QUEUE_LENGTH, sizeof(int8_t));
+    xTaskCreateUniversal(task, "createWaveTask", 16384, NULL, 5, &taskHandle, CORE0);
+
     timer = timerBegin(0, CLOCK_DIVIDER, true);
     timerAttachInterrupt(timer, &onTimer, true);
     timerAlarmWrite(timer, TIMER_ALARM, true);
@@ -1272,14 +1218,18 @@ void setup() {
 //-------------------------------------
 void loop() {
   // Core0 は波形生成に専念している, loop は Core1
+#ifdef _STAMPS3_H_
   int br = (int)(245 * requestedVolume) + 10;
   if (ctrlMode % 2 == 0) {
     SetLedColor(0, br, 0);
   }
   else {
-      double r = -bendNoteShift;
+      float r = -bendNoteShift;
       SetLedColor((int)(br * (1 - r)), 0, (int)(br * r));
   }
   delay(50);
+#else
+  delay(5000);
+#endif
 }
 

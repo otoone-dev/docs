@@ -10,14 +10,12 @@ struct WaveSettings {
   bool isAccControl = false;
   int fineTune = 442;
   int transpose = 0;
-  int portamentoRate = 15;
+  int portamentoRate = 30;
   int delayRate = 15;
 
-  int preparation = 5;
-
-  int distortion = 0;
-  int flanger = 80; // 0 - 50
-  int flangerTime = 50; // 0 - 100
+  int lowPassP = 5; // 音量に対してどこのあたりでフィルタがかかるか。1/10 で 0.0-1.0
+  int lowPassR = 5; // 音量に対してどれくらいの範囲でフィルタがかかるか 1-30
+  int lowPassQ = 0; // Q factor 0 でローパス無効
 };
 
 class Menu {
@@ -45,7 +43,8 @@ public:
   Menu();
   void Initialize(Preferences pref);
   void SetNextWave();
-  bool Update(uint16_t key, int pressure);
+  bool SetNextLowPassQ();
+  bool Update(Preferences pref, uint16_t key, int pressure);
   void SavePreferences(Preferences pref);
   void LoadPreferences(Preferences pref);
   void Display();
@@ -55,19 +54,19 @@ public:
   WaveData waveData;
   int waveIndex = 0;
   bool isEnabled = false;
+  bool factoryResetRequested = false;
 
-  bool isAccControl = false;
   int fineTune = 440;
   int transpose = 0;
   int portamentoRate = 0;
   int delayRate = 0;
   int keySense = 0;
   int breathSense = 0;
+  int breathZero = 0;
 
-  int preparation = 0;
-  int distortion = 0;
-  int flanger = 0;
-  int flangerTime = 0;
+  int lowPassP = 0;
+  int lowPassR = 0;
+  int lowPassQ = 0;
 
   WaveSettings waveSettings[WAVE_MAX];
   int forcePlayNote = -1;

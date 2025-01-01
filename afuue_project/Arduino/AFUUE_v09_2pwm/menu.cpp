@@ -13,12 +13,15 @@ static float bat_vol             = 0.0f;        // バッテリー電圧
 
 enum {
   MENUINDEX_TRANSPOSE,
-  MENUINDEX_ACCCONTROL,
+  //MENUINDEX_LOWPASSP,
+  //MENUINDEX_LOWPASSR,
+  MENUINDEX_LOWPASSQ,
   MENUINDEX_FINETUNE,
   MENUINDEX_PORTAMENTO,
   MENUINDEX_DELAY,
   MENUINDEX_KEYSENSE,
   MENUINDEX_BREATHSENSE,
+  MENUINDEX_BREATHZERO,
   MENUINDEX_CLOCK,
   MENUINDEX_PUSHEDKEY,
   MENUINDEX_PRESSURE,
@@ -52,8 +55,8 @@ void Menu::SavePreferences(Preferences pref) {
     }
 
     char s[32];
-    sprintf(s, "AccControl%d", i);
-    pref.putBool(s, waveSettings[i].isAccControl);
+    //sprintf(s, "AccControl%d", i);
+    //pref.putBool(s, waveSettings[i].isAccControl);
     sprintf(s, "FineTune%d", i);
     pref.putInt(s, waveSettings[i].fineTune);
     sprintf(s, "Transpose%d", i);
@@ -62,6 +65,12 @@ void Menu::SavePreferences(Preferences pref) {
     pref.putInt(s, waveSettings[i].portamentoRate);
     sprintf(s, "DelayRate%d", i);
     pref.putInt(s, waveSettings[i].delayRate);
+    sprintf(s, "LowPassP%d", i);
+    pref.putInt(s, waveSettings[i].lowPassP);
+    sprintf(s, "LowPassR%d", i);
+    pref.putInt(s, waveSettings[i].lowPassR);
+    sprintf(s, "LowPassQ%d", i);
+    pref.putInt(s, waveSettings[i].lowPassQ);
   }
 #endif
   pref.putInt("KeySense", keySense);
@@ -70,40 +79,45 @@ void Menu::SavePreferences(Preferences pref) {
 #else
   pref.putInt("BreathSense2", breathSense);
 #endif
+  pref.putInt("BreathZero", breathZero);
   pref.putInt("WaveIndex", waveIndex);
 }
 
 //--------------------------
 void Menu::ReadPlaySettings(int widx) {
-    isAccControl = waveSettings[widx].isAccControl;
+    //isAccControl = waveSettings[widx].isAccControl;
     fineTune = waveSettings[widx].fineTune;
     transpose = waveSettings[widx].transpose;
     portamentoRate = waveSettings[widx].portamentoRate;
     delayRate = waveSettings[widx].delayRate;
 
-    preparation = waveSettings[widx].preparation;
-    distortion = waveSettings[widx].distortion;
-    flanger = waveSettings[widx].flanger;
-    flangerTime = waveSettings[widx].flangerTime;
+    lowPassP = waveSettings[widx].lowPassP;
+    lowPassR = waveSettings[widx].lowPassR;
+    lowPassQ = waveSettings[widx].lowPassQ;
 }
 
 //--------------------------
 void Menu::WritePlaySettings(int widx) {
-    waveSettings[widx].isAccControl = isAccControl;
+    //waveSettings[widx].isAccControl = isAccControl;
     waveSettings[widx].fineTune = fineTune;
     waveSettings[widx].transpose = transpose;
     waveSettings[widx].portamentoRate = portamentoRate;
     waveSettings[widx].delayRate = delayRate;
+
+    waveSettings[widx].lowPassP = lowPassP;
+    waveSettings[widx].lowPassR = lowPassR;
+    waveSettings[widx].lowPassQ = lowPassQ;
 }
 
 //--------------------------
 void Menu::LoadPreferences(Preferences pref) {
   keySense = pref.getInt("KeySense", 45);
 #ifdef ENABLE_MCP3425
-  breathSense = pref.getInt("BreathSense", 0);
+  breathSense = pref.getInt("BreathSense", 150);
 #else
   breathSense = pref.getInt("BreathSense2", 250);
 #endif
+  breathZero = pref.getInt("BreathZero", 110);
 
   for (int i = 0; i < WAVE_MAX; i++) {
     if (waveData.GetWaveTable(i, 0) == NULL) {
@@ -111,16 +125,23 @@ void Menu::LoadPreferences(Preferences pref) {
     }
 
     char s[32];
-    sprintf(s, "AccControl%d", i);
-    waveSettings[i].isAccControl = pref.getBool(s, false);
+    //sprintf(s, "AccControl%d", i);
+    //waveSettings[i].isAccControl = pref.getBool(s, false);
     sprintf(s, "FineTune%d", i);
     waveSettings[i].fineTune = pref.getInt(s, 442);
     sprintf(s, "Transpose%d", i);
-    waveSettings[i].transpose = pref.getInt(s, 0);
+    waveSettings[i].transpose = pref.getInt(s, waveData.GetWaveTranspose(i));
     sprintf(s, "PortamentoRate%d", i);
     waveSettings[i].portamentoRate = pref.getInt(s, 15);
     sprintf(s, "DelayRate%d", i);
     waveSettings[i].delayRate = pref.getInt(s, 15);
+
+    sprintf(s, "LowPassP%d", i);
+    waveSettings[i].lowPassP = pref.getInt(s, 5);
+    sprintf(s, "LowPassR%d", i);
+    waveSettings[i].lowPassR = pref.getInt(s, 5);
+    sprintf(s, "LowPassQ%d", i);
+    waveSettings[i].lowPassQ = pref.getInt(s, waveData.GetWaveLowPassQ(i));
   }
 
   waveIndex = pref.getInt("WaveIndex", 0);
@@ -163,7 +184,19 @@ void Menu::SetNextWave() {
 }
 
 //--------------------------
-bool Menu::Update(uint16_t key, int pressure) {
+bool Menu::SetNextLowPassQ() {
+  bool ret = false;
+  lowPassQ += 5;
+  if (lowPassQ > 30) {
+    lowPassQ = 0;
+    WritePlaySettings(waveIndex);
+    ret = true;
+  }
+  return ret;
+}
+
+//--------------------------
+bool Menu::Update(Preferences pref, uint16_t key, int pressure) {
 #ifdef _M5STICKC_H_
   M5.update();
   if (M5.BtnA.pressedFor(100)) {
@@ -205,6 +238,12 @@ bool Menu::Update(uint16_t key, int pressure) {
       delay(100);
       M5.update();
       if (M5.BtnB.isReleased()) break;
+
+      if (M5.BtnB.pressedFor(10*1000)) {
+        //出荷時状態に戻す
+        factoryResetRequested = true;
+        return true;
+      }
     }
   }
   if (isEnabled) {
@@ -216,8 +255,19 @@ bool Menu::Update(uint16_t key, int pressure) {
           transpose--;
           if (transpose < -12) transpose = -12;
           break;
-        case MENUINDEX_ACCCONTROL:
-          isAccControl = false;
+#if 0
+        case MENUINDEX_LOWPASSP:
+          lowPassP--;
+          if (lowPassP < 1) lowPassP = 1;
+          break;
+        case MENUINDEX_LOWPASSR:
+          lowPassR--;
+          if (lowPassR < 1) lowPassR = 1;
+          break;
+#endif
+        case MENUINDEX_LOWPASSQ:
+          lowPassQ--;
+          if (lowPassQ < 0) lowPassQ = 0;
           break;
         case MENUINDEX_FINETUNE:
           fineTune--;
@@ -244,6 +294,10 @@ bool Menu::Update(uint16_t key, int pressure) {
           if (breathSense < 100) breathSense = 100;
 #endif
           break;
+        case MENUINDEX_BREATHZERO:
+          breathZero -= 10;
+          if (breathZero < 0) breathZero = 0;
+          break;
         case MENUINDEX_CLOCK:
           minute = (minute + 59) % 60;
           if (minute == 59) {
@@ -268,8 +322,19 @@ bool Menu::Update(uint16_t key, int pressure) {
           transpose++;
           if (transpose > 12) transpose = 12;
           break;
-        case MENUINDEX_ACCCONTROL:
-          isAccControl = true;
+#if 0
+        case MENUINDEX_LOWPASSP:
+          lowPassP++;
+          if (lowPassP > 10) lowPassP = 10;
+          break;
+        case MENUINDEX_LOWPASSR:
+          lowPassR++;
+          if (lowPassR > 30) lowPassR = 30;
+          break;
+#endif
+        case MENUINDEX_LOWPASSQ:
+          lowPassQ++;
+          if (lowPassQ > 50) lowPassQ = 50;
           break;
         case MENUINDEX_FINETUNE:
           fineTune++;
@@ -295,6 +360,10 @@ bool Menu::Update(uint16_t key, int pressure) {
           breathSense += 10;
           if (breathSense > 500) breathSense = 500;
 #endif
+          break;
+        case MENUINDEX_BREATHZERO:
+          breathZero += 10;
+          if (breathZero > 300) breathZero = 300;
           break;
         case MENUINDEX_CLOCK:
           minute = (minute + 1)%60;
@@ -458,12 +527,17 @@ void Menu::DisplayMenu() {
     viewPos = 3 - cursorPos;
   }
   DisplayLine(viewPos, (cursorPos == i), "Transpose", TransposeToStr()); viewPos++; i++;
-  DisplayLine(viewPos, (cursorPos == i), "AccCtrl", std::to_string(isAccControl)); viewPos++; i++;
+#if 0
+  DisplayLine(viewPos, (cursorPos == i), "LowPassP", std::to_string(lowPassP)); viewPos++; i++;
+  DisplayLine(viewPos, (cursorPos == i), "LowPassR", std::to_string(lowPassR)); viewPos++; i++;
+#endif
+  DisplayLine(viewPos, (cursorPos == i), "Resonance", std::to_string(lowPassQ)); viewPos++; i++;
   DisplayLine(viewPos, (cursorPos == i), "FineTune", std::to_string(fineTune)); viewPos++; i++;
   DisplayLine(viewPos, (cursorPos == i), "Portamnto", std::to_string(portamentoRate)); viewPos++; i++;
   DisplayLine(viewPos, (cursorPos == i), "Delay", std::to_string(delayRate)); viewPos++; i++;
   DisplayLine(viewPos, (cursorPos == i), "KeySense", std::to_string(keySense)); viewPos++; i++;
   DisplayLine(viewPos, (cursorPos == i), "BrthSense", std::to_string(breathSense)); viewPos++; i++;
+  DisplayLine(viewPos, (cursorPos == i), "BrthZero", std::to_string(breathZero)); viewPos++; i++;
   DisplayLine(viewPos, (cursorPos == i), "Clock", TimeToStr()); viewPos++; i++;
   DisplayLine(viewPos, (cursorPos == i), "KeyTest", currentKey); viewPos++; i++;
   DisplayLine(viewPos, (cursorPos == i), "BrthTest", std::to_string(currentPressure)); viewPos++; i++;
