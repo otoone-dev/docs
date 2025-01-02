@@ -46,6 +46,7 @@ const float NOTESHIFTTIME_LENGTH = 10.0f;
 volatile float lowPassP = 0.1f;
 volatile float lowPassR = 5.0f;
 volatile float lowPassQ = 0.5f;
+volatile float lowPassIDQ = 1.0f / (2 * lowPassQ);
 
 #define CLOCK_DIVIDER (80)
 #define TIMER_ALARM (40)
@@ -54,6 +55,7 @@ volatile float lowPassQ = 0.5f;
 //#define SAMPLING_RATE (32000) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (50*50) = 32kHz
 //#define SAMPLING_RATE (48019.2f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (49*34) = 48kHz
 //#define SAMPLING_TIME_LENGTH (1.0f / SAMPLING_RATE)
+#define OMEGA_RATE (6.28318530718f / SAMPLING_RATE)
 static float currentWavelength = 0.0f;
 volatile float currentWavelengthTickCount = 0.0f;
 volatile float requestedVolume = 0.0f;
@@ -435,6 +437,17 @@ void SynthesizerThread(void *pvParameters) {
     currentWavelength += (wavelength - currentWavelength) * portamentoRate;
     currentWavelengthTickCount = (currentWavelength / SAMPLING_RATE);
 
+    // ローパスパラメータの更新
+    if (lowPassQ > 0.0f) {
+      float a = (tanh(lowPassR*(requestedVolume-lowPassP)) + 1.0f) * 0.5f;
+      float lp = 100.0f + 20000.0f * a;
+      if (lp > 12000.0f) {
+        lp = 12000.0f;
+      }
+      lowPassValue += (lp - lowPassValue) * 0.8f;
+      lowPassIDQ = 1.0f / (2 * lowPassQ);
+    }
+
     unsigned long m1 = micros();
     int wait = 5;
     if (m1 > m0) {
@@ -561,6 +574,9 @@ void TickThread(void *pvParameters) {
     UpdateAcc();
 #else
     UpdateKeys(0);
+    if (keyLowCs == LOW) {
+      requestedVolume = 0.7f;
+    }
 #endif
     BendExec(td, vol);
 
@@ -892,16 +908,17 @@ void MIDI_Exec() {
 //}
 
 //-------------------------------------
-float LowPass(float value, float freq, float q) {
-	float omega = 2.0f * 3.14159265f * freq / SAMPLING_RATE;
-	float alpha = sin(omega) / (2.0f * q);
+float LowPass(float value, float freq, float idq) {
+	//float omega = 2.0f * 3.14159265f * freq / SAMPLING_RATE;
+  float omega = OMEGA_RATE * freq;
+	float alpha = sin(omega) * idq;// / (2.0f * q);
  
   float cosv = cos(omega);
   float one_minus_cosv = 1.0f - cosv;
 	float a0 =  1.0f + alpha;
 	float a1 = -2.0f * cosv;
 	float a2 =  1.0f - alpha;
-	float b0 = one_minus_cosv / 2.0f;
+	float b0 = one_minus_cosv * 0.5f;// / 2.0f;
 	float b1 = one_minus_cosv;
 	float b2 = b0;//one_minus_cosv / 2.0f;
  
@@ -911,7 +928,8 @@ float LowPass(float value, float freq, float q) {
 	static float out1 = 0.0f;
 	static float out2 = 0.0f;
 
-  float lp = b0/a0 * value + b1/a0 * in1  + b2/a0 * in2 - a1/a0 * out1 - a2/a0 * out2;
+  //float lp = b0/a0 * value + b1/a0 * in1  + b2/a0 * in2 - a1/a0 * out1 - a2/a0 * out2;
+  float lp = (b0 * value + b1 * in1  + b2 * in2 - a1 * out1 - a2 * out2) / a0;
 
   in2  = in1;
   in1  = value;
@@ -924,9 +942,8 @@ float LowPass(float value, float freq, float q) {
 float Voice(float p, float shift) {
   float v = 255.99f*p;
   int t = (int)v;
-  //double f = (v - t);
   v -= t;
-#if 0
+#if 1
   float w0 = currentWaveTableA[t];
   t = (t + 1) % 256;
   float w1 = currentWaveTableA[t];
@@ -955,13 +972,7 @@ uint16_t CreateWave() {
 #endif
 #if 1
     if (lowPassQ > 0.0f) {
-      float a = (tanh(lowPassR*(requestedVolume-lowPassP)) + 1.0f) * 0.5f;
-      float lp = 100.0f + 20000.0f * a;
-      if (lp > 12000.0f) {
-        lp = 12000.0f;
-      }
-      lowPassValue += (lp - lowPassValue) * 0.2f;
-      g = LowPass(g, lowPassValue, lowPassQ);
+      g = LowPass(g, lowPassValue, lowPassIDQ);
     }
 #endif
 
