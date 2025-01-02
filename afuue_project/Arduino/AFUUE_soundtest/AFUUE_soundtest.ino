@@ -21,10 +21,10 @@
 #define CORE1 (1)
 
 //-------------------------------------
-hw_timer_t * timer = NULL;
+static hw_timer_t * timer = NULL;
 #define QUEUE_LENGTH 1
-QueueHandle_t xQueue;
-TaskHandle_t taskHandle;
+static QueueHandle_t xQueue;
+static TaskHandle_t taskHandle;
 static float currentNote = 60.0f;
 static float currentWavelength = 0.0f;
 volatile float currentWavelengthTickCount = 0.0f;
@@ -34,6 +34,10 @@ volatile float phase = 0.0f;
 volatile float lowPassValue = 0.0f;
 volatile uint8_t outH = 0;
 volatile uint8_t outL = 0;
+
+const float lowPassP = 0.5f;
+const float lowPassR = 5.0f;
+const float lowPassQ = 1.0f; // これを大きくするとよりポワッとした音になる
 
 #define CLOCK_DIVIDER (80)
 #define TIMER_ALARM (40)
@@ -100,7 +104,7 @@ float LowPass(float value, float freq, float q) {
 	static float out1 = 0.0f;
 	static float out2 = 0.0f;
 
-  float lp = b0/a0 * value + b1/a0 * in1  + b2/a0 * in2 - a1/a0 * out1 - a2/a0 * out2;
+  float lp = (b0 * value + b1 * in1  + b2 * in2 - a1 * out1 - a2 * out2) / a0;
 
   in2  = in1;
   in1  = value;
@@ -134,15 +138,6 @@ uint16_t CreateWave() {
   float g = Voice(phase) / 32767.0f;
 
   // ローパスフィルタで音をいじる
-  const float lowPassP = 0.5f;
-  const float lowPassR = 5.0f;
-  const float lowPassQ = 1.0f;
-  float a = (tanh(lowPassR*(currentVolume-lowPassP)) + 1.0f) * 0.5f; // 音量でカットオフ周波数を動かす（tanh を使ってるのはリニアにしないため）
-  float lp = 100.0f + 20000.0f * a; // このへんの値は適当
-  if (lp > LOWPASS_CUTOFF_LIMIT) { // サンプリング周波数の 1/2 より下にしないと計算が破綻する
-    lp = LOWPASS_CUTOFF_LIMIT;
-  }
-  lowPassValue += (lp - lowPassValue) * 0.2f;
   g = LowPass(g, lowPassValue, lowPassQ);
 
   // 音量
@@ -240,5 +235,13 @@ void loop() {
   }
 #endif
   currentVolume += (requestedVolume - currentVolume) * 0.05f; // 音量をフワッっと上げるため
+
+  // ローパスパラメータの更新
+  float a = (tanh(lowPassR*(currentVolume-lowPassP)) + 1.0f) * 0.5f; // 音量でカットオフ周波数を動かす（tanh を使ってるのはリニアにしないため）
+  float lp = 100.0f + 20000.0f * a; // このへんの値は適当
+  if (lp > LOWPASS_CUTOFF_LIMIT) { // サンプリング周波数の 1/2 より下にしないと計算が破綻する
+    lp = LOWPASS_CUTOFF_LIMIT;
+  }
+  lowPassValue += (lp - lowPassValue) * 0.8f;
   delay(5);
 }
