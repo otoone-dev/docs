@@ -22,6 +22,7 @@
 
 //-------------------------------------
 static hw_timer_t * timer = NULL;
+static portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 #define QUEUE_LENGTH 1
 static QueueHandle_t xQueue;
 static TaskHandle_t taskHandle;
@@ -37,7 +38,7 @@ volatile uint8_t outL = 0;
 
 const float lowPassP = 0.5f;
 const float lowPassR = 5.0f;
-const float lowPassQ = 1.0f; // これを大きくするとよりポワッとした音になる
+const float lowPassQ = 1.5f; // これを大きくするとよりポワッとした音になる
 
 #define CLOCK_DIVIDER (80)
 #define TIMER_ALARM (40)
@@ -153,12 +154,14 @@ uint16_t CreateWave() {
 //---------------------------------
 // サンプリング周波数ごとに正確に呼ばれるタイマー
 void IRAM_ATTR onTimer(){
+  portENTER_CRITICAL_ISR(&timerMux);
   // 現在の値を書き込むだけ（タイマー割込みで重い処理は書かない方がいいので）
   ledcWrite(0, outL);
   ledcWrite(1, outH);
 
   int8_t data;
   xQueueSendFromISR(xQueue, &data, 0); // キューを送信
+  portEXIT_CRITICAL_ISR(&timerMux);
 }
 
 //---------------------------------
