@@ -32,6 +32,9 @@ volatile float phase = 0.0f;
 volatile float delayBuffer[DELAY_BUFFER_SIZE];
 volatile int delayPos = 0;
 
+volatile const float* sinTable = NULL;
+volatile const float* tanhTable = NULL;
+
 int baseNote = 61; // 49 61 73
 float fineTune = 440.0f;
 volatile float delayRate = 0.15f;
@@ -48,7 +51,8 @@ volatile float lowPassValue = 0.0f;
 #define TIMER_ALARM (40)
 //#define SAMPLING_RATE (20000.0f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (80*50) = 20kHz
 #define SAMPLING_RATE (25000.0f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (80*40) = 25kHz
-#define OMEGA_RATE (6.28318530718f / SAMPLING_RATE)
+//#define OMEGA_RATE (6.28318530718f / SAMPLING_RATE)
+#define OMEGA_RATE (1.0f / SAMPLING_RATE)
 static float currentWavelength = 0.0f;
 volatile float currentWavelengthTickCount = 0.0f;
 volatile float requestedVolume = 0.0f;
@@ -130,6 +134,28 @@ void DrawCenterString(const char* str, int x, int y, int fontId) {
 //--------------------------
 float CalcFrequency(float note) {
   return fineTune * pow(2.0f, (note - (69.0f - 12.0f)) / 12.0f);
+}
+
+//---------------------------------
+float InteropL(volatile const float* table, float p) {
+  float v = 255.99999f*p;
+  int t = (int)v;
+  v -= t;
+  float w0 = table[t];
+  t = (t + 1) % 256;
+  float w1 = table[t];
+  return (w0 * (1.0f - v)) + (w1 * v);
+}
+
+//---------------------------------
+float Interop(volatile const float* table, float p) {
+  float v = 255.99999f*p;
+  int t = (int)v;
+  v -= t;
+  float w0 = table[t];
+  t = (t + 1) % 257;
+  float w1 = table[t];
+  return (w0 * (1.0f - v)) + (w1 * v);
 }
 
 //---------------------------------
@@ -388,13 +414,17 @@ void GetMenuParams() {
     baseNote = 61 + menu.transpose;
     portamentoRate = 1 - (menu.portamentoRate * 0.01f);
     delayRate = menu.delayRate * 0.01f;
-
-    lowPassP = 0.5f;// menu.lowPassP / 10.0f;
-    lowPassR = 5.0f;//menu.lowPassR;
-    lowPassQ = 1.0f;//menu.lowPassQ / 10.0f;
 #endif
     keySenseTimeMs = menu.keySense;
     breathSenseRate = menu.breathSense;
+
+    lowPassP = 0.5f;// menu.lowPassP / 10.0f;
+    lowPassR = 5.0f;//menu.lowPassR;
+    lowPassQ = 0.8f;//menu.lowPassQ / 10.0f;
+    lowPassIDQ = 1.0f / (2.0f * lowPassQ);
+
+    sinTable = menu.waveData.GetSinTable();
+    tanhTable = menu.waveData.GetTanhTable();
 }
 
 //-------------------------------------
@@ -454,16 +484,19 @@ void TickThread(void *pvParameters) {
 #endif
     BendExec(td, vol);
 
-#if 0
+#if 1
     // ローパスパラメータの更新
     if (lowPassQ > 0.0f) {
-      float a = (tanh(lowPassR*(requestedVolume-lowPassP)) + 1.0f) * 0.5f;
+      //float a = (tanh(lowPassR*(requestedVolume-lowPassP)) + 1.0f) * 0.5f;
+      float p = lowPassR*(requestedVolume-lowPassP) / 8.0f + 0.5f;
+      if (p < 0.0f) p = 0.0f;
+      if (p > 1.0f) p = 1.0f;
+      float a = (Interop(tanhTable, p) + 1.0f) * 0.5f;
       float lp = 100.0f + 20000.0f * a;
       if (lp > 12000.0) {
         lp = 12000.0f;
       }
       lowPassValue += (lp - lowPassValue) * 0.8f;
-      lowPassIDQ = 1.0f / (2.0f * lowPassQ);
     }
 #endif
     float n = GetNoteNumber();
@@ -734,9 +767,11 @@ void MIDI_Exec() {
 float LowPass(float value, float freq, float idq) {
 	//float omega = 2.0f * 3.14159265f * freq / SAMPLING_RATE;
   float omega = OMEGA_RATE * freq;
-	float alpha = sin(omega) * idq;// / (2.0f * q);
+	//float alpha = sin(omega) * idq;// / (2.0f * q);
+	float alpha = InteropL(sinTable, omega) * idq;// / (2.0f * q);
  
-  float cosv = cos(omega);
+  //float cosv = cos(omega);
+  float cosv = InteropL(sinTable, omega + 0.25f);
   float one_minus_cosv = 1.0f - cosv;
 	float a0 =  1.0f + alpha;
 	float a1 = -2.0f * cosv;
@@ -761,28 +796,17 @@ float LowPass(float value, float freq, float idq) {
   return lp;
 }
 
-//---------------------------------
-float Voice(float p) {
-  float v = 255.999f*p;
-  int t = (int)v;
-  v -= t;
-  float w0 = currentWaveTable[t];
-  t = (t + 1) % 256;
-  float w1 = currentWaveTable[t];
-  return (w0 * (1.0f - v)) + (w1 * v);
-}
-
 //-------------------------------------
 uint16_t CreateWave() {
     // 波形を生成する
     phase += currentWavelengthTickCount;
-    if (phase >= 1.0 ) phase -= 1.0f;
+    if (phase >= 1.0f) phase -= 1.0f;
 
-    float g = Voice(phase) / 32767.0f;
+    float g = InteropL(currentWaveTable, phase) / 32767.0f;
 
-    //if (lowPassQ > 0.0f) {
-    //  g = LowPass(g, lowPassValue, lowPassIDQ);
-    //}
+    if (lowPassQ > 0.0f) {
+      g = LowPass(g, lowPassValue, lowPassIDQ);
+    }
 
     float e = (32767.0f * g * requestedVolume) + delayBuffer[delayPos];;
 
