@@ -13,7 +13,6 @@ static float bat_vol             = 0.0f;        // バッテリー電圧
 
 enum {
   MENUINDEX_TRANSPOSE,
-  MENUINDEX_ACCCONTROL,
   MENUINDEX_FINETUNE,
   MENUINDEX_PORTAMENTO,
   MENUINDEX_DELAY,
@@ -52,8 +51,6 @@ void Menu::SavePreferences(Preferences pref) {
     }
 
     char s[32];
-    sprintf(s, "AccControl%d", i);
-    pref.putBool(s, waveSettings[i].isAccControl);
     sprintf(s, "FineTune%d", i);
     pref.putInt(s, waveSettings[i].fineTune);
     sprintf(s, "Transpose%d", i);
@@ -75,21 +72,14 @@ void Menu::SavePreferences(Preferences pref) {
 
 //--------------------------
 void Menu::ReadPlaySettings(int widx) {
-    isAccControl = waveSettings[widx].isAccControl;
     fineTune = waveSettings[widx].fineTune;
     transpose = waveSettings[widx].transpose;
     portamentoRate = waveSettings[widx].portamentoRate;
     delayRate = waveSettings[widx].delayRate;
-
-    preparation = waveSettings[widx].preparation;
-    distortion = waveSettings[widx].distortion;
-    flanger = waveSettings[widx].flanger;
-    flangerTime = waveSettings[widx].flangerTime;
 }
 
 //--------------------------
 void Menu::WritePlaySettings(int widx) {
-    waveSettings[widx].isAccControl = isAccControl;
     waveSettings[widx].fineTune = fineTune;
     waveSettings[widx].transpose = transpose;
     waveSettings[widx].portamentoRate = portamentoRate;
@@ -111,8 +101,6 @@ void Menu::LoadPreferences(Preferences pref) {
     }
 
     char s[32];
-    sprintf(s, "AccControl%d", i);
-    waveSettings[i].isAccControl = pref.getBool(s, false);
     sprintf(s, "FineTune%d", i);
     waveSettings[i].fineTune = pref.getInt(s, 442);
     sprintf(s, "Transpose%d", i);
@@ -216,9 +204,6 @@ bool Menu::Update(uint16_t key, int pressure) {
           transpose--;
           if (transpose < -12) transpose = -12;
           break;
-        case MENUINDEX_ACCCONTROL:
-          isAccControl = false;
-          break;
         case MENUINDEX_FINETUNE:
           fineTune--;
           if (fineTune < 400) fineTune = 400;
@@ -267,9 +252,6 @@ bool Menu::Update(uint16_t key, int pressure) {
         case MENUINDEX_TRANSPOSE:
           transpose++;
           if (transpose > 12) transpose = 12;
-          break;
-        case MENUINDEX_ACCCONTROL:
-          isAccControl = true;
           break;
         case MENUINDEX_FINETUNE:
           fineTune++;
@@ -458,7 +440,6 @@ void Menu::DisplayMenu() {
     viewPos = 3 - cursorPos;
   }
   DisplayLine(viewPos, (cursorPos == i), "Transpose", TransposeToStr()); viewPos++; i++;
-  DisplayLine(viewPos, (cursorPos == i), "AccCtrl", std::to_string(isAccControl)); viewPos++; i++;
   DisplayLine(viewPos, (cursorPos == i), "FineTune", std::to_string(fineTune)); viewPos++; i++;
   DisplayLine(viewPos, (cursorPos == i), "Portamnto", std::to_string(portamentoRate)); viewPos++; i++;
   DisplayLine(viewPos, (cursorPos == i), "Delay", std::to_string(delayRate)); viewPos++; i++;
