@@ -9,6 +9,8 @@
 #include "io_expander.h"
 #endif
 
+#include <cfloat>
+
 #if ENABLE_MIDI || ENABLE_BLE_MIDI
 volatile bool midiEnabled = false;
 #endif
@@ -26,14 +28,15 @@ QueueHandle_t xQueue;
 TaskHandle_t taskHandle;
 volatile bool enablePlay = false;
 
-volatile const float* currentWaveTableA = NULL;
-volatile const float* currentWaveTableB = NULL;
-volatile float currentWaveShiftLevel = 0.0f;
+volatile const float* currentWaveTable = NULL;
 volatile float phase = 0.0f;
 volatile float currentWaveLevel = 0.0f;
 #define DELAY_BUFFER_SIZE (8000)
 volatile float delayBuffer[DELAY_BUFFER_SIZE];
 volatile int delayPos = 0;
+
+volatile const float* sinTable = NULL;
+volatile const float* tanhTable = NULL;
 
 int baseNote = 61; // 49 61 73
 float fineTune = 440.0f;
@@ -47,6 +50,12 @@ volatile float lowPassP = 0.1f;
 volatile float lowPassR = 5.0f;
 volatile float lowPassQ = 0.5f;
 volatile float lowPassIDQ = 1.0f / (2 * lowPassQ);
+volatile float lp_a0 = 1.0f;
+volatile float lp_a1 = 0.0f;
+volatile float lp_a2 = 0.0f;
+volatile float lp_b0 = 0.0f;
+volatile float lp_b1 = 0.0f;
+volatile float lp_b2 = 0.0f;
 
 #define CLOCK_DIVIDER (80)
 #define TIMER_ALARM (40)
@@ -54,8 +63,6 @@ volatile float lowPassIDQ = 1.0f / (2 * lowPassQ);
 #define SAMPLING_RATE (25000.0f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (80*40) = 25kHz
 //#define SAMPLING_RATE (32000) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (50*50) = 32kHz
 //#define SAMPLING_RATE (48019.2f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (49*34) = 48kHz
-//#define SAMPLING_TIME_LENGTH (1.0f / SAMPLING_RATE)
-#define OMEGA_RATE (6.28318530718f / SAMPLING_RATE)
 static float currentWavelength = 0.0f;
 volatile float currentWavelengthTickCount = 0.0f;
 volatile float requestedVolume = 0.0f;
@@ -144,6 +151,28 @@ void DrawCenterString(const char* str, int x, int y, int fontId) {
 #ifdef _M5STICKC_H_
   M5.Lcd.drawCentreString(str, x, y, fontId);
 #endif
+}
+
+//---------------------------------
+float InteropL(volatile const float* table, int tableCount, float p) {
+  float v = (tableCount - FLT_MIN) *p;
+  int t = (int)v;
+  v -= t;
+  float w0 = table[t];
+  t = (t + 1) % tableCount;
+  float w1 = table[t];
+  return (w0 * (1.0f - v)) + (w1 * v);
+}
+
+//---------------------------------
+float InteropC(volatile const float* table, int tableCount, float p) {
+  float v = (tableCount - FLT_MIN)*p;
+  int t = (int)v;
+  v -= t;
+  float w0 = table[t];
+  t = (t + 1) % (tableCount + 1);
+  float w1 = table[t];
+  return (w0 * (1.0f - v)) + (w1 * v);
 }
 
 //-------------------------------------
@@ -416,24 +445,8 @@ void SynthesizerThread(void *pvParameters) {
     if (n < 0.0f) n = 0.0f;
     if (n > 1.0f) n = 1.0f;
 
-    float noteOnShift = 0.0f;
-    if (currentWaveTableA == currentWaveTableB) {
-      noiseVolume = n * requestedVolume * noiseLevel;
-    }
-    else {
-      float p = 0.5f * (NOTESHIFTTIME_LENGTH*2 - noteOnTimeMs) / (NOTESHIFTTIME_LENGTH*2);
-      if (p < 0.0f) p = 0.0f;
-      if (p > 1.0f) p = 1.0f;
-      noteOnShift = (1.0f - requestedVolume) * p;
-    }
-
-    float ab = requestedVolume + currentWaveShiftLevel;
-    if (ab < 0.0f) ab = 0.0f;
-    if (ab > 1.0f) ab = 1.0f;
-    waveShift = ab;
-
     // 現在の再生周波数から１サンプルあたりのフェーズの進みを計算
-    float wavelength = CalcFrequency(currentNote + bendNoteShift + noteOnShift);
+    float wavelength = CalcFrequency(currentNote + bendNoteShift);
     currentWavelength += (wavelength - currentWavelength) * portamentoRate;
     currentWavelengthTickCount = (currentWavelength / SAMPLING_RATE);
 
@@ -445,7 +458,17 @@ void SynthesizerThread(void *pvParameters) {
         lp = 12000.0f;
       }
       lowPassValue += (lp - lowPassValue) * 0.8f;
-      lowPassIDQ = 1.0f / (2 * lowPassQ);
+
+      float omega = lowPassValue / SAMPLING_RATE;
+      float alpha = InteropL(sinTable, 1024, omega) * lowPassIDQ;
+      float cosv = InteropL(sinTable, 1024, omega + 0.25f);
+      float one_minus_cosv = 1.0f - cosv;
+      lp_a0 =  1.0f + alpha;
+      lp_a1 = -2.0f * cosv;
+      lp_a2 =  1.0f - alpha;
+      lp_b0 = one_minus_cosv * 0.5f;
+      lp_b1 = one_minus_cosv;
+      lp_b2 = lp_b0;
     }
 
     unsigned long m1 = micros();
@@ -463,6 +486,12 @@ void GetMenuParams() {
     lowPassP = menu.lowPassP / 10.0f;
     lowPassR = menu.lowPassR;
     lowPassQ = menu.lowPassQ / 10.0f;
+    if (lowPassQ > 0.0f) {
+      lowPassIDQ = 1.0f / (2.0f * lowPassQ);
+    }
+    else {
+      lowPassIDQ = 0.0f;
+    }
 #ifdef _M5STICKC_H_
     fineTune = menu.fineTune;
     baseNote = 61 + menu.transpose;
@@ -574,7 +603,7 @@ void TickThread(void *pvParameters) {
     UpdateAcc();
 #else
     UpdateKeys(0);
-    if (keyLowCs == LOW) {
+    if (octDown == LOW && octUp == LOW) {
       requestedVolume = 0.7f;
     }
 #endif
@@ -652,9 +681,7 @@ void MenuThread(void *pvParameters) {
             delay(2000);
             ESP.restart();
           }
-          currentWaveTableA = menu.waveData.GetWaveTable(menu.waveIndex, 0);
-          currentWaveTableB = menu.waveData.GetWaveTable(menu.waveIndex, 1);
-          currentWaveShiftLevel = menu.waveData.GetWaveShiftLevel(menu.waveIndex);
+          currentWaveTable = menu.waveData.GetWaveTable(menu.waveIndex);
           menu.SavePreferences(pref);
         } EndPreferences();
         GetMenuParams();
@@ -709,9 +736,7 @@ void MenuThread(void *pvParameters) {
           {
             menu.SetNextWave();
             BeginPreferences(); {
-              currentWaveTableA = menu.waveData.GetWaveTable(menu.waveIndex, 0);
-              currentWaveTableB = menu.waveData.GetWaveTable(menu.waveIndex, 1);
-              currentWaveShiftLevel = menu.waveData.GetWaveShiftLevel(menu.waveIndex);
+              currentWaveTable = menu.waveData.GetWaveTable(menu.waveIndex);
               menu.SavePreferences(pref);
             } EndPreferences();
             currentNote = baseNote-1;
@@ -908,28 +933,13 @@ void MIDI_Exec() {
 //}
 
 //-------------------------------------
-float LowPass(float value, float freq, float idq) {
-	//float omega = 2.0f * 3.14159265f * freq / SAMPLING_RATE;
-  float omega = OMEGA_RATE * freq;
-	float alpha = sin(omega) * idq;// / (2.0f * q);
- 
-  float cosv = cos(omega);
-  float one_minus_cosv = 1.0f - cosv;
-	float a0 =  1.0f + alpha;
-	float a1 = -2.0f * cosv;
-	float a2 =  1.0f - alpha;
-	float b0 = one_minus_cosv * 0.5f;// / 2.0f;
-	float b1 = one_minus_cosv;
-	float b2 = b0;//one_minus_cosv / 2.0f;
- 
-	// フィルタ計算用のバッファ変数。
+float LowPass(float value) { 
 	static float in1  = 0.0f;
 	static float in2  = 0.0f;
 	static float out1 = 0.0f;
 	static float out2 = 0.0f;
 
-  //float lp = b0/a0 * value + b1/a0 * in1  + b2/a0 * in2 - a1/a0 * out1 - a2/a0 * out2;
-  float lp = (b0 * value + b1 * in1  + b2 * in2 - a1 * out1 - a2 * out2) / a0;
+  float lp = (lp_b0 * value + lp_b1 * in1  + lp_b2 * in2 - lp_a1 * out1 - lp_a2 * out2) / lp_a0;
 
   in2  = in1;
   in1  = value;
@@ -938,32 +948,13 @@ float LowPass(float value, float freq, float idq) {
   return lp;
 }
 
-//---------------------------------
-float Voice(float p, float shift) {
-  float v = 255.99f*p;
-  int t = (int)v;
-  v -= t;
-#if 1
-  float w0 = currentWaveTableA[t];
-  t = (t + 1) % 256;
-  float w1 = currentWaveTableA[t];
-  return (w0 * (1.0f-v)) + (w1 * v);
-#else
-  float w0 = (currentWaveTableA[t] * (1.0f-shift) + currentWaveTableB[t] * shift);
-  t = (t + 1) % 256;
-  float w1 = (currentWaveTableA[t] * (1.0f-shift) + currentWaveTableB[t] * shift);
-  float w = (w0 * (1.0f-v)) + (w1 * v);
-  return w;
-#endif
-}
-
 //-------------------------------------
 uint16_t CreateWave() {
     // 波形を生成する
     phase += currentWavelengthTickCount;
     if (phase >= 1.0f) phase -= 1.0f;
 
-    float g = Voice(phase, waveShift) / 32767.0f;
+    float g = InteropL(currentWaveTable, 256, phase) / 32767.0f;
 
 #if 0
     //ノイズ
@@ -972,7 +963,7 @@ uint16_t CreateWave() {
 #endif
 #if 1
     if (lowPassQ > 0.0f) {
-      g = LowPass(g, lowPassValue, lowPassIDQ);
+      g = LowPass(g);
     }
 #endif
 
@@ -1194,10 +1185,10 @@ void setup() {
   } EndPreferences();
   
   GetMenuParams();
+  sinTable = menu.waveData.GetSinTable();
+  tanhTable = menu.waveData.GetTanhTable();
 
-  currentWaveTableA = menu.waveData.GetWaveTable(menu.waveIndex, 0);
-  currentWaveTableB = menu.waveData.GetWaveTable(menu.waveIndex, 1);
-  currentWaveShiftLevel = menu.waveData.GetWaveShiftLevel(menu.waveIndex);
+  currentWaveTable = menu.waveData.GetWaveTable(menu.waveIndex);
   for (int i = 0; i < DELAY_BUFFER_SIZE; i++) {
     delayBuffer[i] = 0.0f;
   }
@@ -1209,7 +1200,7 @@ void setup() {
 
   if (!isUSBMidiMounted) {
     xQueue = xQueueCreate(QUEUE_LENGTH, sizeof(int8_t));
-    xTaskCreateUniversal(task, "createWaveTask", 16384, NULL, 5, &taskHandle, CORE0);
+    xTaskCreateUniversal(task, "createWaveTask", 16384, NULL, 3, &taskHandle, CORE0);
 
     timer = timerBegin(0, CLOCK_DIVIDER, true);
     timerAttachInterrupt(timer, &onTimer, true);
@@ -1218,10 +1209,10 @@ void setup() {
     SerialPrintLn("timer begin");
   }
 
-  xTaskCreatePinnedToCore(SynthesizerThread, "SynthesizerThread", 2048, NULL, 1, NULL, CORE1);
+  xTaskCreatePinnedToCore(SynthesizerThread, "SynthesizerThread", 2048, NULL, 5, NULL, CORE1);
 
-  xTaskCreatePinnedToCore(TickThread, "TickThread", 2048, NULL, 1, NULL, CORE1);
-  xTaskCreatePinnedToCore(MenuThread, "MenuThread", 2048, NULL, 3, NULL, CORE1);
+  xTaskCreatePinnedToCore(TickThread, "TickThread", 2048, NULL, 6, NULL, CORE1);
+  xTaskCreatePinnedToCore(MenuThread, "MenuThread", 2048, NULL, 23, NULL, CORE1);
 
   enablePlay = true;
 }

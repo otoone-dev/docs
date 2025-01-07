@@ -50,7 +50,7 @@ void Menu::Initialize(Preferences pref) {
 void Menu::SavePreferences(Preferences pref) {
 #ifdef _M5STICKC_H_
   for (int i = 0; i < WAVE_MAX; i++) {
-    if (waveData.GetWaveTable(i, 0) == NULL) {
+    if (waveData.GetWaveTable(i) == NULL) {
       break;
     }
 
@@ -120,7 +120,7 @@ void Menu::LoadPreferences(Preferences pref) {
   breathZero = pref.getInt("BreathZero", 110);
 
   for (int i = 0; i < WAVE_MAX; i++) {
-    if (waveData.GetWaveTable(i, 0) == NULL) {
+    if (waveData.GetWaveTable(i) == NULL) {
       break;
     }
 
@@ -175,7 +175,7 @@ void Menu::ReadRtc() {
 //--------------------------
 void Menu::SetNextWave() {
     waveIndex++;
-    if (waveData.GetWaveTable(waveIndex, 0) == NULL) {
+    if (waveData.GetWaveTable(waveIndex) == NULL) {
       waveIndex = 0;
     }
 #ifdef _M5STICKC_H_
@@ -189,9 +189,9 @@ bool Menu::SetNextLowPassQ() {
   lowPassQ += 5;
   if (lowPassQ > 30) {
     lowPassQ = 0;
-    WritePlaySettings(waveIndex);
     ret = true;
   }
+  WritePlaySettings(waveIndex);
   return ret;
 }
 
