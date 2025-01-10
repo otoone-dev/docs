@@ -88,22 +88,22 @@ const float waveAfuueCla[256] = {
 // freq: カットオフ周波数
 // q: Q値
 float LowPass(float value, float freq, float q) {
-	float omega = 2.0f * 3.14159265f * freq / SAMPLING_RATE;
-	float alpha = sin(omega) / (2.0f * q);
- 
+  float omega = 2.0f * 3.14159265f * freq / SAMPLING_RATE;
+  float alpha = sin(omega) / (2.0f * q);
+
   float cosv = cos(omega);
   float one_minus_cosv = 1.0f - cosv;
-	float a0 =  1.0f + alpha;
-	float a1 = -2.0f * cosv;
-	float a2 =  1.0f - alpha;
-	float b0 = one_minus_cosv / 2.0f;
-	float b1 = one_minus_cosv;
-	float b2 = b0;
+  float a0 =  1.0f + alpha;
+  float a1 = -2.0f * cosv;
+  float a2 =  1.0f - alpha;
+  float b0 = one_minus_cosv / 2.0f;
+  float b1 = one_minus_cosv;
+  float b2 = b0;
  
-	static float in1  = 0.0f;
-	static float in2  = 0.0f;
-	static float out1 = 0.0f;
-	static float out2 = 0.0f;
+  static float in1  = 0.0f;
+  static float in2  = 0.0f;
+  static float out1 = 0.0f;
+  static float out2 = 0.0f;
 
   float lp = (b0 * value + b1 * in1  + b2 * in2 - a1 * out1 - a2 * out2) / a0;
 
@@ -196,7 +196,7 @@ void setup() {
 
   // CORE0 で動く波形生成タスクを作成
   xQueue = xQueueCreate(QUEUE_LENGTH, sizeof(int8_t));
-  xTaskCreateUniversal(createWaveTask, "createWaveTask", 16384, NULL, 5, &taskHandle, CORE0);
+  xTaskCreatePinnedToCore(createWaveTask, "createWaveTask", 16384, NULL, 5, &taskHandle, CORE0);
 
   // タイマー割込み（CORE1 での動作）
   timer = timerBegin(0, CLOCK_DIVIDER, true);
@@ -246,5 +246,6 @@ void loop() {
     lp = LOWPASS_CUTOFF_LIMIT;
   }
   lowPassValue += (lp - lowPassValue) * 0.8f;
+
   delay(5);
 }
