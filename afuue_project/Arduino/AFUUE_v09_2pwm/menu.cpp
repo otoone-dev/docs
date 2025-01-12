@@ -13,8 +13,8 @@ static float bat_vol             = 0.0f;        // バッテリー電圧
 
 enum {
   MENUINDEX_TRANSPOSE,
-  //MENUINDEX_LOWPASSP,
-  //MENUINDEX_LOWPASSR,
+  MENUINDEX_LOWPASSP,
+  MENUINDEX_LOWPASSR,
   MENUINDEX_LOWPASSQ,
   MENUINDEX_FINETUNE,
   MENUINDEX_PORTAMENTO,
@@ -110,14 +110,33 @@ void Menu::WritePlaySettings(int widx) {
 }
 
 //--------------------------
+void Menu::ResetPlaySettings(int widx) {
+  int idx = widx;
+  if (idx < 0) {
+    idx = waveIndex;
+  }
+  // isAccControl = false;
+  fineTune = 442;
+  transpose = waveData.GetWaveTranspose(idx);
+  portamentoRate = 15;
+  delayRate = 15;
+
+  lowPassP = 5;
+  lowPassR = 5;
+  lowPassQ = waveData.GetWaveLowPassQ(idx);
+  WritePlaySettings(idx);
+}
+
+//--------------------------
 void Menu::LoadPreferences(Preferences pref) {
-  keySense = pref.getInt("KeySense", 45);
+  keySense = pref.getInt("KeySense", 50);
 #ifdef ENABLE_MCP3425
   breathSense = pref.getInt("BreathSense", 150);
-#else
-  breathSense = pref.getInt("BreathSense2", 250);
-#endif
   breathZero = pref.getInt("BreathZero", 110);
+#else
+  breathSense = pref.getInt("BreathSense2", 200);
+  breathZero = pref.getInt("BreathZero", 50);
+#endif
 
   for (int i = 0; i < WAVE_MAX; i++) {
     if (waveData.GetWaveTable(i) == NULL) {
@@ -178,9 +197,7 @@ void Menu::SetNextWave() {
     if (waveData.GetWaveTable(waveIndex) == NULL) {
       waveIndex = 0;
     }
-#ifdef _M5STICKC_H_
     ReadPlaySettings(waveIndex);
-#endif
 }
 
 //--------------------------
@@ -218,6 +235,12 @@ bool Menu::Update(Preferences pref, uint16_t key, int pressure) {
       delay(100);
       M5.update();
       if (M5.BtnA.isReleased()) break;
+
+      if (!isEnabled && M5.BtnB.pressedFor(10*1000)) {
+        // すべてを出荷時状態に戻す (!isEnabled なのは↑で false にしているから)
+        factoryResetRequested = true;
+        return true;
+      }
     }
     return true;
   }
@@ -239,10 +262,12 @@ bool Menu::Update(Preferences pref, uint16_t key, int pressure) {
       M5.update();
       if (M5.BtnB.isReleased()) break;
 
-      if (M5.BtnB.pressedFor(10*1000)) {
-        //出荷時状態に戻す
-        factoryResetRequested = true;
-        return true;
+      if (isEnabled && M5.BtnB.pressedFor(5*1000)) {
+        // この波形のパラメータを出荷時状態に戻す
+        ResetPlaySettings(waveIndex);
+        cursorPos = 0;
+        forcePlayNote = 84;
+        Display();
       }
     }
   }
@@ -255,7 +280,6 @@ bool Menu::Update(Preferences pref, uint16_t key, int pressure) {
           transpose--;
           if (transpose < -12) transpose = -12;
           break;
-#if 0
         case MENUINDEX_LOWPASSP:
           lowPassP--;
           if (lowPassP < 1) lowPassP = 1;
@@ -264,7 +288,6 @@ bool Menu::Update(Preferences pref, uint16_t key, int pressure) {
           lowPassR--;
           if (lowPassR < 1) lowPassR = 1;
           break;
-#endif
         case MENUINDEX_LOWPASSQ:
           lowPassQ--;
           if (lowPassQ < 0) lowPassQ = 0;
@@ -322,7 +345,6 @@ bool Menu::Update(Preferences pref, uint16_t key, int pressure) {
           transpose++;
           if (transpose > 12) transpose = 12;
           break;
-#if 0
         case MENUINDEX_LOWPASSP:
           lowPassP++;
           if (lowPassP > 10) lowPassP = 10;
@@ -331,7 +353,6 @@ bool Menu::Update(Preferences pref, uint16_t key, int pressure) {
           lowPassR++;
           if (lowPassR > 30) lowPassR = 30;
           break;
-#endif
         case MENUINDEX_LOWPASSQ:
           lowPassQ++;
           if (lowPassQ > 50) lowPassQ = 50;
@@ -527,11 +548,9 @@ void Menu::DisplayMenu() {
     viewPos = 3 - cursorPos;
   }
   DisplayLine(viewPos, (cursorPos == i), "Transpose", TransposeToStr()); viewPos++; i++;
-#if 0
-  DisplayLine(viewPos, (cursorPos == i), "LowPassP", std::to_string(lowPassP)); viewPos++; i++;
-  DisplayLine(viewPos, (cursorPos == i), "LowPassR", std::to_string(lowPassR)); viewPos++; i++;
-#endif
-  DisplayLine(viewPos, (cursorPos == i), "Resonance", std::to_string(lowPassQ)); viewPos++; i++;
+  DisplayLine(viewPos, (cursorPos == i), "LP_Pos", std::to_string(lowPassP)); viewPos++; i++;
+  DisplayLine(viewPos, (cursorPos == i), "LP_Rate", std::to_string(lowPassR)); viewPos++; i++;
+  DisplayLine(viewPos, (cursorPos == i), "LP_Power", std::to_string(lowPassQ)); viewPos++; i++;
   DisplayLine(viewPos, (cursorPos == i), "FineTune", std::to_string(fineTune)); viewPos++; i++;
   DisplayLine(viewPos, (cursorPos == i), "Portamnto", std::to_string(portamentoRate)); viewPos++; i++;
   DisplayLine(viewPos, (cursorPos == i), "Delay", std::to_string(delayRate)); viewPos++; i++;

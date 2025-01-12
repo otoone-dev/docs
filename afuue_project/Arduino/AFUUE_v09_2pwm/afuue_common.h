@@ -8,9 +8,9 @@
 #include <M5Unified.h>
 
 //#define AFUUE_VER (109) // 8Bit-DAC ADC-Direct    (AFUUE2 First)
-//#define AFUUE_VER (110) // 16Bit-PWM ADC-MCP3425  (AFUUE2 Second)
+#define AFUUE_VER (110) // 16Bit-PWM ADC-MCP3425  (AFUUE2 Second)
 //#define AFUUE_VER (112)   // 16Bit-PWM LPS33        (AFUUE2 Test)
-#define AFUUE_VER (111) // 16Bit-PWM ADCx2        (AFUUE2R First)
+//#define AFUUE_VER (111) // 16Bit-PWM ADCx2        (AFUUE2R First)
 //#define AFUUE_VER (113)   // 16Bit-PWM LPS33        (AFUUE2R Secod)
 
 // AFUUE2R は USB デバイスとして動作させるために USB-MODE:USB-OTG などを設定する必要がある。書き込み時はボタンを押しながら USB ケーブルを PC に接続する。

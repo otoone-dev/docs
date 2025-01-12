@@ -44,6 +44,7 @@ public:
   void Initialize(Preferences pref);
   void SetNextWave();
   bool SetNextLowPassQ();
+  void ResetPlaySettings(int widx = -1);
   bool Update(Preferences pref, uint16_t key, int pressure);
   void SavePreferences(Preferences pref);
   void LoadPreferences(Preferences pref);
