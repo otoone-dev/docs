@@ -431,14 +431,14 @@ const float* WaveData::GetWaveTable(int index) {
 const char* waveName[] = {
   "SynthA",
   "SynthB",
+
   "A_Clarinet",
   "A_Brass",
-
   "A_Flute",
   "A_Violin",
+
   "P_Square",
   "P_Saw",
-
   "P_Triangle",
   NULL,
 };
@@ -449,14 +449,14 @@ const char* WaveData::GetWaveName(int index) {
 const int waveLowPassQ[] = {
   5,
   5,
+
   8,
   7,
-
   5,
   3,
-  5,
-  5,
 
+  5,
+  5,
   5,
 };
 
@@ -467,11 +467,12 @@ int WaveData::GetWaveLowPassQ(int index) {
 const int waveTranspose[] = {
   0,
   0,
+
   0,
   0,
   0,
   -12,
-  0,
+
   0,
   0,
   0,
@@ -479,6 +480,42 @@ const int waveTranspose[] = {
 
 int WaveData::GetWaveTranspose(int index) {
   return waveTranspose[index];
+}
+
+const int wavePortamento[] = {
+  15,
+  15,
+
+  15,
+  15,
+  15,
+  15,
+
+  80,
+  80,
+  80,
+};
+
+int WaveData::GetWavePortamento(int index) {
+  return wavePortamento[index];
+}
+
+const int waveAttackSoftness[] = {
+  10,
+  30,
+
+  20,
+  5,
+  80,
+  50,
+
+  20,
+  10,
+  50,
+};
+
+int WaveData::GetWaveAttackSoftness(int index) {
+  return waveAttackSoftness[index];
 }
 
 const float* WaveData::GetSinTable() const {

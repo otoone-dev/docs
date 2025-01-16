@@ -6,8 +6,8 @@
 #define IOEXPANDER_H
 
 #include <Wire.h>
-#include <Adafruit_MCP23X17.h>
-#include <Adafruit_PCF8574.h>
+#include <Adafruit_MCP23X17.h> // 2.3.2
+#include <Adafruit_PCF8574.h>  // 1.1.1
 #define ENABLE_MCP23017
 
 Adafruit_MCP23X17 mcp;

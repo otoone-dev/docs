@@ -1,8 +1,6 @@
 #include "afuue_common.h"
 #include "i2c.h"
-//#include "communicate.h"
 #include "menu.h"
-#include "wavePureSin.h"
 #include "afuue_midi.h"
 
 #ifdef _M5STICKC_H_
@@ -12,11 +10,12 @@
 #include <cfloat>
 
 #if ENABLE_MIDI || ENABLE_BLE_MIDI
-volatile bool midiEnabled = false;
+volatile bool isMidiEnabled = false;
 #endif
 volatile bool isUSBMidiMounted = false;
 
-static Menu menu;
+static M5Canvas canvas(&M5.Lcd);
+static Menu menu(&canvas);
 static Preferences pref;
 const char* version = "AFUUE ver1.1.0.0";
 const uint8_t commVer1 = 0x16;  // 1.6
@@ -32,7 +31,7 @@ volatile bool enablePlay = false;
 volatile const float* currentWaveTable = NULL;
 volatile float phase = 0.0f;
 volatile float currentWaveLevel = 0.0f;
-#define DELAY_BUFFER_SIZE (8000)
+#define DELAY_BUFFER_SIZE (7993)
 volatile float delayBuffer[DELAY_BUFFER_SIZE];
 volatile int delayPos = 0;
 
@@ -44,9 +43,9 @@ float fineTune = 440.0f;
 volatile float delayRate = 0.15f;
 float portamentoRate = 0.99f;
 float keySenseTimeMs = 50.0f;
+int attackSoftness = 0;
 float breathSenseRate = 300.0f;
 float breathZero = 0.0f;
-const float NOTESHIFTTIME_LENGTH = 10.0f;
 volatile float lowPassP = 0.1f;
 volatile float lowPassR = 5.0f;
 volatile float lowPassQ = 0.5f;
@@ -83,7 +82,7 @@ volatile int defaultPressureValue2 = 0;
 volatile int pressureValue = 0;
 volatile int pressureValue2 = 0;
 static int ctrlMode = 0;
-static bool lipBendEnabled = false;
+static bool isLipSensorEnabled = false;
 static int bendCounter = 0;
 const float BENDRATE = -1.0f;
 const float BENDDOWNTIME_LENGTH = 100.0f; //ms
@@ -362,7 +361,7 @@ uint16_t GetKeyData() {
 //---------------------------------
 void BendExec(float td, float vol) {
 #ifdef ENABLE_ADC2
-    if (lipBendEnabled) {
+    if (isLipSensorEnabled) {
       float b2 = (pressureValue2 - (defaultPressureValue2 + breathZero)) / breathSenseRate;
       if (b2 < 0.0f) b2 = 0.0f;
       if (b2 > vol) b2 = vol;
@@ -376,9 +375,7 @@ void BendExec(float td, float vol) {
       else {
         bendNoteShiftTarget = 0.0f;
       }
-      if (lipBendEnabled) {
-        bendNoteShift += (bendNoteShiftTarget - bendNoteShift) * 0.5f;
-      }
+      bendNoteShift += (bendNoteShiftTarget - bendNoteShift) * 0.5f;
     }
 #else
   // LowC + Eb down -------
@@ -484,21 +481,21 @@ void SynthesizerThread(void *pvParameters) {
 
 //-------------------------------------
 void GetMenuParams() {
-    lowPassP = menu.lowPassP / 10.0f;
+    lowPassP = menu.lowPassP * 0.1f;
     lowPassR = menu.lowPassR;
-    lowPassQ = menu.lowPassQ / 10.0f;
+    lowPassQ = menu.lowPassQ * 0.1f;
     if (lowPassQ > 0.0f) {
       lowPassIDQ = 1.0f / (2.0f * lowPassQ);
     }
     else {
       lowPassIDQ = 0.0f;
     }
-#ifdef _M5STICKC_H_
     fineTune = menu.fineTune;
     baseNote = 61 + menu.transpose;
+    attackSoftness = menu.attackSoftness * 0.01f;
     portamentoRate = 1 - (menu.portamentoRate * 0.01f);
     delayRate = menu.delayRate * 0.01f;
-#endif
+
     keySenseTimeMs = menu.keySense;
     breathSenseRate = menu.breathSense;
     breathZero = menu.breathZero;
@@ -589,7 +586,7 @@ void TickThread(void *pvParameters) {
     //気圧センサー
     pressureValue = GetPressureValue(0);
 #ifdef ENABLE_ADC2
-    if (lipBendEnabled) {
+    if (isLipSensorEnabled) {
       //気圧センサー (ピッチベンド用)
       pressureValue2 = GetPressureValue(1);
     }
@@ -599,20 +596,21 @@ void TickThread(void *pvParameters) {
     float vol = (pressureValue - defPressure) / ((2047.0f-breathSenseRate)-defPressure); // 0 - 1
     if (vol < 0.0f) vol = 0.0f;
     if (vol > 1.0f) vol = 1.0f;
-    requestedVolume = pow(vol,2.0f) * (1.0f-bendVolume);
+    vol = pow(vol,2.0f) * (1.0f-bendVolume);
 #else
 #ifdef ENABLE_LPS33
     float vol = (pressureValue - defPressure) / 70000.0f; // 0 - 1
     if (vol < 0.0f) vol = 0.0f;
     if (vol > 1.0f) vol = 1.0f;
-    requestedVolume = pow(vol,2.0f);
+    vol = pow(vol,2.0f);
 #else
     float vol = (pressureValue - defPressure) / breathSenseRate; // 0 - 1
     if (vol < 0.0f) vol = 0.0f;
     if (vol > 1.0f) vol = 1.0f;
-    requestedVolume = pow(vol,2.0f);
+    vol = pow(vol,2.0f);
 #endif
 #endif
+    requestedVolume += (vol - requestedVolume) * (1.0f - attackSoftness);
     //キー操作や加速度センサー
 #ifdef _M5STICKC_H_
     uint16_t mcpKeys = readFromIOExpander();
@@ -654,7 +652,7 @@ void TickThread(void *pvParameters) {
     }
 
 #if ENABLE_MIDI || ENABLE_BLE_MIDI
-    if (midiEnabled) {
+    if (isMidiEnabled) {
       MIDI_Exec();
     }
 #endif
@@ -673,7 +671,7 @@ void MenuThread(void *pvParameters) {
     if ((menu.isEnabled) && (keyData != 0) && (keyData == keyCurrent)) {
       // メニュー用キーリピート
       keyRepeatCount++;
-      if (keyRepeatCount > 3) {
+      if (keyRepeatCount > 15) {
         if (keyRepeatCount % 2 == 0) {
           keyPush = keyData;
         }
@@ -741,7 +739,7 @@ void MenuThread(void *pvParameters) {
         else if (keyF_Push) {
           // Change wave index or MIDI:Send Program Change
 #if ENABLE_MIDI || ENABLE_BLE_MIDI
-          if (midiEnabled) 
+          if (isMidiEnabled) 
           {
             int pgNum = pgNumHigh * 10 + pgNumLow;
             if (pgNum > 0) {
@@ -775,7 +773,7 @@ void MenuThread(void *pvParameters) {
           }
           currentNote = baseNote-1;
 #if ENABLE_MIDI || ENABLE_BLE_MIDI
-          if (midiEnabled) {
+          if (isMidiEnabled) {
             AFUUEMIDI_NoteOn(currentNote, 10);
             delay(baseNote == 61 ? 400 : 200);
             AFUUEMIDI_NoteOff();
@@ -796,7 +794,7 @@ void MenuThread(void *pvParameters) {
           }
           currentNote = baseNote-1;
 #if ENABLE_MIDI || ENABLE_BLE_MIDI
-          if (midiEnabled) {
+          if (isMidiEnabled) {
             AFUUEMIDI_NoteOn(currentNote, 10);
             delay(baseNote == 61 ? 400 : 200);
             AFUUEMIDI_NoteOff();
@@ -809,7 +807,7 @@ void MenuThread(void *pvParameters) {
         }
         else if (keyG_Push) {
           // LowPassQ (Resonance)
-          if (!midiEnabled) {
+          if (!isMidiEnabled) {
             bool ret = menu.SetNextLowPassQ();
             forcePlayTime = FORCEPLAYTIME_LENGTH;
             if (ret) {
@@ -870,19 +868,19 @@ void MenuThread(void *pvParameters) {
         }
 #if ENABLE_MIDI || ENABLE_BLE_MIDI
         else if (keyB_Push) {
-          if (midiEnabled) {
+          if (isMidiEnabled) {
             // Change MIDI Breath Control Mode
             AFUUEMIDI_ChangeBreathControlMode();
           }
         }
         else if (keyLowC_Push) {
-          if (midiEnabled) {
+          if (isMidiEnabled) {
             // MIDI: Add Program Number +1
             pgNumLow  = (pgNumLow + 1) % 10;
           }
         }
         else if (keyEb_Push) {
-          if (midiEnabled) {
+          if (isMidiEnabled) {
             // MIDI: Add Program Number +10
             pgNumHigh  = (pgNumHigh + 1) % 10;
           }
@@ -895,12 +893,12 @@ void MenuThread(void *pvParameters) {
       }
       if (func_Push) {
         ctrlMode = (ctrlMode + 1) % 4; // 0:normal, 1:lip-bend, 2:MIDI-normal, 3:MIDI-lip-bend
-        lipBendEnabled = (ctrlMode % 2);
+        isLipSensorEnabled = (ctrlMode % 2);
 #if ENABLE_MIDI || ENABLE_BLE_MIDI
-        if (midiEnabled) {
+        if (isMidiEnabled) {
           AFUUEMIDI_NoteOff();
         }
-        midiEnabled = (ctrlMode >= 2) || isUSBMidiMounted;
+        isMidiEnabled = (ctrlMode >= 2) || isUSBMidiMounted;
 #endif
         currentNote = baseNote-1;
         forcePlayTime = FORCEPLAYTIME_LENGTH;
@@ -945,7 +943,7 @@ void MIDI_Exec() {
       }
       AFUUEMIDI_BreathControl(v);
       int16_t b = 0;
-      if (lipBendEnabled) {
+      if (isLipSensorEnabled) {
         b = static_cast<int>(bendNoteShift * 8000);
       }
       AFUUEMIDI_PicthBendControl(b);
@@ -1021,7 +1019,7 @@ void createWaveTask(void *pvParameters) {
     uint32_t data;
     xTaskNotifyWait(0, 0, &data, portMAX_DELAY);
 
-    if (enablePlay && !midiEnabled) {
+    if (enablePlay && !isMidiEnabled) {
       uint16_t dac = CreateWave();
       outH = (dac >> 8) & 0xFF; // HHHH HHHH LLLL LLLL
       outL = dac & 0xFF;
@@ -1059,11 +1057,9 @@ void setup() {
 #if ENABLE_MIDI || ENABLE_BLE_MIDI
   isUSBMidiMounted = AFUUEMIDI_Initialize();
   if (isUSBMidiMounted) {
-    midiEnabled = true;
+    isMidiEnabled = true;
   }
 #endif
-  //bat_per_inclination = 100.0F/(bat_percent_max_vol-bat_percent_min_vol);
-  //bat_per_intercept = -1 * bat_percent_min_vol * bat_per_inclination;
 
 #ifdef _M5STICKC_H_
   M5.Lcd.setBrightness(255);
@@ -1079,7 +1075,6 @@ void setup() {
   M5.Lcd.setTextColor(WHITE, BLACK);
   M5.Lcd.setTextSize(1);
   M5.Lcd.setBrightness(127);
-
 #ifdef ENABLE_IMU
   //M5.IMU.Init();
   //M5.IMU.SetAccelFsr(M5.IMU.AFS_2G);
@@ -1096,10 +1091,10 @@ void setup() {
 #ifdef SOUND_TWOPWM
   pinMode(PWMPIN_LOW, OUTPUT);
   pinMode(PWMPIN_HIGH, OUTPUT);
-  ledcSetup(0, 156250, 8); // 156250Hz, 8Bit(256段階)
+  ledcSetup(0, 156250, 8); // 156,250Hz, 8Bit(256段階)
   ledcAttachPin(PWMPIN_LOW, 0);
   ledcWrite(0, 0);
-  ledcSetup(1, 156250, 8); // 156250Hz, 8Bit(256段階)
+  ledcSetup(1, 156250, 8); // 156,250Hz, 8Bit(256段階)
   ledcAttachPin(PWMPIN_HIGH, 1);
   ledcWrite(1, 0);
 #else
@@ -1117,7 +1112,7 @@ void setup() {
   bool i2cError = false;
 
 #ifdef _M5STICKC_H_
-  M5.Lcd.fillScreen(BLACK);
+  M5.Lcd.fillScreen(TFT_BLACK);
   M5.Lcd.setCursor(10, 10);
   DrawCenterString("Check IOExpander...", 67, 80, 2);
   int retIOEXP = setupIOExpander();
@@ -1224,7 +1219,7 @@ void setup() {
   BeginPreferences(); {
     menu.Initialize(pref);
   } EndPreferences();
-  
+
   GetMenuParams();
   sinTable = menu.waveData.GetSinTable();
   tanhTable = menu.waveData.GetTanhTable();
@@ -1253,7 +1248,7 @@ void setup() {
   xTaskCreatePinnedToCore(SynthesizerThread, "SynthesizerThread", 2048, NULL, 2, NULL, CORE0);
 
   xTaskCreatePinnedToCore(TickThread, "TickThread", 2048, NULL, 3, NULL, CORE0);
-  xTaskCreatePinnedToCore(MenuThread, "MenuThread", 2048, NULL, 1, NULL, CORE0);
+  xTaskCreatePinnedToCore(MenuThread, "MenuThread", 4096, NULL, 1, NULL, CORE0);
 
   enablePlay = true;
 }
@@ -1263,7 +1258,7 @@ void loop() {
   // Core0 は波形生成に専念している, loop は Core1
 #ifdef _STAMPS3_H_
   int br = (int)(245 * requestedVolume) + 10;
-  if (!lipBendEnabled) {
+  if (!isLipSensorEnabled) {
     SetLedColor(0, br, 0);
   }
   else {

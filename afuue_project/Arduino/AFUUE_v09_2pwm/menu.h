@@ -7,15 +7,16 @@
 #define WAVE_MAX (16)
 
 struct WaveSettings {
-  bool isAccControl = false;
-  int fineTune = 442;
-  int transpose = 0;
-  int portamentoRate = 30;
-  int delayRate = 15;
+  bool isAccControl = false; // (未対応)加速度センサーを使用するかどうか
+  int fineTune = 442; // A3(ラ) の周波数 440Hz とか 442Hz とか。
+  int transpose = 0;  // 移調 0:C管 +3(-9):Eb管
+  int attackSoftness = 0; // 吹き始めの音量立ち上がりの柔らかさ (0:一番硬い) で数字が増えるほど柔らかくなる
+  int portamentoRate = 30; // ポルタメント。音の切り替わりを滑らかにする。0 で即時変更。数字が増えるほどゆっくりになる。
+  int delayRate = 15; // ディレイのかかり具合。0 でディレイ無し。
 
-  int lowPassP = 5; // 音量に対してどこのあたりでフィルタがかかるか。1/10 で 0.0-1.0
-  int lowPassR = 5; // 音量に対してどれくらいの範囲でフィルタがかかるか 1-30
-  int lowPassQ = 0; // Q factor 0 でローパス無効
+  int lowPassP = 5; // 音量に対してどこのあたりでフィルタがかかるか 5 が音量中レベル、1 は音量最小、10 が音量MAX
+  int lowPassR = 5; // 音量に対してどれくらいの範囲でフィルタがかかるか(フィルタの立ち上がりの急峻度) 1-30
+  int lowPassQ = 0; // Q factor(1/10単位) 0 でローパス無効、5 で強調されないローパス、5 より大きくなると高い周波数が元の波形より強調されていきます。
 };
 
 class Menu {
@@ -31,6 +32,8 @@ private:
   void DisplayMenu();
   void DisplayPerform(bool onlyRefreshTime = false);
 
+  M5Canvas* canvas;
+
   int cursorPos = 0;
   bool isRtcChanged = false;
   int hour = 0;
@@ -40,7 +43,7 @@ private:
   int testNote = 60;
 
 public:
-  Menu();
+  Menu(M5Canvas* _canvas);
   void Initialize(Preferences pref);
   void SetNextWave();
   bool SetNextLowPassQ();
@@ -59,6 +62,7 @@ public:
 
   int fineTune = 440;
   int transpose = 0;
+  int attackSoftness = 0;
   int portamentoRate = 0;
   int delayRate = 0;
   int keySense = 0;

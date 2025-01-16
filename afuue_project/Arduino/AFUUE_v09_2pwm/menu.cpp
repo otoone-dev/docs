@@ -4,18 +4,14 @@
 #include "wavedata.h"
 #include "menu.h"
 
-const float bat_percent_max_vol = 4.0f;     // バッテリー残量の最大電圧
-const float bat_percent_min_vol = 3.3f;     // バッテリー残量の最小電圧
-static float bat_per_inclination = 0.0f;        // バッテリー残量のパーセンテージ式の傾き
-static float bat_per_intercept   = 0.0f;        // バッテリー残量のパーセンテージ式の切片
-static float bat_per             = 0.0f;        // バッテリー残量のパーセンテージ
-static float bat_vol             = 0.0f;        // バッテリー電圧
+static float bat_per = 0.0f;
 
 enum {
   MENUINDEX_TRANSPOSE,
   MENUINDEX_LOWPASSP,
   MENUINDEX_LOWPASSR,
   MENUINDEX_LOWPASSQ,
+  MENUINDEX_ATTACK,
   MENUINDEX_FINETUNE,
   MENUINDEX_PORTAMENTO,
   MENUINDEX_DELAY,
@@ -30,9 +26,8 @@ enum {
 };
 
 //--------------------------
-Menu::Menu() {
-  bat_per_inclination = 100.0f/(bat_percent_max_vol-bat_percent_min_vol);
-  bat_per_intercept = -bat_percent_min_vol * bat_per_inclination;
+Menu::Menu(M5Canvas* _canvas) {
+  canvas = _canvas;
 }
 
 //--------------------------
@@ -44,6 +39,9 @@ void Menu::Initialize(Preferences pref) {
     pref.putInt("AfuueVer", AFUUE_VER);
   }
   LoadPreferences(pref);
+
+  canvas->setColorDepth(16);
+  canvas->createSprite(135, 240);
 }
 
 //--------------------------
@@ -61,6 +59,8 @@ void Menu::SavePreferences(Preferences pref) {
     pref.putInt(s, waveSettings[i].fineTune);
     sprintf(s, "Transpose%d", i);
     pref.putInt(s, waveSettings[i].transpose);
+    sprintf(s, "AttackSoftness%d", i);
+    pref.putInt(s, waveSettings[i].attackSoftness);
     sprintf(s, "PortamentoRate%d", i);
     pref.putInt(s, waveSettings[i].portamentoRate);
     sprintf(s, "DelayRate%d", i);
@@ -88,6 +88,7 @@ void Menu::ReadPlaySettings(int widx) {
     //isAccControl = waveSettings[widx].isAccControl;
     fineTune = waveSettings[widx].fineTune;
     transpose = waveSettings[widx].transpose;
+    attackSoftness = waveSettings[widx].attackSoftness;
     portamentoRate = waveSettings[widx].portamentoRate;
     delayRate = waveSettings[widx].delayRate;
 
@@ -101,6 +102,7 @@ void Menu::WritePlaySettings(int widx) {
     //waveSettings[widx].isAccControl = isAccControl;
     waveSettings[widx].fineTune = fineTune;
     waveSettings[widx].transpose = transpose;
+    waveSettings[widx].attackSoftness = attackSoftness;
     waveSettings[widx].portamentoRate = portamentoRate;
     waveSettings[widx].delayRate = delayRate;
 
@@ -150,8 +152,10 @@ void Menu::LoadPreferences(Preferences pref) {
     waveSettings[i].fineTune = pref.getInt(s, 442);
     sprintf(s, "Transpose%d", i);
     waveSettings[i].transpose = pref.getInt(s, waveData.GetWaveTranspose(i));
+    sprintf(s, "AttackSoftness%d", i);
+    waveSettings[i].attackSoftness = pref.getInt(s, waveData.GetWaveAttackSoftness(i));
     sprintf(s, "PortamentoRate%d", i);
-    waveSettings[i].portamentoRate = pref.getInt(s, 15);
+    waveSettings[i].portamentoRate = pref.getInt(s, waveData.GetWavePortamento(i));
     sprintf(s, "DelayRate%d", i);
     waveSettings[i].delayRate = pref.getInt(s, 15);
 
@@ -222,8 +226,11 @@ bool Menu::Update(Preferences pref, uint16_t key, int pressure) {
 #ifdef ENABLE_RTC
       WriteRtc();
 #endif
+      canvas->deleteSprite();
       M5.Lcd.setBrightness(127);
       M5.Lcd.setRotation(0);
+      canvas->setColorDepth(16);
+      canvas->createSprite(135, 240);
       isEnabled = false;
       ReadPlaySettings(waveIndex);
     }
@@ -249,8 +256,11 @@ bool Menu::Update(Preferences pref, uint16_t key, int pressure) {
 #ifdef ENABLE_RTC
       ReadRtc();
 #endif
+      canvas->deleteSprite();
       M5.Lcd.setBrightness(255);
       M5.Lcd.setRotation(3);
+      canvas->setColorDepth(16);
+      canvas->createSprite(240, 135);
       isEnabled = true;
     }
     else {
@@ -291,6 +301,10 @@ bool Menu::Update(Preferences pref, uint16_t key, int pressure) {
         case MENUINDEX_LOWPASSQ:
           lowPassQ--;
           if (lowPassQ < 0) lowPassQ = 0;
+          break;
+        case MENUINDEX_ATTACK:
+          attackSoftness--;
+          if (attackSoftness < 0) attackSoftness = 0;
           break;
         case MENUINDEX_FINETUNE:
           fineTune--;
@@ -356,6 +370,10 @@ bool Menu::Update(Preferences pref, uint16_t key, int pressure) {
         case MENUINDEX_LOWPASSQ:
           lowPassQ++;
           if (lowPassQ > 50) lowPassQ = 50;
+          break;
+        case MENUINDEX_ATTACK:
+          attackSoftness++;
+          if (attackSoftness > 99) attackSoftness = 99;
           break;
         case MENUINDEX_FINETUNE:
           fineTune++;
@@ -434,8 +452,6 @@ bool Menu::Update(Preferences pref, uint16_t key, int pressure) {
 //--------------------------
 void Menu::DrawBattery(int x, int y) {
 #ifdef _M5STICKC_H_
-  //bat_vol = M5.Axp.GetVbatData() * 1.1 / 1000;   // V
-  //bat_per = bat_per_inclination * bat_vol + bat_per_intercept;    // %
   bat_per = M5.Power.getBatteryLevel();
   if(bat_per > 100.0f){
       bat_per = 100.0f;
@@ -444,19 +460,19 @@ void Menu::DrawBattery(int x, int y) {
   if (bat_per < 25.0f) {
     color = RED;
   }
-  M5.Lcd.fillRect(x - 4, y + 1, 3, 5, color);
-  M5.Lcd.fillRect(x - 2, y - 4, 24, 15, color);
-  M5.Lcd.fillRect(x, y - 2, 20, 11, BLACK);
+  canvas->fillRect(x - 4, y + 1, 3, 5, color);
+  canvas->fillRect(x - 2, y - 4, 24, 15, color);
+  canvas->fillRect(x, y - 2, 20, 11, BLACK);
 
-  M5.Lcd.fillRect(x, y - 2, 20, 11, BLACK);
+  canvas->fillRect(x, y - 2, 20, 11, BLACK);
   if (bat_per >= 75.0f) {
-    M5.Lcd.fillRect(x + 2, y, 4, 7, WHITE);
+    canvas->fillRect(x + 2, y, 4, 7, WHITE);
   }
   if (bat_per >= 50.0f) {
-    M5.Lcd.fillRect(x + 8, y, 4, 7, WHITE);
+    canvas->fillRect(x + 8, y, 4, 7, WHITE);
   }
   if (bat_per >= 25.0f) {
-    M5.Lcd.fillRect(x + 14, y, 4, 7, WHITE);
+    canvas->fillRect(x + 14, y, 4, 7, WHITE);
   }
 #endif
 }
@@ -484,7 +500,7 @@ void Menu::DrawString(const char* str, int sx, int sy) {
     if ((c >= 0x20) && (c <= 0x7F)) {
       p = FontTable[c - 0x20];
     }
-    M5.Lcd.drawBitmap(x, y, 6*2, 8*2, p);
+    canvas->pushImage(x, y, 6*2, 8*2, p);
     x += 6*2;
     ps++;
   }
@@ -540,7 +556,7 @@ std::string Menu::NoteNumberToStr() {
 //--------------------------
 void Menu::DisplayMenu() {
 #ifdef _M5STICKC_H_
-  //M5.Lcd.fillScreen(BLACK);
+  //canvas->fillScreen(BLACK);
   DrawString("[AFUUE Settings]", 10, 10);
   int viewPos = 0;
   int i = 0;
@@ -551,6 +567,7 @@ void Menu::DisplayMenu() {
   DisplayLine(viewPos, (cursorPos == i), "LP_Pos", std::to_string(lowPassP)); viewPos++; i++;
   DisplayLine(viewPos, (cursorPos == i), "LP_Rate", std::to_string(lowPassR)); viewPos++; i++;
   DisplayLine(viewPos, (cursorPos == i), "LP_Power", std::to_string(lowPassQ)); viewPos++; i++;
+  DisplayLine(viewPos, (cursorPos == i), "Attack", std::to_string(attackSoftness)); viewPos++; i++;
   DisplayLine(viewPos, (cursorPos == i), "FineTune", std::to_string(fineTune)); viewPos++; i++;
   DisplayLine(viewPos, (cursorPos == i), "Portamnto", std::to_string(portamentoRate)); viewPos++; i++;
   DisplayLine(viewPos, (cursorPos == i), "Delay", std::to_string(delayRate)); viewPos++; i++;
@@ -568,8 +585,8 @@ void Menu::DisplayMenu() {
 void Menu::DisplayPerform(bool onlyRefreshTime) {
 #ifdef _M5STICKC_H_
   if (onlyRefreshTime == false) {
-    //M5.Lcd.fillScreen(BLACK);
-    M5.Lcd.drawBitmap(0, 240-115, 120, 115, bitmap_logo);
+    //canvas->fillScreen(BLACK);
+    canvas->pushImage(0, 240-115, 120, 115, bitmap_logo);
     DrawString(waveData.GetWaveName(waveIndex), 10, 70);
     DrawString(TransposeToStr().c_str(), 10, 100);
   }
@@ -592,13 +609,17 @@ void Menu::DisplayPerform(bool onlyRefreshTime) {
 
 //--------------------------
 void Menu::Display() {
-  M5.Lcd.startWrite();
-  M5.Lcd.fillScreen(BLACK);
+#ifdef _M5STICKC_H_
+  canvas->fillScreen(TFT_BLACK);
+
   if (isEnabled) {
     DisplayMenu();
   }
   else {
+    ReadRtc();
     DisplayPerform();
   }
-  M5.Lcd.endWrite();
+
+  canvas->pushSprite(0, 0);
+#endif
 }
