@@ -1,5 +1,4 @@
-#ifndef ASCII_FONTS_H
-#define ASCII_FONTS_H
+#pragma once
 
 // (ascii_fonts)
 const unsigned short font_0x20[192] = {
@@ -1829,5 +1828,3 @@ const unsigned short* FontTable[] = {
   font_0x7e,
   font_0x7f,
 };
-
-#endif //ASCII_FONTS_H

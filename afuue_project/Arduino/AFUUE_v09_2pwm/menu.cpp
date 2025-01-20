@@ -1,4 +1,5 @@
 #include "afuue_common.h"
+#include "afuue_midi.h"
 #include "logo.h"
 #include "ascii_fonts.h"
 #include "wavedata.h"
@@ -39,9 +40,10 @@ void Menu::Initialize(Preferences pref) {
     pref.putInt("AfuueVer", AFUUE_VER);
   }
   LoadPreferences(pref);
-
+#ifdef _M5STICKC_H_
   canvas->setColorDepth(16);
-  canvas->createSprite(135, 240);
+  canvas->createSprite(DISPLAY_HEIGHT, DISPLAY_WIDTH);
+#endif
 }
 
 //--------------------------
@@ -217,8 +219,8 @@ bool Menu::SetNextLowPassQ() {
 }
 
 //--------------------------
-bool Menu::Update(Preferences pref, uint16_t key, int pressure) {
 #ifdef _M5STICKC_H_
+bool Menu::Update(Preferences pref, uint16_t key, int pressure) {
   M5.update();
   if (M5.BtnA.pressedFor(100)) {
     if (isEnabled) {
@@ -230,7 +232,7 @@ bool Menu::Update(Preferences pref, uint16_t key, int pressure) {
       M5.Lcd.setBrightness(127);
       M5.Lcd.setRotation(0);
       canvas->setColorDepth(16);
-      canvas->createSprite(135, 240);
+      canvas->createSprite(DISPLAY_HEIGHT, DISPLAY_WIDTH);
       isEnabled = false;
       ReadPlaySettings(waveIndex);
     }
@@ -260,7 +262,7 @@ bool Menu::Update(Preferences pref, uint16_t key, int pressure) {
       M5.Lcd.setBrightness(255);
       M5.Lcd.setRotation(3);
       canvas->setColorDepth(16);
-      canvas->createSprite(240, 135);
+      canvas->createSprite(DISPLAY_WIDTH, DISPLAY_HEIGHT);
       isEnabled = true;
     }
     else {
@@ -276,6 +278,7 @@ bool Menu::Update(Preferences pref, uint16_t key, int pressure) {
         // この波形のパラメータを出荷時状態に戻す
         ResetPlaySettings(waveIndex);
         cursorPos = 0;
+        forcePlayTime = FORCEPLAYTIME_LENGTH * 3;
         forcePlayNote = 84;
         Display();
       }
@@ -346,6 +349,7 @@ bool Menu::Update(Preferences pref, uint16_t key, int pressure) {
           testNote--;
           if (testNote < 12) testNote = 12;
           forcePlayNote = testNote;
+          forcePlayTime = FORCEPLAYTIME_LENGTH;
           break;
       }
       if (cursorPos != MENUINDEX_PUSHEDKEY) {
@@ -415,6 +419,7 @@ bool Menu::Update(Preferences pref, uint16_t key, int pressure) {
           testNote++;
           if (testNote > 96) testNote = 96;
           forcePlayNote = testNote;
+          forcePlayTime = FORCEPLAYTIME_LENGTH;
           break;
       }
       if (cursorPos != MENUINDEX_PUSHEDKEY) {
@@ -445,9 +450,199 @@ bool Menu::Update(Preferences pref, uint16_t key, int pressure) {
     }
 #endif
   }
-#endif // _M5STICKC_H_
   return false;
 }
+#endif // _M5STICKC_H_
+
+//--------------------------
+#ifdef _STAMPS3_H_
+bool Menu::Update2R(Preferences pref, volatile WaveInfo* pInfo, const KeySystem* pKey) {
+  M5.update();
+  static int pgNumHigh = 0;
+  static int pgNumLow = 0;
+
+  if (pKey->IsKeyLowCs_Down() && pKey->IsKeyGs_Down()) {
+    // Config
+    if ((pKey->IsKeyLowC_Down() && pKey->IsKeyEb_Push()) || (pKey->IsKeyEb_Down() && pKey->IsKeyLowC_Push())) {
+      // この波形のパラメータを出荷時状態に戻す
+      ResetPlaySettings(waveIndex);
+      forcePlayTime = FORCEPLAYTIME_LENGTH * 3;
+      forcePlayNote = 84;
+      return true;
+    }
+    else if (pKey->IsKeyF_Push()) {
+      // Change wave index or MIDI:Send Program Change
+#if ENABLE_MIDI || ENABLE_BLE_MIDI
+      if (isMidiEnabled) 
+      {
+        int pgNum = pgNumHigh * 10 + pgNumLow;
+        if (pgNum > 0) {
+          AFUUEMIDI_NoteOff();
+          delay(500);
+          AFUUEMIDI_ProgramChange(pgNum-1);
+          pgNumHigh = 0;
+          pgNumLow = 0;
+        }
+      }
+      else
+#endif
+      {
+        SetNextWave();
+        forcePlayTime = FORCEPLAYTIME_LENGTH;
+        forcePlayNote = pInfo->baseNote - 1;
+        return true;
+      }
+    }
+    else if (pKey->IsKeyD_Push()) {
+      // Transpose--
+      if (pKey->IsKeyE_Down()) {
+        pInfo->baseNote = 61;
+      } else {
+        pInfo->baseNote--;
+        if (pInfo->baseNote < 61-12) pInfo->baseNote = 61-12;
+      }
+#if ENABLE_MIDI || ENABLE_BLE_MIDI
+      if (isMidiEnabled) {
+        AFUUEMIDI_NoteOn(pInfo->baseNote-1, 10);
+        delay(static_cast<int>(pInfo->baseNote == 61 ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH));
+        AFUUEMIDI_NoteOff();
+      }
+      else
+#endif
+      {
+        forcePlayTime = pInfo->baseNote == 61 ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH;
+        forcePlayNote = pInfo->baseNote - 1;
+        return true;
+      }
+    }
+    else if (pKey->IsKeyE_Push()) {
+      // Transpose++
+      if (pKey->IsKeyD_Down()) {
+        pInfo->baseNote = 61;
+      } else {
+        pInfo->baseNote++;
+        if (pInfo->baseNote > 61+12) pInfo->baseNote = 61+12;
+      }
+#if ENABLE_MIDI || ENABLE_BLE_MIDI
+      if (isMidiEnabled) {
+        AFUUEMIDI_NoteOn(pInfo->baseNote-1, 10);
+        delay(static_cast<int>(pInfo->baseNote == 61 ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH));
+        AFUUEMIDI_NoteOff();
+      }
+      else
+#endif
+      {
+        forcePlayTime = pInfo->baseNote == 61 ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH;
+        forcePlayNote = pInfo->baseNote - 1;
+        return true;
+      }
+    }
+    else if (pKey->IsKeyG_Push()) {
+      // LowPassQ (Resonance)
+      if (!isMidiEnabled) {
+        bool ret = SetNextLowPassQ();
+        forcePlayTime = ret ? FORCEPLAYTIME_LENGTH * 2 : FORCEPLAYTIME_LENGTH;
+        forcePlayNote = pInfo->baseNote - 1;
+        return true;
+      }
+    }
+    else if (pKey->IsKeyA_Push()) {
+      // Breath sensitivity
+      breathSense -= 50;
+      if (breathSense < 100) {
+        breathSense = 350;
+      }
+      forcePlayTime = (breathSense == 200) ? FORCEPLAYTIME_LENGTH * 2 : FORCEPLAYTIME_LENGTH;
+      forcePlayNote = pInfo->baseNote - 1;
+      return true;
+    }
+    else if (pKey->IsKeyDown_Push()) {
+      // Fine Tune
+      switch ((int)pInfo->fineTune) {
+        default:
+          pInfo->fineTune = 440.0f;
+          break;
+        case 440:
+          pInfo->fineTune = 442.0f;
+          break;
+        case 442:
+          pInfo->fineTune = 438.0f;
+          break;
+      }
+      forcePlayTime = (pInfo->fineTune == 440) ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH;
+      forcePlayNote = pInfo->baseNote - 1;
+      return true;
+    }
+    else if (pKey->IsKeyUp_Push()) {
+      // Delay Rate
+      switch ((int)(pInfo->delayRate*100)) {
+        default:
+          pInfo->delayRate = 0.15f;
+          break;
+        case 14:
+        case 15:
+          pInfo->delayRate = 0.3f;
+          break;
+        case 29:
+        case 30:
+          pInfo->delayRate = 0.0f;
+          break;
+      }
+      forcePlayTime = (pInfo->delayRate == 0.15f) ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH;
+      forcePlayNote = pInfo->baseNote - 1;
+      return true;
+    }
+#if ENABLE_MIDI || ENABLE_BLE_MIDI
+    else if (pKey->IsKeyB_Push()) {
+      if (isMidiEnabled) {
+        // Change MIDI Breath Control Mode
+        AFUUEMIDI_ChangeBreathControlMode();
+      }
+    }
+    else if (pKey->IsKeyLowC_Push()) {
+      if (isMidiEnabled) {
+        // MIDI: Add Program Number +1
+        pgNumLow  = (pgNumLow + 1) % 10;
+      }
+    }
+    else if (pKey->IsKeyEb_Push()) {
+      if (isMidiEnabled) {
+        // MIDI: Add Program Number +10
+        pgNumHigh  = (pgNumHigh + 1) % 10;
+      }
+    }
+#endif
+  }
+  else {
+    pgNumHigh = 0;
+    pgNumLow = 0;
+  }
+  if (pKey->IsFuncBtn_Push()) {
+    ctrlMode = (ctrlMode + 1) % 4; // 0:normal, 1:lip-bend, 2:MIDI-normal, 3:MIDI-lip-bend
+    isLipSensorEnabled = (ctrlMode % 2);
+#if ENABLE_MIDI || ENABLE_BLE_MIDI
+    if (isMidiEnabled) {
+      AFUUEMIDI_NoteOff();
+    }
+    isMidiEnabled = (ctrlMode >= 2) || isUSBMidiMounted;
+#endif
+    forcePlayNote = pInfo->baseNote-1;
+    forcePlayTime = FORCEPLAYTIME_LENGTH;
+    return true;
+  }
+  if (pKey->IsFuncBtn_Down()) {
+    funcDownCount++;
+    if (funcDownCount >= 20*5) {
+      factoryResetRequested = true;
+      return true;
+    }
+  }
+  else {
+    funcDownCount = 0;
+  }
+  return false;
+}
+#endif
 
 //--------------------------
 void Menu::DrawBattery(int x, int y) {
@@ -509,19 +704,39 @@ void Menu::DrawString(const char* str, int sx, int sy) {
 
 //--------------------------
 void Menu::DisplayLine(int line, bool selected, const std::string& title, const std::string& value) {
+#ifdef _M5STICKC_H_
   if ((line < 0)||(line > 3)) return;
   
-  std::string s = "  ";
-  if (selected) {
-    s = "> ";
+  std::string s = "";
+
+  if (DISPLAY_WIDTH == 128) {
+    // M5AtomS3
+    if (!selected) {
+      return;
+    }
+    s += "\n";
+    s += title;
+    s += "\n";
+    s += "\n";
+    s += " : ";
+    s += value;
+    DrawString(s.c_str(), 10, 10 + 20);
   }
-  s += title;
-  while (s.length() < 11) {
-    s += " ";
+  else {
+    // M5StickC Plus
+    s += "  ";
+    if (selected) {
+      s = "> ";
+    }
+    s += title;
+    while (s.length() < 11) {
+      s += " ";
+    }
+    s += ": ";
+    s += value;
+    DrawString(s.c_str(), 10, 10 + 20*(line+2));
   }
-  s += ": ";
-  s += value;
-  DrawString(s.c_str(), 10, 10 + 20*(line+2));
+#endif
 }
 
 //--------------------------
@@ -556,8 +771,13 @@ std::string Menu::NoteNumberToStr() {
 //--------------------------
 void Menu::DisplayMenu() {
 #ifdef _M5STICKC_H_
-  //canvas->fillScreen(BLACK);
-  DrawString("[AFUUE Settings]", 10, 10);
+  if (DISPLAY_WIDTH == 128) {
+    // M5AtomS3
+    DrawString("[Settings]", 10, 10);
+  } else {
+    // M5StickC Plus
+    DrawString("[AFUUE Settings]", 10, 10);
+  }
   int viewPos = 0;
   int i = 0;
   if (cursorPos >= 4) {
@@ -585,8 +805,9 @@ void Menu::DisplayMenu() {
 void Menu::DisplayPerform(bool onlyRefreshTime) {
 #ifdef _M5STICKC_H_
   if (onlyRefreshTime == false) {
-    //canvas->fillScreen(BLACK);
-    canvas->pushImage(0, 240-115, 120, 115, bitmap_logo);
+    if (DISPLAY_HEIGHT > 128) {
+      canvas->pushImage(0, 240-115, 120, 115, bitmap_logo);
+    }
     DrawString(waveData.GetWaveName(waveIndex), 10, 70);
     DrawString(TransposeToStr().c_str(), 10, 100);
   }

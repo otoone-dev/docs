@@ -1,6 +1,10 @@
 #include "afuue_common.h"
 #include "communicate.h"
 
+const char* version = "AFUUE ver1.1.0.0";
+const uint8_t commVer1 = 0x16;  // 1.6
+const uint8_t commVer2 = 0x02;  // protocolVer = 2
+
 //---------------------------------
 int ChangeSigned(int data) {
     if (data < 64)

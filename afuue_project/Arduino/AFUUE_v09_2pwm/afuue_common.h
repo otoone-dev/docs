@@ -1,5 +1,4 @@
-#ifndef AFUUE_COMMON_H
-#define AFUUE_COMMON_H
+#pragma once
 
 #include <WiFi.h>
 #include <Wire.h>
@@ -7,10 +6,10 @@
 #include <M5Unified.h>
 
 //#define AFUUE_VER (109) // 8Bit-DAC ADC-Direct    (AFUUE2 First)
-#define AFUUE_VER (110) // 16Bit-PWM ADC-MCP3425  (AFUUE2 Second)
-//#define AFUUE_VER (112)   // 16Bit-PWM LPS33      (AFUUE2 Test)
-//#define AFUUE_VER (111) // 16Bit-PWM ADCx2        (AFUUE2R First)
-//#define AFUUE_VER (113)   // 16Bit-PWM LPS33      (AFUUE2R Second)
+//#define AFUUE_VER (110) // 16Bit-PWM ADC-MCP3425  (AFUUE2 Second)
+//#define AFUUE_VER (112) // 16Bit-PWM LPS33        (AFUUE2 Test)
+#define AFUUE_VER (111) // 16Bit-PWM ADCx2        (AFUUE2R First)
+//#define AFUUE_VER (113) // 16Bit-PWM LPS33x2      (AFUUE2R Second)
 
 /*
 Arduino IDE 2.3.4
@@ -82,6 +81,10 @@ USB-MIDI についてはこちらの記事を参考にさせていただきま�
 #ifdef _M5STICKC_H_
 // M5StickC Plus ------------
 #define _M5DISPLAY_H_
+#define DISPLAY_WIDTH (240) // M5StickC Plus
+#define DISPLAY_HEIGHT (135)
+//#define DISPLAY_WIDTH (128) // M5AtomS3
+//#define DISPLAY_HEIGHT (128)
 #define ENABLE_IMU
 #ifdef SOUND_TWOPWM
 #define PWMPIN_LOW (0)
@@ -135,6 +138,14 @@ USB-MIDI についてはこちらの記事を参考にさせていただきま�
 #endif
 
 
+
+#define CLOCK_DIVIDER (80)
+#define TIMER_ALARM (40)
+//#define SAMPLING_RATE (20000) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (80*50) = 20kHz
+#define SAMPLING_RATE (25000.0f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (80*40) = 25kHz
+//#define SAMPLING_RATE (32000) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (50*50) = 32kHz
+//#define SAMPLING_RATE (48019.2f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (49*34) = 48kHz
+
 //#define ENABLE_COMMUNICATETOOL (0)
 #define ENABLE_BLE_MIDI (0)
 #define ENABLE_MIDI (1)
@@ -142,5 +153,3 @@ USB-MIDI についてはこちらの記事を参考にさせていただきま�
 
 extern int baseNote;
 extern void SerialPrintLn(const char* text);
-
-#endif // AFUUE_COMMON_H

@@ -1,3 +1,5 @@
+#pragma once
+
 // (120, 115)
 const unsigned short bitmap_logo[13800] =
 {

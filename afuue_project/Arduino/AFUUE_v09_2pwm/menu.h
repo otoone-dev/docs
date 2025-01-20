@@ -1,11 +1,27 @@
-#ifndef MENU_H
-#define MENU_H
+#pragma once
+
 #include <string>
 #include <Preferences.h>
 #include "wavedata.h"
+#include "key_system.h"
 
 #define WAVE_MAX (16)
+#define FORCEPLAYTIME_LENGTH (200.0f) //ms
 
+// こちらは再生用
+struct WaveInfo {
+  float lowPassP = 0.1f;
+  float lowPassR = 5.0f;
+  float lowPassQ = 0.5f;
+  float lowPassIDQ = 1.0f / (2 * lowPassQ);
+
+  int baseNote = 61; // 49 61 73
+  float fineTune = 440.0f;
+  float delayRate = 0.15f;
+  float portamentoRate = 0.99f;
+};
+
+// こちらは保存用
 struct WaveSettings {
   bool isAccControl = false; // (未対応)加速度センサーを使用するかどうか
   int fineTune = 442; // A3(ラ) の周波数 440Hz とか 442Hz とか。
@@ -20,35 +36,18 @@ struct WaveSettings {
 };
 
 class Menu {
-private:
-  void WritePlaySettings(int widx);
-  void ReadPlaySettings(int widx);
-  void WriteRtc();
-  void ReadRtc();
-  std::string TransposeToStr();
-  std::string TimeToStr();
-  std::string NoteNumberToStr();
-  void DisplayLine(int line, bool selected, const std::string& title, const std::string& value);
-  void DisplayMenu();
-  void DisplayPerform(bool onlyRefreshTime = false);
-
-  M5Canvas* canvas;
-
-  int cursorPos = 0;
-  bool isRtcChanged = false;
-  int hour = 0;
-  int minute = 0;
-  std::string currentKey = "";
-  int currentPressure = 0;
-  int testNote = 60;
-
 public:
   Menu(M5Canvas* _canvas);
   void Initialize(Preferences pref);
   void SetNextWave();
   bool SetNextLowPassQ();
   void ResetPlaySettings(int widx = -1);
+#ifdef _M5STICKC_H_
   bool Update(Preferences pref, uint16_t key, int pressure);
+#endif
+#ifdef _STAMPS3_H_
+  bool Update2R(Preferences pref, volatile WaveInfo* pInfo, const KeySystem* pKey);
+#endif
   void SavePreferences(Preferences pref);
   void LoadPreferences(Preferences pref);
   void Display();
@@ -75,7 +74,37 @@ public:
 
   WaveSettings waveSettings[WAVE_MAX];
   int forcePlayNote = -1;
+  int forcePlayTime = 0;
+
+  int ctrlMode = 0;
+  bool isLipSensorEnabled = false;
+  bool isMidiEnabled = false;
+  bool isUSBMidiMounted = false;
+
+private:
+  void WritePlaySettings(int widx);
+  void ReadPlaySettings(int widx);
+  void WriteRtc();
+  void ReadRtc();
+  std::string TransposeToStr();
+  std::string TimeToStr();
+  std::string NoteNumberToStr();
+  void DisplayLine(int line, bool selected, const std::string& title, const std::string& value);
+  void DisplayMenu();
+  void DisplayPerform(bool onlyRefreshTime = false);
+
+  M5Canvas* canvas;
+
+  int cursorPos = 0;
+  bool isRtcChanged = false;
+  int hour = 0;
+  int minute = 0;
+  std::string currentKey = "";
+  int currentPressure = 0;
+  int testNote = 60;
+
+#ifdef _STAMPS3_H_
+  int funcDownCount = 0;
+#endif
 };
 
-
-#endif //MENU_H

@@ -2,8 +2,7 @@
  * https://qazsedcftf.blogspot.com/2018/12/esp32arduinoi2cmcp23017.html
  * より拝借
  */
-#ifndef IOEXPANDER_H
-#define IOEXPANDER_H
+#pragma once
 
 #include <Wire.h>
 #include <Adafruit_MCP23X17.h> // 2.3.2
@@ -81,5 +80,3 @@ uint16_t readFromIOExpander() {
   }
   return 0;
 }
-
-#endif //IOEXPANDER_H

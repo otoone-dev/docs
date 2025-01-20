@@ -1,5 +1,4 @@
-#ifndef WAVEDATA_H
-#define WAVEDATA_H
+#pragma once
 
 class WaveData {
 public:
@@ -13,4 +12,3 @@ public:
   const float* GetTanhTable() const;
 };
 
-#endif //WAVEDATA_H
