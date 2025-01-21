@@ -414,9 +414,8 @@ void MenuThread(void *pvParameters) {
           waveGenerator.currentWaveTable = menu.waveData.GetWaveTable(menu.waveIndex);
           menu.SavePreferences(pref);
         } EndPreferences();
-        GetMenuParams();
       }
-      if (menu.isEnabled == false) {
+      if (menu.isEnabled == false && !result) {
         // perform mode
       } else {
         // menu mode
