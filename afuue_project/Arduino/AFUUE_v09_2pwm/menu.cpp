@@ -32,22 +32,54 @@ Menu::Menu(M5Canvas* _canvas) {
 }
 
 //--------------------------
-void Menu::Initialize(Preferences pref) {
-  //pref.clear(); // CLEAR ALL FLASH MEMORY
-  int ver = pref.getInt("AfuueVer", -1);
-  if (ver != AFUUE_VER) {
-    pref.clear(); // CLEAR ALL FLASH MEMORY
-    pref.putInt("AfuueVer", AFUUE_VER);
-  }
-  LoadPreferences(pref);
+// 初期化
+void Menu::Initialize() {
+  BeginPreferences();
+  {
+    //pref.clear(); // CLEAR ALL FLASH MEMORY
+    int ver = pref.getInt("AfuueVer", -1);
+    if (ver != AFUUE_VER) {
+      pref.clear(); // CLEAR ALL FLASH MEMORY
+      pref.putInt("AfuueVer", AFUUE_VER);
+    }
+    LoadPreferences();
+  } EndPreferences();
 #ifdef _M5STICKC_H_
   canvas->setColorDepth(16);
   canvas->createSprite(DISPLAY_HEIGHT, DISPLAY_WIDTH);
 #endif
 }
 
+//-------------------------------------
+void Menu::SetTimer(hw_timer_t * _timer) {
+  timer = _timer;
+}
+
+//-------------------------------------
+// Flash書き込み開始
+void Menu::BeginPreferences() {
+  usePreferencesDepth++;
+  if (usePreferencesDepth > 1) return;
+  if (timer) timerAlarmDisable(timer);
+  delay(10);
+  pref.begin("Afuue/Settings", false);
+}
+
 //--------------------------
-void Menu::SavePreferences(Preferences pref) {
+// Flash書き込み終了
+void Menu::EndPreferences() {
+  usePreferencesDepth--;
+  if (usePreferencesDepth == 0) {
+    pref.end();  
+    delay(10);
+    if (timer) timerAlarmEnable(timer);
+  }
+  if (usePreferencesDepth < 0) usePreferencesDepth = 0;
+}
+
+//--------------------------
+// Flashに保存
+void Menu::SavePreferences() {
 #ifdef _M5STICKC_H_
   for (int i = 0; i < WAVE_MAX; i++) {
     if (waveData.GetWaveTable(i) == NULL) {
@@ -86,6 +118,13 @@ void Menu::SavePreferences(Preferences pref) {
 }
 
 //--------------------------
+// Flash初期化
+void Menu::ClearAllFlash(){
+  pref.clear(); // CLEAR ALL FLASH MEMORY
+}
+
+//--------------------------
+// 現在の値を記録バッファから読み出し
 void Menu::ReadPlaySettings(int widx) {
     //isAccControl = waveSettings[widx].isAccControl;
     fineTune = waveSettings[widx].fineTune;
@@ -100,6 +139,7 @@ void Menu::ReadPlaySettings(int widx) {
 }
 
 //--------------------------
+// 現在の値を記録用バッファに書き込み
 void Menu::WritePlaySettings(int widx) {
     //waveSettings[widx].isAccControl = isAccControl;
     waveSettings[widx].fineTune = fineTune;
@@ -114,6 +154,7 @@ void Menu::WritePlaySettings(int widx) {
 }
 
 //--------------------------
+// 現在の設定をリセット
 void Menu::ResetPlaySettings(int widx) {
   int idx = widx;
   if (idx < 0) {
@@ -132,7 +173,8 @@ void Menu::ResetPlaySettings(int widx) {
 }
 
 //--------------------------
-void Menu::LoadPreferences(Preferences pref) {
+// Flash から読み出し
+void Menu::LoadPreferences() {
   keySense = pref.getInt("KeySense", 50);
 #ifdef ENABLE_MCP3425
   breathSense = pref.getInt("BreathSense", 150);
@@ -175,6 +217,7 @@ void Menu::LoadPreferences(Preferences pref) {
 
 #ifdef ENABLE_RTC
 //--------------------------
+// RTC 時刻変更
 void Menu::WriteRtc() {
   if (isRtcChanged == false) {
     return;
@@ -188,6 +231,7 @@ void Menu::WriteRtc() {
 }
 
 //--------------------------
+// RTC から時刻を得る
 void Menu::ReadRtc() {
   m5::rtc_time_t TimeStruct;
   M5.Rtc.getTime(&TimeStruct);
@@ -198,6 +242,7 @@ void Menu::ReadRtc() {
 #endif
 
 //--------------------------
+// 次の音色の波形テーブルに変更
 void Menu::SetNextWave() {
     waveIndex++;
     if (waveData.GetWaveTable(waveIndex) == NULL) {
@@ -207,6 +252,7 @@ void Menu::SetNextWave() {
 }
 
 //--------------------------
+// 次のローパスQ値に変更
 bool Menu::SetNextLowPassQ() {
   bool ret = false;
   lowPassQ += 5;
@@ -219,8 +265,9 @@ bool Menu::SetNextLowPassQ() {
 }
 
 //--------------------------
+// メニュー更新処理 (AFUUE2)
 #ifdef _M5STICKC_H_
-bool Menu::Update(Preferences pref, uint16_t key, int pressure) {
+bool Menu::Update(uint16_t key, int pressure) {
   M5.update();
   if (M5.BtnA.pressedFor(100)) {
     if (isEnabled) {
@@ -455,8 +502,9 @@ bool Menu::Update(Preferences pref, uint16_t key, int pressure) {
 #endif // _M5STICKC_H_
 
 //--------------------------
+// メニュー更新処理（AFUUE2R)
 #ifdef _STAMPS3_H_
-bool Menu::Update2R(Preferences pref, volatile WaveInfo* pInfo, const KeySystem* pKey) {
+bool Menu::Update2R(volatile WaveInfo* pInfo, const KeySystem* pKey) {
   M5.update();
   static int pgNumHigh = 0;
   static int pgNumLow = 0;
@@ -645,6 +693,7 @@ bool Menu::Update2R(Preferences pref, volatile WaveInfo* pInfo, const KeySystem*
 #endif
 
 //--------------------------
+// x, y にバッテリー情報を描画
 void Menu::DrawBattery(int x, int y) {
 #ifdef _M5STICKC_H_
   bat_per = M5.Power.getBatteryLevel();
@@ -673,6 +722,7 @@ void Menu::DrawBattery(int x, int y) {
 }
 
 //--------------------------
+// sx, sy の位置に str を描画（英数字のみです）
 void Menu::DrawString(const char* str, int sx, int sy) {
 #ifdef _M5STICKC_H_
   const char* ps = str;
@@ -703,6 +753,7 @@ void Menu::DrawString(const char* str, int sx, int sy) {
 }
 
 //--------------------------
+// 線をひく
 void Menu::DisplayLine(int line, bool selected, const std::string& title, const std::string& value) {
 #ifdef _M5STICKC_H_
   if ((line < 0)||(line > 3)) return;
@@ -740,6 +791,7 @@ void Menu::DisplayLine(int line, bool selected, const std::string& title, const 
 }
 
 //--------------------------
+// 時刻から文字へ
 std::string Menu::TimeToStr() {
   char s[16];
   sprintf(s, "%02d:%02d", hour, minute);
@@ -747,6 +799,7 @@ std::string Menu::TimeToStr() {
 }
 
 //--------------------------
+// トランスポーズの文字列を取得
 std::string Menu::TransposeToStr() {
   const char* TransposeTable[25] = {
     "-C", "-Db", "-D", "-Eb", "-E", "-F", "-Gb", "-G", "-Ab", "-A", "-Bb", "-B",
@@ -759,6 +812,7 @@ std::string Menu::TransposeToStr() {
 }
 
 //--------------------------
+// ノート番号の文字列を取得
 std::string Menu::NoteNumberToStr() {
   const char* NoteName[] = {
     "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
@@ -769,6 +823,7 @@ std::string Menu::NoteNumberToStr() {
 }
 
 //--------------------------
+// メニュー用の描画
 void Menu::DisplayMenu() {
 #ifdef _M5STICKC_H_
   if (DISPLAY_WIDTH == 128) {
@@ -802,6 +857,7 @@ void Menu::DisplayMenu() {
 }
 
 //--------------------------
+// 演奏時用の描画
 void Menu::DisplayPerform(bool onlyRefreshTime) {
 #ifdef _M5STICKC_H_
   if (onlyRefreshTime == false) {
@@ -829,6 +885,7 @@ void Menu::DisplayPerform(bool onlyRefreshTime) {
 }
 
 //--------------------------
+// 描画窓口
 void Menu::Display() {
 #ifdef _M5STICKC_H_
   canvas->fillScreen(TFT_BLACK);

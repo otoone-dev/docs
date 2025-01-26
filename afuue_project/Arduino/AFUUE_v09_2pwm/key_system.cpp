@@ -6,6 +6,10 @@
 #endif
 
 //---------------------------------
+KeySystem::KeySystem() {}
+
+//---------------------------------
+// 初期化
 int KeySystem::Initialize() {
 #ifdef _M5STICKC_H_
   return setupIOExpander();
@@ -26,6 +30,7 @@ int KeySystem::Initialize() {
 }
 
 //---------------------------------
+// 演奏用のキー処理
 void KeySystem::UpdateKeys() {
 #ifdef _M5STICKC_H_
   uint16_t mcpKeys = readFromIOExpander();
@@ -41,7 +46,7 @@ void KeySystem::UpdateKeys() {
   keyB = ((mcpKeys & 0x2000) != 0);
   octDown = ((mcpKeys & 0x4000) != 0);
   octUp = ((mcpKeys & 0x8000) != 0);
-#else
+#endif
 #ifdef _STAMPS3_H_
   keyLowC = digitalRead(1);
   keyEb = digitalRead(2);
@@ -55,7 +60,8 @@ void KeySystem::UpdateKeys() {
   keyB = digitalRead(10);
   octDown = digitalRead(44);
   octUp = digitalRead(46);
-#else
+#endif
+#if 0
   keyLowC = digitalRead(16);
   keyEb = digitalRead(17);
   keyD = digitalRead(5);
@@ -69,9 +75,10 @@ void KeySystem::UpdateKeys() {
   octDown = digitalRead(23);
   octUp = digitalRead(3) && digitalRead(4); // before1.5:RXD0 after1.6:GPIO4
 #endif
-#endif
 }
+
 //---------------------------------
+// 機能操作向けキー処理
 void KeySystem::UpdateMenuKeys(bool isKeyRepeatEnabled) {
   uint16_t k = 0;
   if (keyLowC == LOW) k |= (1 << 0);
@@ -105,7 +112,9 @@ void KeySystem::UpdateMenuKeys(bool isKeyRepeatEnabled) {
   }
   keyCurrent = keyData;
 }
+
 //---------------------------------
+// 現在のキーで再生されるノート番号
 float KeySystem::GetNoteNumber(int baseNote) const {
   int b = 0;
   if (keyLowC == LOW) b |= (1 << 7);
@@ -208,11 +217,13 @@ bool KeySystem::IsBendKeysDown() const {
 }
 
 //---------------------------------
+// キーが押されているかどうか
 uint16_t KeySystem::GetKeyData() const {
   return keyData;
 }
 
 //---------------------------------
+// キーを押した直後かどうか
 uint16_t KeySystem::GetKeyPush() const {
   return keyPush;
 }

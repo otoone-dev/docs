@@ -2,6 +2,7 @@
 
 class KeySystem {
 public:
+  KeySystem();
   int Initialize();
   void UpdateKeys();
   void UpdateMenuKeys(bool isKeyRepeatEnabled);

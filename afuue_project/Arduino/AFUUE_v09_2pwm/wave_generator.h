@@ -20,6 +20,7 @@ private:
   volatile WaveInfo* m_pInfo = NULL;
   float phase = 0.0f;
   float currentWaveLevel = 0.0f;
+
   const static int DELAY_BUFFER_SIZE = 7993;
   float delayBuffer[DELAY_BUFFER_SIZE];
   int delayPos = 0;

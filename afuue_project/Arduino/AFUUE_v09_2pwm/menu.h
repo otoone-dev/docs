@@ -38,23 +38,29 @@ struct WaveSettings {
 class Menu {
 public:
   Menu(M5Canvas* _canvas);
-  void Initialize(Preferences pref);
+  void Initialize();
+  void SetTimer(hw_timer_t * _timer);
   void SetNextWave();
   bool SetNextLowPassQ();
   void ResetPlaySettings(int widx = -1);
 #ifdef _M5STICKC_H_
-  bool Update(Preferences pref, uint16_t key, int pressure);
+  bool Update(uint16_t key, int pressure);
 #endif
 #ifdef _STAMPS3_H_
-  bool Update2R(Preferences pref, volatile WaveInfo* pInfo, const KeySystem* pKey);
+  bool Update2R(volatile WaveInfo* pInfo, const KeySystem* pKey);
 #endif
-  void SavePreferences(Preferences pref);
-  void LoadPreferences(Preferences pref);
+  void BeginPreferences();
+  void EndPreferences();
+  void SavePreferences();
+  void LoadPreferences();
+  void ClearAllFlash();
   void Display();
   void DrawBattery(int x, int y);
   void DrawString(const char* str, int sx, int sy);
 
   WaveData waveData;
+  Preferences pref;
+
   int waveIndex = 0;
   bool isEnabled = false;
   bool factoryResetRequested = false;
@@ -94,7 +100,9 @@ private:
   void DisplayPerform(bool onlyRefreshTime = false);
 
   M5Canvas* canvas;
+  hw_timer_t * timer;
 
+  int usePreferencesDepth = 0;
   int cursorPos = 0;
   bool isRtcChanged = false;
   int hour = 0;

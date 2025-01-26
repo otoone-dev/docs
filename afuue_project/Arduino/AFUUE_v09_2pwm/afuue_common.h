@@ -56,7 +56,7 @@ USB-MIDI についてはこちらの記事を参考にさせていただきま�
 #include <MIDI.h>
 #define SOUND_TWOPWM
 #define ENABLE_ADC
-#define ENABLE_ADC2
+#define ENABLE_LIP
 
 #elif (AFUUE_VER == 112)
 // AFUUE2 LPS33 Test
@@ -106,10 +106,10 @@ USB-MIDI についてはこちらの記事を参考にさせていただきま�
 #else
 #define DACPIN (39)
 #endif
-#ifdef ENABLE_ADC2
+#ifdef ENABLE_LIP
 #define ADCPIN (11)
 #define ADCPIN2 (12)
-#endif //ENABLE_ADC2
+#endif //ENABLE_LIP
 #define MIDI_IN_PIN (42)
 #define MIDI_OUT_PIN (41)
 #endif //--------------
@@ -118,14 +118,6 @@ USB-MIDI についてはこちらの記事を参考にさせていただきま�
 // ESP32 Devkit -------------
 #define DACPIN (DAC1) // 25
 #define LEDPIN (33) // ESP32-Devkit
-
-#define ENABLE_ADXL345
-#ifdef ENABLE_ADXL345
-#define ADXL345_DEVICE (0x53)    // ADXL345 device address
-#define ADXL345_RESO (0.0039f) // 3.9mG
-#define ADXL345_POWER_CTL 0x2d
-#define ADXL345_DATAX0 0x32
-#endif //ENABLE_ADXL345
 #endif //--------------
 
 
