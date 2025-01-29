@@ -11,9 +11,8 @@ public:
   void CreateWave(bool enabled);
   //---------------------------------
   float requestedVolume = 0.0f;
+  float noiseVolume = 0.0f;
   const float* currentWaveTable = NULL;
-  volatile uint8_t outH = 0;
-  volatile uint8_t outL = 0;
 
 private:
   //---------------------------------

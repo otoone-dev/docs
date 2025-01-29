@@ -1,68 +1,23 @@
 #include "afuue_common.h"
 #include "afuue_midi.h"
 
-#ifdef _STAMPS3_H_
-Adafruit_USBD_MIDI usb_midi;
-MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usb_midi, MIDI);
-#endif
-
-MIDIMODE midiMode = MIDIMODE::BREATHCONTROL; // 0:BreathControl 1:Expression 2:AfterTouch 3:MainVolume 4:CUTOFF(for KORG NTS-1)
-byte midiPgNo = 51;
-uint8_t midiPacket[32];
-bool deviceConnected = false;
-bool playing = false;
-int channelNo = 1;
-int prevNoteNumber = -1;
-unsigned long activeNotifyTime = 0;
-bool isUSBMounted = false;
+#if ENABLE_MIDI
 
 #if ENABLE_BLE_MIDI
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
 #include <BLE2902.h>
-
 #define SERVICE_UUID        "03b80e5a-ede8-4b33-a751-6ce34ec4c700"  // Apple BLE MIDI とするので固定
 #define CHARACTERISTIC_UUID "7772e5db-3868-4112-a1a9-f2669d106bf3"
+#endif // ENABLE_BLE_MIDI
 
-BLECharacteristic *pCharacteristic;
 
-class MyServerCallbacks: public BLEServerCallbacks {
-    void onConnect(BLEServer* pServer) {
-      deviceConnected = true;
-      SerialPrintLn("connected");
-
-      AFUUEMIDI_NoteOn(baseNote + 1, 50);
-      delay(500);
-      AFUUEMIDI_NoteOff();
-    };
-
-    void onDisconnect(BLEServer* pServer) {
-      deviceConnected = false;
-      SerialPrintLn("disconnected");
-    }
-};
-#endif
-
+Adafruit_USBD_MIDI usb_midi;
+MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usb_midi, MIDI);
 
 //---------------------------------
-bool AFUUEMIDI_Initialize() {
-#if ENABLE_MIDI
-#ifdef _STAMPS3_H_
-    usb_midi.setStringDescriptor("AFUUE2R");
-    MIDI.begin(MIDI_CHANNEL_OMNI); //すべてのチャンネルを受信
-    delay(1000);
-    isUSBMounted = TinyUSBDevice.mounted();
-    if (isUSBMounted) {
-      // USB MIDI
-    } else {
-      // MIDI TRS out
-      Serial2.begin(31250, SERIAL_8N1, MIDI_OUT_PIN, MIDI_IN_PIN);
-    }
-#endif
-    deviceConnected = true;
-
-#endif
+bool AfuueMIDI::Initialize() {
 #if ENABLE_BLE_MIDI
     BLEDevice::init("AFUUE2");
       
@@ -95,24 +50,64 @@ bool AFUUEMIDI_Initialize() {
     pAdvertising->start();
   
     SerialPrintLn("BLE MIDI begin");
+#else
+    usb_midi.setStringDescriptor("AFUUE2R");
+    MIDI.begin(MIDI_CHANNEL_OMNI); //すべてのチャンネルを受信
+    delay(1000);
+    isUSBMounted = TinyUSBDevice.mounted();
+    if (isUSBMounted) {
+      // USB MIDI
+    } else {
+      // MIDI TRS out
+      Serial2.begin(31250, SERIAL_8N1, MIDI_OUT_PIN, MIDI_IN_PIN);
+    }
+    deviceConnected = true;
 #endif
   return isUSBMounted;
 }
 
 //---------------------------------
-void SerialSend(uint8_t* midiPacket, size_t size) {
-  if (isUSBMounted) {
-    return;
+void AfuueMIDI::Update(int note, float requestedVolume, bool isLipSensorEnabled, float bendNoteShift) {
+  int v = (int)(requestedVolume * 127);
+  if (playing == false) {
+    if (v > 0) {
+      SetLedColor(100, 100, 100);
+      NoteOn(note, v);
+    }
+  } else {
+    if (v <= 0) {
+        NoteOff();
+    } else {
+      if (prevNoteNumber != note) {
+        NoteOn(note, v);
+      }
+      BreathControl(v);
+      int16_t b = 0;
+      if (isLipSensorEnabled) {
+        b = static_cast<int>(bendNoteShift * 8000);
+      }
+      PicthBendControl(b);
+    }
   }
-#ifdef _STAMPS3_H_
-  Serial2.write(midiPacket, size);
-#endif
+  unsigned long t = millis();
+  if ((t < activeNotifyTime) || (activeNotifyTime + 200 < t)) {
+    activeNotifyTime = t;
+    ActiveNotify();
+  }
 }
 
 //---------------------------------
-void AFUUEMIDI_NoteOn(int note, int vol) {
+void AfuueMIDI::SerialSend(uint8_t* midiPacket, size_t size) {
+  if (isUSBMounted) {
+    return;
+  }
+  Serial2.write(midiPacket, size);
+}
+
+//---------------------------------
+void AfuueMIDI::NoteOn(int note, int vol) {
     if (playing) {
-      AFUUEMIDI_NoteOff();
+      NoteOff();
     }
     //if (playing != false) return;
 #if ENABLE_BLE_MIDI
@@ -127,8 +122,7 @@ void AFUUEMIDI_NoteOn(int note, int vol) {
     midiPacket[7] = vol;
     pCharacteristic->setValue(midiPacket, 8); // packet, length in bytes
     pCharacteristic->notify();
-#endif
-#if ENABLE_MIDI
+#else
     midiPacket[0] = 0x90 + channelNo;
     midiPacket[1] = note;
     midiPacket[2] = 120;
@@ -151,18 +145,17 @@ void AFUUEMIDI_NoteOn(int note, int vol) {
       midiPacket[5] = vol;
       SerialSend(midiPacket, 6);
     }
-#ifdef _STAMPS3_H_
+
     if (isUSBMounted) {
       MIDI.sendNoteOn(note, 120, channelNo);
     }
-#endif
 #endif
     playing = true;
     prevNoteNumber = note;
 }
 
 //---------------------------------
-void AFUUEMIDI_NoteOff() {
+void AfuueMIDI::NoteOff() {
   // vol=0 で NoteOn というのもアリらしい (PSS-A50調べ)
     if ((playing == false) || (prevNoteNumber < 0)) return;
 #if ENABLE_BLE_MIDI
@@ -173,26 +166,23 @@ void AFUUEMIDI_NoteOff() {
     midiPacket[4] = 0;    // velocity
     pCharacteristic->setValue(midiPacket, 5); // packet, length in bytes)
     pCharacteristic->notify();
-#endif
-#if ENABLE_MIDI
+#else
     midiPacket[0] = 0x80 + channelNo;
     midiPacket[1] = prevNoteNumber;
     midiPacket[2] = 0;
       
     SerialSend(midiPacket, 3);
 
-#ifdef _STAMPS3_H_
     if (isUSBMounted) {
       MIDI.sendNoteOff(prevNoteNumber, 0, channelNo);
     }
-#endif
 #endif
     playing = false;
     prevNoteNumber = -1;
 }
 
 //---------------------------------
-void AFUUEMIDI_PicthBendControl(int bend) {
+void AfuueMIDI::PicthBendControl(int bend) {
     if (playing == false) return;
 
     uint16_t value = static_cast<uint16_t>(bend + 0x8000) >> 2; // 14bit
@@ -206,23 +196,20 @@ void AFUUEMIDI_PicthBendControl(int bend) {
     midiPacket[4] = d1;
     pCharacteristic->setValue(midiPacket, 5); // packet, length in bytes)
     pCharacteristic->notify();
-#endif
-#if ENABLE_MIDI
+#else
     midiPacket[0] = 0xE0 + channelNo;
     midiPacket[1] = d0;
     midiPacket[2] = d1;
     SerialSend(midiPacket, 3);
 
-#ifdef _STAMPS3_H_
     if (isUSBMounted) {
       MIDI.sendPitchBend(bend, channelNo);
     }
 #endif
-#endif
 }
 
 //---------------------------------
-void AFUUEMIDI_BreathControl(int vol) {
+void AfuueMIDI::BreathControl(int vol) {
 #if ENABLE_BLE_MIDI
     midiPacket[0] = 0x80; // header
     midiPacket[1] = 0x80; // timestamp, not implemented
@@ -232,8 +219,7 @@ void AFUUEMIDI_BreathControl(int vol) {
     midiPacket[4] = vol;
     pCharacteristic->setValue(midiPacket, 5); // packet, length in bytes
     pCharacteristic->notify();
-#endif
-#if ENABLE_MIDI
+#else
     if (midiMode == MIDIMODE::AFTERTOUCH) { // after touch (channel pressure)
       midiPacket[0] = 0xD0 + channelNo;
       midiPacket[1] = vol;
@@ -253,7 +239,7 @@ void AFUUEMIDI_BreathControl(int vol) {
       midiPacket[2] = vol;
       SerialSend(midiPacket, 3);
     }
-#ifdef _STAMPS3_H_
+
     if (isUSBMounted) {
       if (midiMode == MIDIMODE::AFTERTOUCH) {
           MIDI.sendAfterTouch(vol, channelNo);
@@ -263,11 +249,10 @@ void AFUUEMIDI_BreathControl(int vol) {
       }
     }
 #endif
-#endif
 }
 
 //---------------------------------
-void AFUUEMIDI_ProgramChange(int no) {
+void AfuueMIDI::ProgramChange(int no) {
 #if ENABLE_BLE_MIDI
     midiPacket[0] = 0x80; // header
     midiPacket[1] = 0x80; // timestamp, not implemented
@@ -275,47 +260,43 @@ void AFUUEMIDI_ProgramChange(int no) {
     midiPacket[3] = no;
     pCharacteristic->setValue(midiPacket, 4); // packet, length in bytes
     pCharacteristic->notify();
-#endif
-#if ENABLE_MIDI
+#else
     midiPacket[0] = 0xC0 + channelNo;
     midiPacket[1] = no;
       
     SerialSend(midiPacket, 2);
 
-#ifdef _STAMPS3_H_
     if (isUSBMounted) {
       MIDI.sendProgramChange(no, channelNo);
     }
 #endif
-#endif
 }
 
 //---------------------------------
-void AFUUEMIDI_ChangeBreathControlMode() {
-  AFUUEMIDI_BreathControl(127);
+void AfuueMIDI::ChangeBreathControlMode() {
+  BreathControl(127);
   midiMode = (MIDIMODE)(((int)midiMode + 1) % (int)MIDIMODE::MAX);
-  AFUUEMIDI_NoteOn(60, 30);
+  NoteOn(60, 30);
   delay(100);
 }
 
 //---------------------------------
-void AFUUEMIDI_ActiveNotify() {
+void AfuueMIDI::ActiveNotify() {
 #if ENABLE_BLE_MIDI
     midiPacket[0] = 0x80; // header
     midiPacket[1] = 0x80; // timestamp, not implemented
     midiPacket[2] = 0xFE; // active sense
     pCharacteristic->setValue(midiPacket, 3); // packet, length in bytes
     pCharacteristic->notify();
-#endif
-#if ENABLE_MIDI
+#else
     midiPacket[0] = 0xFE;
       
     SerialSend(midiPacket, 1);
 
-#ifdef _STAMPS3_H_
     if (isUSBMounted) {
       MIDI.sendActiveSensing();
     }
 #endif
-#endif
 }
+
+#endif // ENABLE_MIDI

@@ -518,6 +518,41 @@ int WaveData::GetWaveAttackSoftness(int index) {
   return waveAttackSoftness[index];
 }
 
+const float waveNoiseLevel[] = {
+  0.0f,
+  0.0f,
+
+  0.0f,
+  0.0f,
+  0.0f,
+  0.0f,
+
+  0.0f,
+  0.0f,
+  0.0f,
+};
+
+float WaveData::GetWaveNoiseLevel(int index) {
+  return waveNoiseLevel[index];
+}
+
+const float waveAttackNoiseLevel[] = {
+  0.5f,
+  0.5f,
+
+  0.5f,
+  0.5f,
+  0.5f,
+  0.0f,
+
+  0.0f,
+  0.0f,
+  0.0f,
+};
+
+float WaveData::GetWaveAttackNoiseLevel(int index) {
+  return waveAttackNoiseLevel[index];
+}
 const float* WaveData::GetSinTable() const {
   return sinTable;
 }

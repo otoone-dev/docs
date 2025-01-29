@@ -1,3 +1,5 @@
+#pragma once
+
 #include "afuue_common.h"
 
 class Sensors {
@@ -5,11 +7,12 @@ public:
   Sensors();
   bool Initialize();
   void Update();
+  void UpdateAcc();
   void BendExec(float td, float vol, bool bendKeysDown);
   float GetBlowPower() const;
 
   float accx, accy, accz;
-  float vol;
+  float blowPower;
   float bendNoteShift = 0.0f;
   float breathSenseRate = 300.0f;
   float breathZero = 0.0f;
@@ -26,7 +29,6 @@ private:
   float bendDownTime = 0.0f;
   float bendVolume = 0.0f;
 
-  void UpdateAcc();
 #ifdef ENABLE_MCP3425
   bool InitPressureMCP3425();
 #endif

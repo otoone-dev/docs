@@ -136,6 +136,7 @@ USB-MIDI についてはこちらの記事を参考にさせていただきま�
 //#define SAMPLING_RATE (20000) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (80*50) = 20kHz
 #define SAMPLING_RATE (25000.0f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (80*40) = 25kHz
 //#define SAMPLING_RATE (32000) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (50*50) = 32kHz
+//#define SAMPLING_RATE (44077.13f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (55*33) = 44kHz
 //#define SAMPLING_RATE (48019.2f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (49*34) = 48kHz
 
 //#define ENABLE_COMMUNICATETOOL (0)
@@ -143,5 +144,17 @@ USB-MIDI についてはこちらの記事を参考にさせていただきま�
 #define ENABLE_MIDI (1)
 #define ENABLE_SERIALOUTPUT (1)//(0 && !ENABLE_MIDI)
 
+extern volatile uint8_t waveOutH;
+extern volatile uint8_t waveOutL;
+extern TaskHandle_t taskHandle;
 extern int baseNote;
+
+extern bool IsStickC();
+extern bool IsStampS3();
+extern bool IsAtomS3();
+extern bool HasDisplay();
+extern bool HasImu();
+
 extern void SerialPrintLn(const char* text);
+extern void SetLedColor(int r, int g, int b);
+extern void DrawCenterString(const char* str, int x, int y, int fontId);

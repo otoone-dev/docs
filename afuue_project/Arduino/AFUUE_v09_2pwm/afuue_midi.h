@@ -1,5 +1,8 @@
-#ifndef AFUUEMIDI_H
-#define AFUUEMIDI_H
+#pragma once
+
+#include "afuue_common.h"
+
+#if ENABLE_MIDI
 
 enum MIDIMODE {
   BREATHCONTROL,
@@ -10,22 +13,58 @@ enum MIDIMODE {
   MAX,
 };
 
-extern MIDIMODE midiMode; // 0:BreathControl 1:Expression 2:AfterTouch 3:MainVolume 4:CUTOFF(for KORG NTS-1)
-extern byte midiPgNo;
-extern bool deviceConnected;
-extern bool playing;
-extern int channelNo;
-extern int prevNoteNumber;
-extern unsigned long activeNotifyTime;
+class AfuueMIDI {
+public:
+  AfuueMIDI() {}
+  bool Initialize();
+  void Update(int note, float requestedVolume, bool isLipSensorEnabled, float bendNoteShift);
 
-extern bool AFUUEMIDI_Initialize();
-extern void AFUUEMIDI_NoteOn(int note, int vol);
-extern void AFUUEMIDI_ChangeNote(int note, int vol);
-extern void AFUUEMIDI_NoteOff();
-extern void AFUUEMIDI_PicthBendControl(int value);
-extern void AFUUEMIDI_BreathControl(int vol);
-extern void AFUUEMIDI_ProgramChange(int no);
-extern void AFUUEMIDI_ChangeBreathControlMode();
-extern void AFUUEMIDI_ActiveNotify();
+  void NoteOn(int note, int vol);
+  void NoteOff();
+  void PicthBendControl(int bend);
+  void BreathControl(int vol);
+  void ProgramChange(int no);
+  void ChangeBreathControlMode();
+  void ActiveNotify();
 
-#endif //AFUUEMIDI_H
+private:
+  MIDIMODE midiMode = MIDIMODE::BREATHCONTROL; // 0:BreathControl 1:Expression 2:AfterTouch 3:MainVolume 4:CUTOFF(for KORG NTS-1)
+  byte midiPgNo = 51;
+  uint8_t midiPacket[32];
+  bool deviceConnected = false;
+  bool playing = false;
+  int channelNo = 1;
+  int prevNoteNumber = -1;
+  unsigned long activeNotifyTime = 0;
+  bool isUSBMounted = false;
+
+  void SerialSend(uint8_t* midiPacket, size_t size);
+
+#if ENABLE_BLE_MIDI
+  BLECharacteristic *pCharacteristic;
+
+  class MyServerCallbacks: public BLEServerCallbacks {
+  public:
+    MyServerCallbacks(AfuueMIDI* _afuueMidi) {
+      afuueMidi = _afuueMidi;
+    }
+      void onConnect(BLEServer* pServer) {
+        deviceConnected = true;
+        SerialPrintLn("connected");
+
+        afuueMidi->NoteOn(baseNote + 1, 50);
+        delay(500);
+        afuueMidi->NoteOff();
+      };
+
+      void onDisconnect(BLEServer* pServer) {
+        deviceConnected = false;
+        SerialPrintLn("disconnected");
+      }
+  private:
+    AfuueMIDI* afuueMidi;
+  };
+#endif
+
+};
+#endif // ENABLE_MIDI

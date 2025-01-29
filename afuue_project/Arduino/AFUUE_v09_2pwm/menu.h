@@ -4,6 +4,7 @@
 #include <Preferences.h>
 #include "wavedata.h"
 #include "key_system.h"
+#include "afuue_midi.h"
 
 #define WAVE_MAX (16)
 #define FORCEPLAYTIME_LENGTH (200.0f) //ms
@@ -37,7 +38,11 @@ struct WaveSettings {
 
 class Menu {
 public:
-  Menu(M5Canvas* _canvas);
+  Menu(M5Canvas* _canvas
+#if ENABLE_MIDI
+  , AfuueMIDI* _midi
+#endif
+  );
   void Initialize();
   void SetTimer(hw_timer_t * _timer);
   void SetNextWave();
@@ -100,6 +105,7 @@ private:
   void DisplayPerform(bool onlyRefreshTime = false);
 
   M5Canvas* canvas;
+  AfuueMIDI* afuueMidi;
   hw_timer_t * timer;
 
   int usePreferencesDepth = 0;

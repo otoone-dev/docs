@@ -84,19 +84,19 @@ void Sensors::Update() {
     float vol = (pressureValue - defPressure) / ((2047.0f-breathSenseRate)-defPressure); // 0 - 1
     if (vol < 0.0f) vol = 0.0f;
     if (vol > 1.0f) vol = 1.0f;
-    vol = pow(vol,2.0f) * (1.0f-bendVolume);
+    blowPower = pow(vol,2.0f) * (1.0f-bendVolume);
 #endif
 #ifdef ENABLE_LPS33
     float vol = (pressureValue - defPressure) / 70000.0f; // 0 - 1
     if (vol < 0.0f) vol = 0.0f;
     if (vol > 1.0f) vol = 1.0f;
-    vol = pow(vol,2.0f);
+    blowPower = pow(vol,2.0f);
 #endif
 #ifdef ENABLE_ADC
     float vol = (pressureValue - defPressure) / breathSenseRate; // 0 - 1
     if (vol < 0.0f) vol = 0.0f;
     if (vol > 1.0f) vol = 1.0f;
-    vol = pow(vol,2.0f);
+    blowPower = pow(vol,2.0f);
 #endif
 }
 
@@ -155,21 +155,21 @@ void Sensors::BendExec(float td, float vol, bool bendKeysDown) {
 
 //---------------------------------
 float Sensors::GetBlowPower() const {
-    return vol;
+    return blowPower;
 }
 
 //-------------------------------------
 // 加速度センサー更新
 void Sensors:: UpdateAcc() {
-    float ax = 0.0f;
-    float ay = 0.0f;
-    float az = 1.0f;
-  #ifdef _M5STICKC_H_
-    //M5.IMU.getAccelData(&ax,&ay,&az);
-  #endif
-    accx += (ax - accx) * 0.3f;
-    accy += (ay - accy) * 0.3f;
-    accz += (az - accz) * 0.3f;
+    if (HasImu()) {
+      float ax = 0.0f;
+      float ay = 0.0f;
+      float az = 1.0f;
+      M5.Imu.getAccelData(&ax,&ay,&az);
+      accx += (ax - accx) * 0.3f;
+      accy += (ay - accy) * 0.3f;
+      accz += (az - accz) * 0.3f;
+    }
 }
 
 //-------------------------------------

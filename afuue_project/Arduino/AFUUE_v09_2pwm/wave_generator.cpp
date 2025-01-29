@@ -65,8 +65,8 @@ void WaveGenerator::Tick(float note) {
 // 波形生成のため高速に呼ばれる処理
 void WaveGenerator:: CreateWave(bool enabled) {
   if (!enabled) {
-    outH = 0;
-    outL = 0;
+    waveOutH = 0;
+    waveOutL = 0;
     return;
   }
 
@@ -76,11 +76,11 @@ void WaveGenerator:: CreateWave(bool enabled) {
 
   float g = InteropL(currentWaveTable, 256, phase) / 32767.0f;
 
-#if 0
   //ノイズ
-  float n = (static_cast<float>(rand()) / RAND_MAX);
-  g = (g * (1.0f-noiseVolume) + 32767.0f * n * noiseVolume);
-#endif
+  if (noiseVolume > 0.0f) {
+    float n = (static_cast<float>(rand()) / RAND_MAX);
+    g = (g * (1.0f-noiseVolume) + n * noiseVolume);
+  }
 
   if (m_pInfo->lowPassQ > 0.0f) {
     g = LowPass(g);
@@ -99,8 +99,8 @@ void WaveGenerator:: CreateWave(bool enabled) {
   else if (e > 32700.0f) e = 32700.0f;
 
   uint16_t dac = static_cast<uint16_t>(e + 32768.0f);
-  outH = (dac >> 8) & 0xFF; // HHHH HHHH LLLL LLLL
-  outL = dac & 0xFF;
+  waveOutH = (dac >> 8) & 0xFF; // HHHH HHHH LLLL LLLL
+  waveOutL = dac & 0xFF;
 }
 
 //--------------------------

@@ -27,8 +27,15 @@ enum {
 };
 
 //--------------------------
-Menu::Menu(M5Canvas* _canvas) {
+Menu::Menu(M5Canvas* _canvas
+#if ENABLE_MIDI
+, AfuueMIDI* _midi
+#endif
+) {
   canvas = _canvas;
+#if ENABLE_MIDI
+  afuueMidi = _midi;
+#endif
 }
 
 //--------------------------
@@ -520,14 +527,14 @@ bool Menu::Update2R(volatile WaveInfo* pInfo, const KeySystem* pKey) {
     }
     else if (pKey->IsKeyF_Push()) {
       // Change wave index or MIDI:Send Program Change
-#if ENABLE_MIDI || ENABLE_BLE_MIDI
+#if ENABLE_MIDI
       if (isMidiEnabled) 
       {
         int pgNum = pgNumHigh * 10 + pgNumLow;
         if (pgNum > 0) {
-          AFUUEMIDI_NoteOff();
+          afuueMidi->NoteOff();
           delay(500);
-          AFUUEMIDI_ProgramChange(pgNum-1);
+          afuueMidi->ProgramChange(pgNum-1);
           pgNumHigh = 0;
           pgNumLow = 0;
         }
@@ -549,11 +556,11 @@ bool Menu::Update2R(volatile WaveInfo* pInfo, const KeySystem* pKey) {
         pInfo->baseNote--;
         if (pInfo->baseNote < 61-12) pInfo->baseNote = 61-12;
       }
-#if ENABLE_MIDI || ENABLE_BLE_MIDI
+#if ENABLE_MIDI
       if (isMidiEnabled) {
-        AFUUEMIDI_NoteOn(pInfo->baseNote-1, 10);
+        afuueMidi->NoteOn(pInfo->baseNote-1, 10);
         delay(static_cast<int>(pInfo->baseNote == 61 ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH));
-        AFUUEMIDI_NoteOff();
+        afuueMidi->NoteOff();
       }
       else
 #endif
@@ -571,11 +578,11 @@ bool Menu::Update2R(volatile WaveInfo* pInfo, const KeySystem* pKey) {
         pInfo->baseNote++;
         if (pInfo->baseNote > 61+12) pInfo->baseNote = 61+12;
       }
-#if ENABLE_MIDI || ENABLE_BLE_MIDI
+#if ENABLE_MIDI
       if (isMidiEnabled) {
-        AFUUEMIDI_NoteOn(pInfo->baseNote-1, 10);
+        afuueMidi->NoteOn(pInfo->baseNote-1, 10);
         delay(static_cast<int>(pInfo->baseNote == 61 ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH));
-        AFUUEMIDI_NoteOff();
+        afuueMidi->NoteOff();
       }
       else
 #endif
@@ -640,11 +647,11 @@ bool Menu::Update2R(volatile WaveInfo* pInfo, const KeySystem* pKey) {
       forcePlayNote = pInfo->baseNote - 1;
       return true;
     }
-#if ENABLE_MIDI || ENABLE_BLE_MIDI
+#if ENABLE_MIDI
     else if (pKey->IsKeyB_Push()) {
       if (isMidiEnabled) {
         // Change MIDI Breath Control Mode
-        AFUUEMIDI_ChangeBreathControlMode();
+        afuueMidi->ChangeBreathControlMode();
       }
     }
     else if (pKey->IsKeyLowC_Push()) {
@@ -668,9 +675,9 @@ bool Menu::Update2R(volatile WaveInfo* pInfo, const KeySystem* pKey) {
   if (pKey->IsFuncBtn_Push()) {
     ctrlMode = (ctrlMode + 1) % 4; // 0:normal, 1:lip-bend, 2:MIDI-normal, 3:MIDI-lip-bend
     isLipSensorEnabled = (ctrlMode % 2);
-#if ENABLE_MIDI || ENABLE_BLE_MIDI
+#if ENABLE_MIDI
     if (isMidiEnabled) {
-      AFUUEMIDI_NoteOff();
+      afuueMidi->NoteOff();
     }
     isMidiEnabled = (ctrlMode >= 2) || isUSBMidiMounted;
 #endif
