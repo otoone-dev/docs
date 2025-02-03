@@ -7,6 +7,12 @@ Sensors::Sensors() {}
 //---------------------------------
 // 初期化
 bool Sensors::Initialize() {
+#ifdef ENABLE_IMU
+  if (HasImu()) {
+    M5.Imu.init();
+    //M5.IMU.setAccelFsr(M5.IMU.AFS_2G);
+  }
+#endif
 #ifdef ENABLE_MCP3425
   bool mcp3425OK = InitPressureMCP3425();
   if (!mcp3425OK) {
@@ -103,73 +109,73 @@ void Sensors::Update() {
 //---------------------------------
 // ベンド処理
 void Sensors::BendExec(float td, float vol, bool bendKeysDown) {
-  #ifdef ENABLE_LIP
-      if (isLipSensorEnabled) {
-        float b2 = (pressureValue2 - (defaultPressureValue2 + breathZero)) / breathSenseRate;
-        if (b2 < 0.0f) b2 = 0.0f;
-        if (b2 > vol) b2 = vol;
-        float bendNoteShiftTarget = 0.0f;
-        if (vol > 0.0001f) {
-          bendNoteShiftTarget = -1.0f + ((vol - b2) / vol)*1.2f;
-          if (bendNoteShiftTarget > 0.0f) {
-            bendNoteShiftTarget = 0.0f;
-          }
-        }
-        else {
-          bendNoteShiftTarget = 0.0f;
-        }
-        bendNoteShift += (bendNoteShiftTarget - bendNoteShift) * 0.5f;
-      }
-  #else
-    // LowC + Eb down -------
-    if (bendKeysDown) {
-    //if ((keyLowC == LOW) && (keyEb == LOW)) {
-      bendDownTime += td;
-      if (bendDownTime > BENDDOWNTIME_LENGTH) {
-        bendDownTime = BENDDOWNTIME_LENGTH;
+#ifdef ENABLE_LIP
+  if (isLipSensorEnabled) {
+    float b2 = (pressureValue2 - (defaultPressureValue2 + breathZero)) / breathSenseRate;
+    if (b2 < 0.0f) b2 = 0.0f;
+    if (b2 > vol) b2 = vol;
+    float bendNoteShiftTarget = 0.0f;
+    if (vol > 0.0001f) {
+      bendNoteShiftTarget = -1.0f + ((vol - b2) / vol)*1.2f;
+      if (bendNoteShiftTarget > 0.0f) {
+        bendNoteShiftTarget = 0.0f;
       }
     }
     else {
-      if (bendDownTime > 0.0f) {
-        bendDownTime = -bendDownTime;
-      }
-      else {
-        bendDownTime += td;
-        if (bendDownTime > 0.0f) {
-          bendDownTime = 0.0f;
-        }
-      }
+      bendNoteShiftTarget = 0.0f;
     }
-    float bend = 0.0f;
+    bendNoteShift += (bendNoteShiftTarget - bendNoteShift) * 0.5f;
+  }
+#else
+  // LowC + Eb down -------
+  if (bendKeysDown) {
+  //if ((keyLowC == LOW) && (keyEb == LOW)) {
+    bendDownTime += td;
+    if (bendDownTime > BENDDOWNTIME_LENGTH) {
+      bendDownTime = BENDDOWNTIME_LENGTH;
+    }
+  }
+  else {
     if (bendDownTime > 0.0f) {
-      bend = bendDownTime / BENDDOWNTIME_LENGTH;
-      bendVolume = bend;
+      bendDownTime = -bendDownTime;
     }
-    else if (bendDownTime < 0.0f) {
-      bend = -(bendDownTime / BENDDOWNTIME_LENGTH);
-      bendVolume = bend;
+    else {
+      bendDownTime += td;
+      if (bendDownTime > 0.0f) {
+        bendDownTime = 0.0f;
+      }
     }
-    bendNoteShift = bend * BENDRATE;
-  #endif
+  }
+  float bend = 0.0f;
+  if (bendDownTime > 0.0f) {
+    bend = bendDownTime / BENDDOWNTIME_LENGTH;
+    bendVolume = bend;
+  }
+  else if (bendDownTime < 0.0f) {
+    bend = -(bendDownTime / BENDDOWNTIME_LENGTH);
+    bendVolume = bend;
+  }
+  bendNoteShift = bend * BENDRATE;
+#endif
 }
 
 //---------------------------------
 float Sensors::GetBlowPower() const {
-    return blowPower;
+  return blowPower;
 }
 
 //-------------------------------------
 // 加速度センサー更新
 void Sensors:: UpdateAcc() {
-    if (HasImu()) {
-      float ax = 0.0f;
-      float ay = 0.0f;
-      float az = 1.0f;
-      M5.Imu.getAccelData(&ax,&ay,&az);
-      accx += (ax - accx) * 0.3f;
-      accy += (ay - accy) * 0.3f;
-      accz += (az - accz) * 0.3f;
-    }
+  if (HasImu()) {
+    float ax = 0.0f;
+    float ay = 0.0f;
+    float az = 1.0f;
+    M5.Imu.getAccelData(&ax,&ay,&az);
+    accx += (ax - accx) * 0.3f;
+    accy += (ay - accy) * 0.3f;
+    accz += (az - accz) * 0.3f;
+  }
 }
 
 //-------------------------------------
@@ -206,10 +212,10 @@ int32_t Sensors::GetPressureValueLPS33(int side) {
 
 //-------------------------------------
 // ADC から値取得
-#define PRESSURE_AVERAGE_COUNT (10)
+#define PRESSURE_AVERAGE_COUNT (20)
 #ifdef ENABLE_ADC
 int Sensors::GetPressureValueADC(int index) {
-  int averaged = 0;
+  float averaged = 0;
   int average_count = 0;
   while (average_count == 0) {
     for (int i = 0; i < PRESSURE_AVERAGE_COUNT; i++) {
@@ -241,25 +247,25 @@ int Sensors::GetPressureValueADC(int index) {
 
 //-------------------------------------
 // 気圧センサーの値取得窓口
-int Sensors::GetPressureValue(int index) {
+float Sensors::GetPressureValue(int index) {
 #ifdef ENABLE_LIP
   // ADC x 2
 #ifdef ENABLE_LPS33
-    return GetPressureValueLPS33(index);
+  return GetPressureValueLPS33(index);
 #else
-    return GetPressureValueADC(index);
+  return GetPressureValueADC(index);
 #endif
 #else
   // ADC x 1
 #ifdef ENABLE_MCP3425
-    Wire.requestFrom(MCP3425_ADDR, 2);
-    return (Wire.read() << 8 ) | Wire.read();
+  Wire.requestFrom(MCP3425_ADDR, 2);
+  return (Wire.read() << 8 ) | Wire.read();
 #endif
 #ifdef ENABLE_LPS33
-    return GetPressureValueLPS33(0);
+  return GetPressureValueLPS33(0);
 #endif
 #ifdef ENABLE_ADC
-    return GetPressureValueADC(0);
+  return GetPressureValueADC(0);
 #endif
   // ----
 #endif // LIP

@@ -67,4 +67,19 @@ private:
 #endif
 
 };
+#else
+class AfuueMIDI {
+public:
+  AfuueMIDI() {}
+  bool Initialize() {}
+  void Update(int note, float requestedVolume, bool isLipSensorEnabled, float bendNoteShift) {}
+
+  void NoteOn(int note, int vol) {}
+  void NoteOff() {}
+  void PicthBendControl(int bend) {}
+  void BreathControl(int vol) {}
+  void ProgramChange(int no) {}
+  void ChangeBreathControlMode() {}
+  void ActiveNotify() {}
+};
 #endif // ENABLE_MIDI

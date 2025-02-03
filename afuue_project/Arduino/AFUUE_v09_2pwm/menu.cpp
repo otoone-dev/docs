@@ -5,37 +5,10 @@
 #include "wavedata.h"
 #include "menu.h"
 
-static float bat_per = 0.0f;
-
-enum {
-  MENUINDEX_TRANSPOSE,
-  MENUINDEX_LOWPASSP,
-  MENUINDEX_LOWPASSR,
-  MENUINDEX_LOWPASSQ,
-  MENUINDEX_ATTACK,
-  MENUINDEX_FINETUNE,
-  MENUINDEX_PORTAMENTO,
-  MENUINDEX_DELAY,
-  MENUINDEX_KEYSENSE,
-  MENUINDEX_BREATHSENSE,
-  MENUINDEX_BREATHZERO,
-  MENUINDEX_CLOCK,
-  MENUINDEX_PUSHEDKEY,
-  MENUINDEX_PRESSURE,
-  MENUINDEX_SPEAKER,
-  MENUINDEX_MAX,
-};
-
 //--------------------------
-Menu::Menu(M5Canvas* _canvas
-#if ENABLE_MIDI
-, AfuueMIDI* _midi
-#endif
-) {
+Menu::Menu(M5Canvas* _canvas, AfuueMIDI* _midi) {
   canvas = _canvas;
-#if ENABLE_MIDI
   afuueMidi = _midi;
-#endif
 }
 
 //--------------------------
@@ -43,7 +16,6 @@ Menu::Menu(M5Canvas* _canvas
 void Menu::Initialize() {
   BeginPreferences();
   {
-    //pref.clear(); // CLEAR ALL FLASH MEMORY
     int ver = pref.getInt("AfuueVer", -1);
     if (ver != AFUUE_VER) {
       pref.clear(); // CLEAR ALL FLASH MEMORY
@@ -55,6 +27,193 @@ void Menu::Initialize() {
   canvas->setColorDepth(16);
   canvas->createSprite(DISPLAY_HEIGHT, DISPLAY_WIDTH);
 #endif
+
+  // プロパティ編集定義 MenuProperties(表示名, 表示値取得, 増やす処理, 減らす処理)
+  m_menus.emplace_back(MenuProperties("Transpose",
+    [&](){ return TransposeToStr(); },
+    [&](){
+      currentWaveSettings.transpose++;
+      if (currentWaveSettings.transpose > 12) currentWaveSettings.transpose = 12;
+    },
+    [&](){
+      currentWaveSettings.transpose--;
+      if (currentWaveSettings.transpose < -12) currentWaveSettings.transpose = -12;
+    } ));
+  m_menus.emplace_back(MenuProperties("LP_Pos",
+    [&](){ return std::to_string(currentWaveSettings.lowPassP); },
+    [&](){
+      currentWaveSettings.lowPassP++;
+      if (currentWaveSettings.lowPassP > 10) currentWaveSettings.lowPassP = 10;
+    },
+    [&](){
+      currentWaveSettings.lowPassP--;
+      if (currentWaveSettings.lowPassP < 1) currentWaveSettings.lowPassP = 1;
+    } ));
+  m_menus.emplace_back(MenuProperties("LP_Rate",
+    [&](){ return std::to_string(currentWaveSettings.lowPassR); },
+    [&](){
+      currentWaveSettings.lowPassR++;
+      if (currentWaveSettings.lowPassR > 30) currentWaveSettings.lowPassR = 30;
+    },
+    [&](){
+      currentWaveSettings.lowPassR--;
+      if (currentWaveSettings.lowPassR < 1) currentWaveSettings.lowPassR = 1;
+    } ));
+  m_menus.emplace_back(MenuProperties("LP_Power",
+    [&](){ return std::to_string(currentWaveSettings.lowPassQ); },
+    [&](){
+      currentWaveSettings.lowPassQ++;
+      if (currentWaveSettings.lowPassQ > 50) currentWaveSettings.lowPassQ = 50;
+    },
+    [&](){
+      currentWaveSettings.lowPassQ--;
+      if (currentWaveSettings.lowPassQ < 0) currentWaveSettings.lowPassQ = 0;
+    } ));
+  m_menus.emplace_back(MenuProperties("Attack",
+    [&](){ return std::to_string(currentWaveSettings.attackSoftness); },
+    [&](){
+      currentWaveSettings.attackSoftness++;
+      if (currentWaveSettings.attackSoftness > 99) currentWaveSettings.attackSoftness = 99;
+    },
+    [&](){
+      currentWaveSettings.attackSoftness--;
+      if (currentWaveSettings.attackSoftness < 0) currentWaveSettings.attackSoftness = 0;
+    } ));
+  m_menus.emplace_back(MenuProperties("Drop",
+    [&]() -> std::string {
+      if (currentWaveSettings.pitchDropLevel > 0) {
+        return std::to_string(currentWaveSettings.pitchDropLevel);
+      }
+      return "OFF";
+    },
+    [&](){
+      currentWaveSettings.pitchDropLevel++;
+      if (currentWaveSettings.pitchDropLevel > 20) currentWaveSettings.pitchDropLevel = 20;
+    },
+    [&](){
+      currentWaveSettings.pitchDropLevel--;
+      if (currentWaveSettings.pitchDropLevel < 0) currentWaveSettings.pitchDropLevel = 0;
+    } ));
+  m_menus.emplace_back(MenuProperties("DropPos",
+    [&](){ return std::to_string(currentWaveSettings.pitchDropPos); },
+    [&](){
+      currentWaveSettings.pitchDropPos++;
+      if (currentWaveSettings.pitchDropPos > 10) currentWaveSettings.pitchDropPos = 10;
+    },
+    [&](){
+      currentWaveSettings.pitchDropPos--;
+      if (currentWaveSettings.pitchDropPos < 0) currentWaveSettings.pitchDropPos = 0;
+    } ));
+  m_menus.emplace_back(MenuProperties("FineTune",
+    [&](){ return std::to_string(currentWaveSettings.fineTune); },
+    [&](){
+      currentWaveSettings.fineTune++;
+      if (currentWaveSettings.fineTune > 480) currentWaveSettings.fineTune = 480;
+    },
+    [&](){
+      currentWaveSettings.fineTune--;
+      if (currentWaveSettings.fineTune < 400) currentWaveSettings.fineTune = 400;
+    } ));
+  m_menus.emplace_back(MenuProperties("Portamento",
+    [&](){ return std::to_string(currentWaveSettings.portamentoRate); },
+    [&](){
+      currentWaveSettings.portamentoRate++;
+      if (currentWaveSettings.portamentoRate > 99) currentWaveSettings.portamentoRate = 99;
+    },
+    [&](){
+      currentWaveSettings.portamentoRate--;
+      if (currentWaveSettings.portamentoRate < 0) currentWaveSettings.portamentoRate = 0;
+    } ));
+  m_menus.emplace_back(MenuProperties("Delay",
+    [&](){ return std::to_string(currentWaveSettings.delayRate); },
+    [&](){
+      currentWaveSettings.delayRate++;
+      if (currentWaveSettings.delayRate > 99) currentWaveSettings.delayRate = 99;
+    },
+    [&](){
+      currentWaveSettings.delayRate--;
+      if (currentWaveSettings.delayRate < 0) currentWaveSettings.delayRate = 0;
+    } ));
+  m_menus.emplace_back(MenuProperties());
+  m_menus.emplace_back(MenuProperties("KeySense",
+    [&](){ return std::to_string(keySense); },
+    [&](){
+      keySense += 5;
+      if (keySense > 100) keySense = 100;
+    },
+    [&](){
+      keySense -= 5;
+      if (keySense < 0) keySense = 0;
+    } ));
+  m_menus.emplace_back(MenuProperties("BrthSense", 
+    [&](){ return std::to_string(breathSense); },
+    [&](){
+#ifdef ENABLE_MCP3425
+      breathSense += 50;
+      if (breathSense > 500) breathSense = 500;
+#else
+      breathSense += 10;
+      if (breathSense > 500) breathSense = 500;
+#endif
+    },
+    [&](){
+#ifdef ENABLE_MCP3425
+      breathSense -= 50;
+      if (breathSense < 0) breathSense = 0;
+#else
+      breathSense -= 10;
+      if (breathSense < 100) breathSense = 100;
+#endif
+    } ));
+  m_menus.emplace_back(MenuProperties("BrthZero",
+    [&](){ return std::to_string(breathZero); },
+    [&](){
+      breathZero += 10;
+      if (breathZero > 300) breathZero = 300;
+    },
+    [&](){
+      breathZero -= 10;
+      if (breathZero < 0) breathZero = 0;
+    } ));
+  m_menus.emplace_back(MenuProperties("Clock",
+    [&](){ return TimeToStr(); },
+    [&](){
+      minute = (minute + 1)%60;
+      if (minute == 0) {
+        hour = (hour + 1)%24;
+      }
+      isRtcChanged = true;
+    },
+    [&](){
+      minute = (minute + 59) % 60;
+      if (minute == 59) {
+        hour = (hour + 23)%24;
+      }
+      isRtcChanged = true;
+    } ));
+  m_menus.emplace_back(MenuProperties());
+  m_menus.emplace_back(MenuProperties("KeyTest",
+    [&](){ return currentKey; },
+    [&](){},
+    [&](){} ));
+  m_menus.emplace_back(MenuProperties("BrthTest",
+    [&](){ return std::to_string(currentPressure); },
+    [&](){},
+    [&](){} ));
+  m_menus.emplace_back(MenuProperties("SpkTest",
+    [&](){ return NoteNumberToStr(); },
+    [&](){
+      testNote++;
+      if (testNote > 96) testNote = 96;
+      forcePlayNote = testNote;
+      forcePlayTime = FORCEPLAYTIME_LENGTH;
+    },
+    [&](){
+      testNote--;
+      if (testNote < 12) testNote = 12;
+      forcePlayNote = testNote;
+      forcePlayTime = FORCEPLAYTIME_LENGTH;
+    } ));
 }
 
 //-------------------------------------
@@ -102,6 +261,10 @@ void Menu::SavePreferences() {
     pref.putInt(s, waveSettings[i].transpose);
     sprintf(s, "AttackSoftness%d", i);
     pref.putInt(s, waveSettings[i].attackSoftness);
+    sprintf(s, "PitchDropLevel%d", i);
+    pref.putInt(s, waveSettings[i].pitchDropLevel);
+    sprintf(s, "PitchDropPos%d", i);
+    pref.putInt(s, waveSettings[i].pitchDropPos);
     sprintf(s, "PortamentoRate%d", i);
     pref.putInt(s, waveSettings[i].portamentoRate);
     sprintf(s, "DelayRate%d", i);
@@ -133,31 +296,13 @@ void Menu::ClearAllFlash(){
 //--------------------------
 // 現在の値を記録バッファから読み出し
 void Menu::ReadPlaySettings(int widx) {
-    //isAccControl = waveSettings[widx].isAccControl;
-    fineTune = waveSettings[widx].fineTune;
-    transpose = waveSettings[widx].transpose;
-    attackSoftness = waveSettings[widx].attackSoftness;
-    portamentoRate = waveSettings[widx].portamentoRate;
-    delayRate = waveSettings[widx].delayRate;
-
-    lowPassP = waveSettings[widx].lowPassP;
-    lowPassR = waveSettings[widx].lowPassR;
-    lowPassQ = waveSettings[widx].lowPassQ;
+  currentWaveSettings = waveSettings[widx];
 }
 
 //--------------------------
 // 現在の値を記録用バッファに書き込み
 void Menu::WritePlaySettings(int widx) {
-    //waveSettings[widx].isAccControl = isAccControl;
-    waveSettings[widx].fineTune = fineTune;
-    waveSettings[widx].transpose = transpose;
-    waveSettings[widx].attackSoftness = attackSoftness;
-    waveSettings[widx].portamentoRate = portamentoRate;
-    waveSettings[widx].delayRate = delayRate;
-
-    waveSettings[widx].lowPassP = lowPassP;
-    waveSettings[widx].lowPassR = lowPassR;
-    waveSettings[widx].lowPassQ = lowPassQ;
+  waveSettings[widx] = currentWaveSettings;
 }
 
 //--------------------------
@@ -167,15 +312,18 @@ void Menu::ResetPlaySettings(int widx) {
   if (idx < 0) {
     idx = waveIndex;
   }
-  // isAccControl = false;
-  fineTune = 442;
-  transpose = waveData.GetWaveTranspose(idx);
-  portamentoRate = 15;
-  delayRate = 15;
+  // currentWaveSettings.isAccControl = false;
+  currentWaveSettings.fineTune = 442;
+  currentWaveSettings.transpose = waveData.GetWaveTranspose(idx);
+  currentWaveSettings.attackSoftness = waveData.GetWaveAttackSoftness(idx);
+  currentWaveSettings.pitchDropLevel = waveData.GetWavePitchDropLevel(idx);
+  currentWaveSettings.pitchDropPos = waveData.GetWavePitchDropPos(idx);
+  currentWaveSettings.portamentoRate = 15;
+  currentWaveSettings.delayRate = 15;
 
-  lowPassP = 5;
-  lowPassR = 5;
-  lowPassQ = waveData.GetWaveLowPassQ(idx);
+  currentWaveSettings.lowPassP = 5;
+  currentWaveSettings.lowPassR = 5;
+  currentWaveSettings.lowPassQ = waveData.GetWaveLowPassQ(idx);
   WritePlaySettings(idx);
 }
 
@@ -185,7 +333,7 @@ void Menu::LoadPreferences() {
   keySense = pref.getInt("KeySense", 50);
 #ifdef ENABLE_MCP3425
   breathSense = pref.getInt("BreathSense", 150);
-  breathZero = pref.getInt("BreathZero", 110);
+  breathZero = pref.getInt("BreathZero", 170);
 #else
   breathSense = pref.getInt("BreathSense2", 200);
   breathZero = pref.getInt("BreathZero", 50);
@@ -205,6 +353,10 @@ void Menu::LoadPreferences() {
     waveSettings[i].transpose = pref.getInt(s, waveData.GetWaveTranspose(i));
     sprintf(s, "AttackSoftness%d", i);
     waveSettings[i].attackSoftness = pref.getInt(s, waveData.GetWaveAttackSoftness(i));
+    sprintf(s, "PitchDrop%d", i);
+    waveSettings[i].pitchDropLevel = pref.getInt(s, waveData.GetWavePitchDropLevel(i));
+    sprintf(s, "PitchDropPos%d", i);
+    waveSettings[i].pitchDropPos = pref.getInt(s, waveData.GetWavePitchDropPos(i));
     sprintf(s, "PortamentoRate%d", i);
     waveSettings[i].portamentoRate = pref.getInt(s, waveData.GetWavePortamento(i));
     sprintf(s, "DelayRate%d", i);
@@ -222,7 +374,7 @@ void Menu::LoadPreferences() {
   ReadPlaySettings(waveIndex);
 }
 
-#ifdef ENABLE_RTC
+#if ENABLE_RTC
 //--------------------------
 // RTC 時刻変更
 void Menu::WriteRtc() {
@@ -262,9 +414,9 @@ void Menu::SetNextWave() {
 // 次のローパスQ値に変更
 bool Menu::SetNextLowPassQ() {
   bool ret = false;
-  lowPassQ += 5;
-  if (lowPassQ > 30) {
-    lowPassQ = 0;
+  currentWaveSettings.lowPassQ += 5;
+  if (currentWaveSettings.lowPassQ > 30) {
+    currentWaveSettings.lowPassQ = 0;
     ret = true;
   }
   WritePlaySettings(waveIndex);
@@ -273,20 +425,21 @@ bool Menu::SetNextLowPassQ() {
 
 //--------------------------
 // メニュー更新処理 (AFUUE2)
-#ifdef _M5STICKC_H_
 bool Menu::Update(uint16_t key, int pressure) {
   M5.update();
   if (M5.BtnA.pressedFor(100)) {
     if (isEnabled) {
       cursorPos = 0;
-#ifdef ENABLE_RTC
+#if ENABLE_RTC
       WriteRtc();
 #endif
+#ifdef DISPLAY_WIDTH
       canvas->deleteSprite();
       M5.Lcd.setBrightness(127);
       M5.Lcd.setRotation(0);
       canvas->setColorDepth(16);
       canvas->createSprite(DISPLAY_HEIGHT, DISPLAY_WIDTH);
+#endif
       isEnabled = false;
       ReadPlaySettings(waveIndex);
     }
@@ -309,18 +462,23 @@ bool Menu::Update(uint16_t key, int pressure) {
   }
   if (M5.BtnB.pressedFor(100)) {
     if (isEnabled == false) {
-#ifdef ENABLE_RTC
+#if ENABLE_RTC
       ReadRtc();
 #endif
+#ifdef DISPLAY_WIDTH
       canvas->deleteSprite();
       M5.Lcd.setBrightness(255);
       M5.Lcd.setRotation(3);
       canvas->setColorDepth(16);
       canvas->createSprite(DISPLAY_WIDTH, DISPLAY_HEIGHT);
+#endif
       isEnabled = true;
     }
     else {
-      cursorPos = (cursorPos + 1)%((int)MENUINDEX_MAX);
+      cursorPos = (cursorPos + 1)%((int)m_menus.size());
+      if (!m_menus[cursorPos].valueFunc) {
+        cursorPos = (cursorPos + 1)%((int)m_menus.size());
+      }
     }
     Display();
     while (1) {
@@ -341,145 +499,21 @@ bool Menu::Update(uint16_t key, int pressure) {
   if (isEnabled) {
     bool octDown = ((key & (1 << 10)) != 0);
     bool octUp = ((key & (1 << 11)) != 0);
-    if (octDown) {
-      switch (cursorPos) {
-        case MENUINDEX_TRANSPOSE:
-          transpose--;
-          if (transpose < -12) transpose = -12;
-          break;
-        case MENUINDEX_LOWPASSP:
-          lowPassP--;
-          if (lowPassP < 1) lowPassP = 1;
-          break;
-        case MENUINDEX_LOWPASSR:
-          lowPassR--;
-          if (lowPassR < 1) lowPassR = 1;
-          break;
-        case MENUINDEX_LOWPASSQ:
-          lowPassQ--;
-          if (lowPassQ < 0) lowPassQ = 0;
-          break;
-        case MENUINDEX_ATTACK:
-          attackSoftness--;
-          if (attackSoftness < 0) attackSoftness = 0;
-          break;
-        case MENUINDEX_FINETUNE:
-          fineTune--;
-          if (fineTune < 400) fineTune = 400;
-          break;
-        case MENUINDEX_PORTAMENTO:
-          portamentoRate--;
-          if (portamentoRate < 0) portamentoRate = 0;
-          break;
-        case MENUINDEX_DELAY:
-          delayRate--;
-          if (delayRate < 0) delayRate = 0;
-          break;
-        case MENUINDEX_KEYSENSE:
-          keySense -= 5;
-          if (keySense < 0) keySense = 0;
-          break;
-        case MENUINDEX_BREATHSENSE:
-#ifdef ENABLE_MCP3425
-          breathSense -= 50;
-          if (breathSense < 0) breathSense = 0;
-#else
-          breathSense -= 10;
-          if (breathSense < 100) breathSense = 100;
-#endif
-          break;
-        case MENUINDEX_BREATHZERO:
-          breathZero -= 10;
-          if (breathZero < 0) breathZero = 0;
-          break;
-        case MENUINDEX_CLOCK:
-          minute = (minute + 59) % 60;
-          if (minute == 59) {
-            hour = (hour + 23)%24;
-          }
-          isRtcChanged = true;
-          break;
-        case MENUINDEX_SPEAKER:
-          testNote--;
-          if (testNote < 12) testNote = 12;
-          forcePlayNote = testNote;
-          forcePlayTime = FORCEPLAYTIME_LENGTH;
-          break;
-      }
-      if (cursorPos != MENUINDEX_PUSHEDKEY) {
-        Display();
-        WritePlaySettings(waveIndex);
-      }
-    }
     if (octUp) {
-      switch (cursorPos) {
-        case MENUINDEX_TRANSPOSE:
-          transpose++;
-          if (transpose > 12) transpose = 12;
-          break;
-        case MENUINDEX_LOWPASSP:
-          lowPassP++;
-          if (lowPassP > 10) lowPassP = 10;
-          break;
-        case MENUINDEX_LOWPASSR:
-          lowPassR++;
-          if (lowPassR > 30) lowPassR = 30;
-          break;
-        case MENUINDEX_LOWPASSQ:
-          lowPassQ++;
-          if (lowPassQ > 50) lowPassQ = 50;
-          break;
-        case MENUINDEX_ATTACK:
-          attackSoftness++;
-          if (attackSoftness > 99) attackSoftness = 99;
-          break;
-        case MENUINDEX_FINETUNE:
-          fineTune++;
-          if (fineTune > 480) fineTune = 480;
-          break;
-        case MENUINDEX_PORTAMENTO:
-          portamentoRate++;
-          if (portamentoRate > 99) portamentoRate = 99;
-          break;
-        case MENUINDEX_DELAY:
-          delayRate++;
-          if (delayRate > 99) delayRate = 99;
-          break;
-        case MENUINDEX_KEYSENSE:
-          keySense += 5;
-          if (keySense > 100) keySense = 100;
-          break;
-        case MENUINDEX_BREATHSENSE:
-#ifdef ENABLE_MCP3425
-          breathSense += 50;
-          if (breathSense > 500) breathSense = 500;
-#else
-          breathSense += 10;
-          if (breathSense > 500) breathSense = 500;
-#endif
-          break;
-        case MENUINDEX_BREATHZERO:
-          breathZero += 10;
-          if (breathZero > 300) breathZero = 300;
-          break;
-        case MENUINDEX_CLOCK:
-          minute = (minute + 1)%60;
-          if (minute == 0) {
-            hour = (hour + 1)%24;
-          }
-          isRtcChanged = true;
-          break;
-        case MENUINDEX_SPEAKER:
-          testNote++;
-          if (testNote > 96) testNote = 96;
-          forcePlayNote = testNote;
-          forcePlayTime = FORCEPLAYTIME_LENGTH;
-          break;
+      if (m_menus[cursorPos].plusFunc) {
+        // 値を増やす
+        m_menus[cursorPos].plusFunc();
       }
-      if (cursorPos != MENUINDEX_PUSHEDKEY) {
-        Display();
-        WritePlaySettings(waveIndex);
+      Display();
+      WritePlaySettings(waveIndex);
+    }
+    if (octDown) {
+      if (m_menus[cursorPos].minusFunc) {
+        // 値を減らす
+        m_menus[cursorPos].minusFunc();
       }
+      Display();
+      WritePlaySettings(waveIndex);
     }
     const char* keyName[] = {
       "LowC", "Eb", "D", "E", "F", "LowC#", "G#", "G", "A", "B", "Down", "Up"
@@ -494,7 +528,7 @@ bool Menu::Update(uint16_t key, int pressure) {
     currentPressure = pressure;
   }
   else {
-#ifdef ENABLE_RTC
+#if ENABLE_RTC
     m5::rtc_time_t TimeStruct;
     M5.Rtc.getTime(&TimeStruct);
     if ((hour != TimeStruct.hours) || (minute != TimeStruct.minutes)) {
@@ -506,11 +540,9 @@ bool Menu::Update(uint16_t key, int pressure) {
   }
   return false;
 }
-#endif // _M5STICKC_H_
 
 //--------------------------
 // メニュー更新処理（AFUUE2R)
-#ifdef _STAMPS3_H_
 bool Menu::Update2R(volatile WaveInfo* pInfo, const KeySystem* pKey) {
   M5.update();
   static int pgNumHigh = 0;
@@ -697,12 +729,11 @@ bool Menu::Update2R(volatile WaveInfo* pInfo, const KeySystem* pKey) {
   }
   return false;
 }
-#endif
 
 //--------------------------
 // x, y にバッテリー情報を描画
 void Menu::DrawBattery(int x, int y) {
-#ifdef _M5STICKC_H_
+#ifdef DISPLAY_WIDTH
   bat_per = M5.Power.getBatteryLevel();
   if(bat_per > 100.0f){
       bat_per = 100.0f;
@@ -731,7 +762,7 @@ void Menu::DrawBattery(int x, int y) {
 //--------------------------
 // sx, sy の位置に str を描画（英数字のみです）
 void Menu::DrawString(const char* str, int sx, int sy) {
-#ifdef _M5STICKC_H_
+#ifdef DISPLAY_WIDTH
   const char* ps = str;
   int x = sx;
   int y = sy;
@@ -762,11 +793,10 @@ void Menu::DrawString(const char* str, int sx, int sy) {
 //--------------------------
 // 線をひく
 void Menu::DisplayLine(int line, bool selected, const std::string& title, const std::string& value) {
-#ifdef _M5STICKC_H_
+#ifdef DISPLAY_WIDTH
   if ((line < 0)||(line > 3)) return;
   
   std::string s = "";
-
   if (DISPLAY_WIDTH == 128) {
     // M5AtomS3
     if (!selected) {
@@ -776,8 +806,10 @@ void Menu::DisplayLine(int line, bool selected, const std::string& title, const 
     s += title;
     s += "\n";
     s += "\n";
-    s += " : ";
-    s += value;
+    if (value != "") {
+      s += " : ";
+      s += value;
+    }
     DrawString(s.c_str(), 10, 10 + 20);
   }
   else {
@@ -790,8 +822,10 @@ void Menu::DisplayLine(int line, bool selected, const std::string& title, const 
     while (s.length() < 11) {
       s += " ";
     }
-    s += ": ";
-    s += value;
+    if (value != "") {
+      s += " : ";
+      s += value;
+    }
     DrawString(s.c_str(), 10, 10 + 20*(line+2));
   }
 #endif
@@ -799,7 +833,7 @@ void Menu::DisplayLine(int line, bool selected, const std::string& title, const 
 
 //--------------------------
 // 時刻から文字へ
-std::string Menu::TimeToStr() {
+std::string Menu::TimeToStr() const {
   char s[16];
   sprintf(s, "%02d:%02d", hour, minute);
   return std::string(s);
@@ -807,20 +841,20 @@ std::string Menu::TimeToStr() {
 
 //--------------------------
 // トランスポーズの文字列を取得
-std::string Menu::TransposeToStr() {
+std::string Menu::TransposeToStr() const {
   const char* TransposeTable[25] = {
     "-C", "-Db", "-D", "-Eb", "-E", "-F", "-Gb", "-G", "-Ab", "-A", "-Bb", "-B",
     "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B", "+C"
   };
-  if ((transpose < -12) && (transpose > 12)) {
+  if ((currentWaveSettings.transpose < -12) && (currentWaveSettings.transpose > 12)) {
     return "??";
   }
-  return std::string(TransposeTable[transpose+12]);
+  return std::string(TransposeTable[currentWaveSettings.transpose+12]);
 }
 
 //--------------------------
 // ノート番号の文字列を取得
-std::string Menu::NoteNumberToStr() {
+std::string Menu::NoteNumberToStr() const {
   const char* NoteName[] = {
     "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
   };
@@ -832,7 +866,7 @@ std::string Menu::NoteNumberToStr() {
 //--------------------------
 // メニュー用の描画
 void Menu::DisplayMenu() {
-#ifdef _M5STICKC_H_
+#ifdef DISPLAY_WIDTH
   if (DISPLAY_WIDTH == 128) {
     // M5AtomS3
     DrawString("[Settings]", 10, 10);
@@ -845,28 +879,24 @@ void Menu::DisplayMenu() {
   if (cursorPos >= 4) {
     viewPos = 3 - cursorPos;
   }
-  DisplayLine(viewPos, (cursorPos == i), "Transpose", TransposeToStr()); viewPos++; i++;
-  DisplayLine(viewPos, (cursorPos == i), "LP_Pos", std::to_string(lowPassP)); viewPos++; i++;
-  DisplayLine(viewPos, (cursorPos == i), "LP_Rate", std::to_string(lowPassR)); viewPos++; i++;
-  DisplayLine(viewPos, (cursorPos == i), "LP_Power", std::to_string(lowPassQ)); viewPos++; i++;
-  DisplayLine(viewPos, (cursorPos == i), "Attack", std::to_string(attackSoftness)); viewPos++; i++;
-  DisplayLine(viewPos, (cursorPos == i), "FineTune", std::to_string(fineTune)); viewPos++; i++;
-  DisplayLine(viewPos, (cursorPos == i), "Portamnto", std::to_string(portamentoRate)); viewPos++; i++;
-  DisplayLine(viewPos, (cursorPos == i), "Delay", std::to_string(delayRate)); viewPos++; i++;
-  DisplayLine(viewPos, (cursorPos == i), "KeySense", std::to_string(keySense)); viewPos++; i++;
-  DisplayLine(viewPos, (cursorPos == i), "BrthSense", std::to_string(breathSense)); viewPos++; i++;
-  DisplayLine(viewPos, (cursorPos == i), "BrthZero", std::to_string(breathZero)); viewPos++; i++;
-  DisplayLine(viewPos, (cursorPos == i), "Clock", TimeToStr()); viewPos++; i++;
-  DisplayLine(viewPos, (cursorPos == i), "KeyTest", currentKey); viewPos++; i++;
-  DisplayLine(viewPos, (cursorPos == i), "BrthTest", std::to_string(currentPressure)); viewPos++; i++;
-  DisplayLine(viewPos, (cursorPos == i), "SpkTest", NoteNumberToStr()); viewPos++; i++;
+
+  for (const auto& m : m_menus) {
+    if (m.valueFunc) {
+      DisplayLine(viewPos, (cursorPos == i), m.name, m.valueFunc());
+    }
+    else {
+      DisplayLine(viewPos, false, "------", "");
+    }
+    viewPos++;
+    i++;
+  }
 #endif
 }
 
 //--------------------------
 // 演奏時用の描画
 void Menu::DisplayPerform(bool onlyRefreshTime) {
-#ifdef _M5STICKC_H_
+#ifdef DISPLAY_WIDTH
   if (onlyRefreshTime == false) {
     if (DISPLAY_HEIGHT > 128) {
       canvas->pushImage(0, 240-115, 120, 115, bitmap_logo);
@@ -875,6 +905,7 @@ void Menu::DisplayPerform(bool onlyRefreshTime) {
     DrawString(TransposeToStr().c_str(), 10, 100);
   }
   {
+#if ENABLE_RTC
     m5::rtc_time_t TimeStruct;
     M5.Rtc.getTime(&TimeStruct);
     if (hour == TimeStruct.hours) {
@@ -886,6 +917,7 @@ void Menu::DisplayPerform(bool onlyRefreshTime) {
     char s[32];
     sprintf(s, "%02d:%02d", hour, minute);
     DrawString(s, 10, 10);
+#endif
     DrawBattery(103, 12);
   }
 #endif
@@ -894,7 +926,7 @@ void Menu::DisplayPerform(bool onlyRefreshTime) {
 //--------------------------
 // 描画窓口
 void Menu::Display() {
-#ifdef _M5STICKC_H_
+#ifdef DISPLAY_WIDTH
   canvas->fillScreen(TFT_BLACK);
 
   if (isEnabled) {

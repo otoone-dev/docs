@@ -10,6 +10,7 @@ public:
   void UpdateAcc();
   void BendExec(float td, float vol, bool bendKeysDown);
   float GetBlowPower() const;
+  float GetPressureValue(int index);
 
   float accx, accy, accz;
   float blowPower;
@@ -21,8 +22,8 @@ public:
 private:
   int defaultPressureValue = 0;
   int defaultPressureValue2 = 0;
-  int pressureValue = 0;
-  int pressureValue2 = 0;
+  float pressureValue = 0;
+  float pressureValue2 = 0;
   int bendCounter = 0;
   const float BENDRATE = -1.0f;
   const float BENDDOWNTIME_LENGTH = 100.0f; //ms
@@ -40,6 +41,5 @@ private:
 #ifdef ENABLE_ADC
   int GetPressureValueADC(int index);
 #endif
-  int GetPressureValue(int index);
 };
 

@@ -18,7 +18,6 @@ public:
 
   }
   void Initialize();
-  void Loop();
 
 private:
   M5Canvas canvas;
@@ -38,12 +37,16 @@ private:
   float targetNote = 60.0f;
   float currentNote = 60.0f;
   float startNote = 60.0f;
+
   float keyTimeMs = 0.0f;
   float keySenseTimeMs = 50.0f;
-  int attackSoftness = 0;
+
   float attackNoiseLevel = 0.0f;
   const float ATTACKNOISETIME_LENGTH = 50.0f; //ms
   float noteOnTimeMs = 0.0f;
+
+  float volumeDropNoteShift = 0.0f;
+
   float noteOnAccX, noteOnAccY, noteOnAccZ;
   float forcePlayTime = 0.0f;
 

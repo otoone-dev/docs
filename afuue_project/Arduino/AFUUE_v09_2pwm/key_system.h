@@ -47,11 +47,9 @@ public:
   bool IsKeyUp_Down() const {
     return (octUp == LOW);
   }
-#ifdef _STAMPS3_H_
   bool IsFuncBtn_Down() const {
     return ((keyData & (1 << 12)) != 0);
   }
-#endif
 
   bool IsKeyLowC_Push() const {
     return ((keyPush & (1 << 0)) != 0);
@@ -89,11 +87,9 @@ public:
   bool IsKeyUp_Push() const {
     return ((keyPush & (1 << 11)) != 0);
   }
-#ifdef _STAMPS3_H_
   bool IsFuncBtn_Push() const {
     return ((keyPush & (1 << 12)) != 0);
   }
-#endif
 
 private:
   uint16_t keyData = 0;

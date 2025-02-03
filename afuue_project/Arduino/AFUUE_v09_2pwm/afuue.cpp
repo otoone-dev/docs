@@ -30,12 +30,6 @@ void Afuue::Initialize() {
   M5.Lcd.setTextSize(1);
   M5.Lcd.setBrightness(127);
 #endif // _M5STICKC_H_
-#ifdef ENABLE_IMU
-  if (HasImu()) {
-    M5.Imu.Init();
-    M5.Imu.SetAccelFsr(M5.IMU.AFS_2G);
-  }
-#endif
 
 #ifdef _STAMPS3_H_
   SetLedColor(10, 10, 10);
@@ -114,7 +108,7 @@ void Afuue::Initialize() {
     xQueue = xQueueCreate(QUEUE_LENGTH, sizeof(int8_t));
     xTaskCreatePinnedToCore(CreateWaveTask, "createWaveTask", 16384, this, configMAX_PRIORITIES, &taskHandle, CORE0);
 
-    timer = timerBegin(0, CLOCK_DIVIDER, true);
+    timer = timerBegin(0, CLOCK_DIVIDER, true); // Events Run On は Core1 想定
     timerAttachInterrupt(timer, &OnTimer, false);
     timerAlarmWrite(timer, TIMER_ALARM, true);
     timerAlarmEnable(timer);
@@ -130,164 +124,154 @@ void Afuue::Initialize() {
 }
 
 //-------------------------------------
-void Afuue::Loop() {
-  // Core0 は波形生成に専念している, loop は Core1
-#ifdef _STAMPS3_H_
-  int br = (int)(245 * generator.requestedVolume) + 10;
-  if (!menu.isLipSensorEnabled) {
-    SetLedColor(0, br, 0);
-  }
-  else {
-      float r = -sensors.bendNoteShift;
-      SetLedColor((int)(br * (1 - r)), 0, (int)(br * r));
-  }
-  delay(50);
-#else
-  delay(5000);
-#endif
-}
-
-//-------------------------------------
 void Afuue::GetMenuParams() {
-    waveInfo.lowPassP = menu.lowPassP * 0.1f;
-    waveInfo.lowPassR = menu.lowPassR;
-    waveInfo.lowPassQ = menu.lowPassQ * 0.1f;
-    if (waveInfo.lowPassQ > 0.0f) {
-      waveInfo.lowPassIDQ = 1.0f / (2.0f * waveInfo.lowPassQ);
-    }
-    else {
-      waveInfo.lowPassIDQ = 0.0f;
-    }
-    waveInfo.fineTune = menu.fineTune;
-    waveInfo.baseNote = 61 + menu.transpose;
-    waveInfo.portamentoRate = 1 - (menu.portamentoRate * 0.01f);
-    waveInfo.delayRate = menu.delayRate * 0.01f;
+  waveInfo.ApplyFromWaveSettings(menu.currentWaveSettings);
 
-    attackSoftness = menu.attackSoftness * 0.01f;
-    attackNoiseLevel = menu.waveData.GetWaveAttackNoiseLevel(menu.waveIndex);
-    keySenseTimeMs = menu.keySense;
-    sensors.breathSenseRate = menu.breathSense;
-    sensors.breathZero = menu.breathZero;
-    sensors.isLipSensorEnabled = menu.isLipSensorEnabled;
+  attackNoiseLevel = menu.waveData.GetWaveAttackNoiseLevel(menu.waveIndex);
+  keySenseTimeMs = menu.keySense;
+  sensors.breathSenseRate = menu.breathSense;
+  sensors.breathZero = menu.breathZero;
+  sensors.isLipSensorEnabled = menu.isLipSensorEnabled;
 }
 
 //-------------------------------------
 void Afuue::Update(float td) {
+  float reqVolume = generator.requestedVolume;
 #if ENABLE_MIDI
-    if (menu.isMidiEnabled) {
-      afuueMidi.Update((int)currentNote, generator.requestedVolume, sensors.isLipSensorEnabled, sensors.bendNoteShift);
-    } else
+  if (menu.isMidiEnabled) {
+    afuueMidi.Update((int)currentNote, reqVolume, sensors.isLipSensorEnabled, sensors.bendNoteShift + volumeDropNoteShift);
+  } else
 #endif
-    {
-      // ノイズ
-      if (generator.requestedVolume < 0.001f) {
-        noteOnTimeMs = 0.0f;
-        noteOnAccX = sensors.accx;
-        noteOnAccY = sensors.accy;
-        noteOnAccZ = sensors.accz;
-      }
-      else {
-        noteOnTimeMs += td;
-      }
-      float n = (ATTACKNOISETIME_LENGTH - noteOnTimeMs) / ATTACKNOISETIME_LENGTH;
-      if (n < 0.0f) n = 0.0f;
-      if (n > 1.0f) n = 1.0f;
-      generator.noiseVolume = n * attackNoiseLevel;
-
-      generator.Tick(currentNote + sensors.bendNoteShift);
+  {
+    // ノイズ
+    if (reqVolume < 0.001f) {
+      noteOnTimeMs = 0.0f;
+      noteOnAccX = sensors.accx;
+      noteOnAccY = sensors.accy;
+      noteOnAccZ = sensors.accz;
     }
+    else {
+      noteOnTimeMs += td;
+    }
+    float n = (ATTACKNOISETIME_LENGTH - noteOnTimeMs) / ATTACKNOISETIME_LENGTH;
+    if (n < 0.0f) n = 0.0f;
+    if (n > 1.0f) n = 1.0f;
+    generator.noiseVolume = n * attackNoiseLevel;
+
+    generator.Tick(currentNote + sensors.bendNoteShift + volumeDropNoteShift, td);
+  }
 }
 
 //-------------------------------------
 void Afuue::Control(float td) {
-    //気圧センサー
-    sensors.Update();
-    float blow = sensors.GetBlowPower();
+  //気圧センサー
+  sensors.Update();
+  float blow = sensors.GetBlowPower();
 
-    generator.requestedVolume += (blow - generator.requestedVolume) * (1.0f - attackSoftness);
+  generator.requestedVolume += (blow - generator.requestedVolume) * (1.0f - waveInfo.attackSoftness);
 
-    //キー操作や加速度センサー
-    key.UpdateKeys();
-    sensors.UpdateAcc();
-    sensors.BendExec(td, blow, key.IsBendKeysDown());
+  if (waveInfo.pitchDropPos > 0.0f && generator.requestedVolume < waveInfo.pitchDropPos) {
+    // 音量によるピッチダウン
+    volumeDropNoteShift = (1.0f-(generator.requestedVolume / waveInfo.pitchDropPos)) * waveInfo.pitchDropLevel;
+  }
+  else {
+    volumeDropNoteShift = 0.0f;
+  }
 
-    float n = key.GetNoteNumber(waveInfo.baseNote);
-    if (forcePlayTime > 0.0f) {
-      generator.requestedVolume = 0.1f;
-      forcePlayTime -= td;
-    } else {
-      if (targetNote != n) {
-        keyTimeMs = 0.0f;
-        startNote = currentNote;
-        targetNote = n;
-      }
+  //キー操作や加速度センサー
+  key.UpdateKeys();
+  sensors.UpdateAcc();
+  sensors.BendExec(td, blow, key.IsBendKeysDown());
+
+  float n = key.GetNoteNumber(waveInfo.baseNote);
+  if (forcePlayTime > 0.0f) {
+    generator.requestedVolume = 0.1f;
+    forcePlayTime -= td;
+  } else {
+    if (targetNote != n) {
+      keyTimeMs = 0.0f;
+      startNote = currentNote;
+      targetNote = n;
     }
-    if (generator.requestedVolume < 0.001f) {
-      currentNote = targetNote;
+  }
+  if (generator.requestedVolume < 0.001f) {
+    currentNote = targetNote;
+    keyTimeMs = 1000.0f;
+  }
+
+  // キー押されてもしばらくは反応しない処理（ピロ音防止）
+  if (keyTimeMs < 1000.0f) {
+    keyTimeMs += td;
+    if (keyTimeMs >= keySenseTimeMs) {
       keyTimeMs = 1000.0f;
+      currentNote = targetNote;
     }
-
-    // キー押されてもしばらくは反応しない処理（ピロ音防止）
-    if (keyTimeMs < 1000.0f) {
-      keyTimeMs += td;
-      if (keyTimeMs >= keySenseTimeMs) {
-        keyTimeMs = 1000.0f;
-        currentNote = targetNote;
-      }
-    }
+  }
 }
 
 //-------------------------------------
 void Afuue::MenuExec() {
-    key.UpdateMenuKeys(menu.isEnabled);
+  key.UpdateMenuKeys(menu.isEnabled);
 
-#ifdef _M5STICKC_H_
-    bool result = menu.Update(key.GetKeyPush(), pressureValue);
-#endif
-#ifdef _STAMPS3_H_
-    bool result = menu.Update2R(&waveInfo, &key);
-#endif
-    if (result) {
-      menu.BeginPreferences(); {
-        if (menu.factoryResetRequested) {
-          //出荷時状態に戻す
-          M5.Lcd.fillScreen(BLACK);
-          menu.DrawString("FACTORY RESET", 10, 10);
-          menu.ClearAllFlash(); // CLEAR ALL FLASH MEMORY
-          delay(2000);
-          ESP.restart();
-        }
-        generator.currentWaveTable = menu.waveData.GetWaveTable(menu.waveIndex);
-        menu.SavePreferences();
-      } menu.EndPreferences();
-    }
-    if (menu.isEnabled == false && !result) {
-      // perform mode
-    } else {
-      // menu mode or menu changed
-      GetMenuParams();
-      if (menu.forcePlayNote >= 0) {
-        forcePlayTime = menu.forcePlayTime;
-        currentNote = menu.forcePlayNote;
-        Serial.printf("play note=%1.1f, time=%1.1f\n", currentNote, forcePlayTime);
-        menu.forcePlayNote = -1;
+  bool result;
+  if (HasDisplay()) {
+    result = menu.Update(key.GetKeyPush(), sensors.GetPressureValue(0));
+  }
+  else {
+    result = menu.Update2R(&waveInfo, &key);
+  }
+  if (result) {
+    menu.BeginPreferences(); {
+      if (menu.factoryResetRequested) {
+        //出荷時状態に戻す
+        M5.Lcd.fillScreen(BLACK);
+        menu.DrawString("FACTORY RESET", 10, 10);
+        menu.ClearAllFlash(); // CLEAR ALL FLASH MEMORY
+        delay(2000);
+        ESP.restart();
       }
+      generator.currentWaveTable = menu.waveData.GetWaveTable(menu.waveIndex);
+      menu.SavePreferences();
+    } menu.EndPreferences();
+  }
+  if (menu.isEnabled == false && !result) {
+    // perform mode
+  } else {
+    // menu mode or menu changed
+    GetMenuParams();
+    if (menu.forcePlayNote >= 0) {
+      forcePlayTime = menu.forcePlayTime;
+      currentNote = menu.forcePlayNote;
+      Serial.printf("play note=%1.1f, time=%1.1f\n", currentNote, forcePlayTime);
+      menu.forcePlayNote = -1;
     }
+  }
+
+  if (HasLED()) {
+    int br = (int)(245 * generator.requestedVolume) + 10;
+    if (!menu.isLipSensorEnabled) {
+      SetLedColor(0, br, 0);
+    }
+    else {
+        float r = -sensors.bendNoteShift;
+        SetLedColor((int)(br * (1 - r)), 0, (int)(br * r));
+    }
+  }
 }
 
 //-------------------------------------
 #if 0
 void Afuue::SerialTask(void *pvParameters) {
-    Afuue* system = reinterpret_cast<Afuue*>(pvParameters);
-    KeySystem& key = system->GetKey();
-    Sensors& sensors = system->GetSensors();
+  Afuue* system = reinterpret_cast<Afuue*>(pvParameters);
+  KeySystem& key = system->GetKey();
+  Sensors& sensors = system->GetSensors();
 
-    while (1) {
-      char s[32];
-      sprintf(s, "%d,%d,%d,%d", key.GetKeyData(),(int)(sensors.accx*100), (int)(sensors.accy*100), (int)(sensors.accz*100));
-      Serial.println(s);
-      delay(50);
-    }
+  while (1) {
+    char s[32];
+    sprintf(s, "%d,%d,%d,%d", key.GetKeyData(),(int)(sensors.accx*100), (int)(sensors.accy*100), (int)(sensors.accz*100));
+    Serial.println(s);
+    delay(50);
+  }
 }
 #endif
 

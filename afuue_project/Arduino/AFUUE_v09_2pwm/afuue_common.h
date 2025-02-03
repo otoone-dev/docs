@@ -5,11 +5,11 @@
 #include <Preferences.h>
 #include <M5Unified.h>
 
-//#define AFUUE_VER (109) // 8Bit-DAC ADC-Direct    (AFUUE2 First)
-//#define AFUUE_VER (110) // 16Bit-PWM ADC-MCP3425  (AFUUE2 Second)
-//#define AFUUE_VER (112) // 16Bit-PWM LPS33        (AFUUE2 Test)
-#define AFUUE_VER (111) // 16Bit-PWM ADCx2        (AFUUE2R First)
-//#define AFUUE_VER (113) // 16Bit-PWM LPS33x2      (AFUUE2R Second)
+//#define AFUUE_VER (1090) // 8Bit-DAC ADC-Direct    (AFUUE2 First)
+#define AFUUE_VER (1100) // 16Bit-PWM ADC-MCP3425  (AFUUE2 Second)
+//#define AFUUE_VER (1120) // 16Bit-PWM LPS33        (AFUUE2 Test)
+//#define AFUUE_VER (1110) // 16Bit-PWM ADCx2        (AFUUE2R First)
+//#define AFUUE_VER (1130) // 16Bit-PWM LPS33x2      (AFUUE2R Second)
 
 /*
 Arduino IDE 2.3.4
@@ -37,18 +37,18 @@ https://qiita.com/tomoto335/items/d20aa668a62ad49cda36
 USB-MIDI についてはこちらの記事を参考にさせていただきました
 */
 
-#if (AFUUE_VER == 109)
+#if (AFUUE_VER == 1090)
 // AFUUE2 初代
 #define _M5STICKC_H_
 #define ENABLE_ADC
 
-#elif (AFUUE_VER == 110)
+#elif (AFUUE_VER == 1100)
 // AFUUE2 改良版
 #define _M5STICKC_H_
 #define SOUND_TWOPWM
 #define ENABLE_MCP3425
 
-#elif (AFUUE_VER == 111)
+#elif (AFUUE_VER == 1110)
 // AFUUE2R 初代
 #define _STAMPS3_H_
 #include <Arduino.h>
@@ -58,14 +58,14 @@ USB-MIDI についてはこちらの記事を参考にさせていただきま�
 #define ENABLE_ADC
 #define ENABLE_LIP
 
-#elif (AFUUE_VER == 112)
+#elif (AFUUE_VER == 1120)
 // AFUUE2 LPS33 Test
 #define _M5STICKC_H_
 #define SOUND_TWOPWM
 #define ENABLE_LPS33
 #include <Arduino_LPS22HB.h>
 
-#elif (AFUUE_VER == 113)
+#elif (AFUUE_VER == 1130)
 // AFUUE2R 改良版
 #define _STAMPS3_H_
 #include <Arduino.h>
@@ -93,9 +93,10 @@ USB-MIDI についてはこちらの記事を参考にさせていただきま�
 #define DACPIN (DAC2) // 26
 #endif
 
-#define LEDPIN (10) // M5StickC
+#define LEDPIN (10)
 #define ADCPIN (ADC2) // 36
-#define ENABLE_RTC
+#define ENABLE_RTC (1)
+#define ENABLE_MIDI (0)
 #endif //--------------
 
 #ifdef _STAMPS3_H_
@@ -110,6 +111,8 @@ USB-MIDI についてはこちらの記事を参考にさせていただきま�
 #define ADCPIN (11)
 #define ADCPIN2 (12)
 #endif //ENABLE_LIP
+#define ENABLE_RTC (0)
+#define ENABLE_MIDI (1)
 #define MIDI_IN_PIN (42)
 #define MIDI_OUT_PIN (41)
 #endif //--------------
@@ -118,6 +121,8 @@ USB-MIDI についてはこちらの記事を参考にさせていただきま�
 // ESP32 Devkit -------------
 #define DACPIN (DAC1) // 25
 #define LEDPIN (33) // ESP32-Devkit
+#define ENABLE_RTC (0)
+#define ENABLE_MIDI (0)
 #endif //--------------
 
 
@@ -141,8 +146,7 @@ USB-MIDI についてはこちらの記事を参考にさせていただきま�
 
 //#define ENABLE_COMMUNICATETOOL (0)
 #define ENABLE_BLE_MIDI (0)
-#define ENABLE_MIDI (1)
-#define ENABLE_SERIALOUTPUT (1)//(0 && !ENABLE_MIDI)
+#define ENABLE_SERIALOUTPUT (0)
 
 extern volatile uint8_t waveOutH;
 extern volatile uint8_t waveOutL;
@@ -152,6 +156,7 @@ extern int baseNote;
 extern bool IsStickC();
 extern bool IsStampS3();
 extern bool IsAtomS3();
+extern bool HasLED();
 extern bool HasDisplay();
 extern bool HasImu();
 

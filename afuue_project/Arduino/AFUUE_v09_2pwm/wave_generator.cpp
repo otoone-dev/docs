@@ -33,13 +33,40 @@ void WaveGenerator::Initialize(Menu& menu) {
 
 //----------------------------
 // 音程の変更など比較的ゆっくりな処理
-void WaveGenerator::Tick(float note) {
+void WaveGenerator::Tick(float note, float td) {
   // 現在の再生周波数から１サンプルあたりのフェーズの進みを計算
+  float rnd = 2.0f * (rand() / (float)RAND_MAX) - 1.0f; // -1.0f - 1.0f
   float wavelength = CalcFrequency(note);
   currentWavelength += (wavelength - currentWavelength) * m_pInfo->portamentoRate;
   currentWavelengthTickCount = (currentWavelength / SAMPLING_RATE);
 
+  // グロウル
+  float growlRate = 0.0f;
+#if 0
+  if (requestedVolume > growlPos) {
+    growlRate = ((requestedVolume - growlPos) / growlBand) * growlLevel;
+    float f = currentWavelength * 0.2f;
+    if (f > 100.0f) f = 100.0f;
+    if (f < 30.0f) f = 30.0f;
+    growlPhase += 6.283f * (td / 1000.0f) / (1.0f / f);
+    while (growlPhase > 6.283f) growlPhase -= 6.283f;
+    volumeShift = 1.0f - growlRate * sin(growlPhase);
+  }
+  else {
+    volumeShift = 1.0f;
+  }
+#else
+  volumeShift = 1.0f;
+#endif
+
   // ローパスパラメータの更新
+  if (m_pInfo->lowPassQ > 0.0f) {
+    m_pInfo->lowPassIDQ = 1.0f / (2.0f * (m_pInfo->lowPassQ + 1.0f * growlRate));
+  }
+  else {
+    m_pInfo->lowPassIDQ = 0.0f;
+  }
+
   if (m_pInfo->lowPassQ > 0.0f) {
     float a = (tanh(m_pInfo->lowPassR*(requestedVolume-m_pInfo->lowPassP)) + 1.0f) * 0.5f;
     float lp = 100.0f + 20000.0f * a;
@@ -86,7 +113,7 @@ void WaveGenerator:: CreateWave(bool enabled) {
     g = LowPass(g);
   }
 
-  float e = (g * requestedVolume) + delayBuffer[delayPos];
+  float e = (g * requestedVolume * volumeShift) + delayBuffer[delayPos];
 
   if ( (-0.00002f < e) && (e < 0.00002f) ) {
     e = 0.0f;
@@ -104,13 +131,13 @@ void WaveGenerator:: CreateWave(bool enabled) {
 }
 
 //--------------------------
-float WaveGenerator::CalcFrequency(float note) {
+float WaveGenerator::CalcFrequency(float note) const {
   return m_pInfo->fineTune * pow(2, (note - (69.0f-12.0f))/12.0f);
 }
 
 //---------------------------------
 // テーブルの補間計算 (波形などのループ用)
-float WaveGenerator::InteropL(volatile const float* table, int tableCount, float p) {
+float WaveGenerator::InteropL(volatile const float* table, int tableCount, float p) const {
   float v = (tableCount - FLT_MIN) *p;
   int t = (int)v;
   v -= t;
@@ -122,7 +149,7 @@ float WaveGenerator::InteropL(volatile const float* table, int tableCount, float
 
 //---------------------------------
 // テーブルの補間計算 (Tan などのループしないもの用)
-float WaveGenerator::InteropC(volatile const float* table, int tableCount, float p) {
+float WaveGenerator::InteropC(volatile const float* table, int tableCount, float p) const {
   float v = (tableCount - FLT_MIN)*p;
   int t = (int)v;
   v -= t;

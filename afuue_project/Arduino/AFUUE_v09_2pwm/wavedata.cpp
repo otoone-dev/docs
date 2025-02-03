@@ -416,6 +416,7 @@ const float* waveTable[] = {
   waveSynthA2,
   waveSynthB2,
   waveAfuueCla,
+  waveAfuueCla,
   waveAfuueBrass,
   waveAfuueFlute,
   waveAfuueViolin,
@@ -433,6 +434,7 @@ const char* waveName[] = {
   "SynthB",
 
   "A_Clarinet",
+  "A_Recorder",
   "A_Brass",
   "A_Flute",
   "A_Violin",
@@ -450,6 +452,7 @@ const int waveLowPassQ[] = {
   5,
   5,
 
+  6,
   8,
   7,
   5,
@@ -457,7 +460,7 @@ const int waveLowPassQ[] = {
 
   5,
   5,
-  5,
+  20,
 };
 
 int WaveData::GetWaveLowPassQ(int index) {
@@ -468,6 +471,7 @@ const int waveTranspose[] = {
   0,
   0,
 
+  0,
   0,
   0,
   0,
@@ -490,10 +494,11 @@ const int wavePortamento[] = {
   15,
   15,
   15,
+  15,
 
   80,
   80,
-  80,
+  93,
 };
 
 int WaveData::GetWavePortamento(int index) {
@@ -505,8 +510,9 @@ const int waveAttackSoftness[] = {
   30,
 
   20,
+  20,
   5,
-  80,
+  70,
   50,
 
   20,
@@ -525,6 +531,7 @@ const float waveNoiseLevel[] = {
   0.0f,
   0.0f,
   0.0f,
+  0.1f,
   0.0f,
 
   0.0f,
@@ -543,6 +550,7 @@ const float waveAttackNoiseLevel[] = {
   0.5f,
   0.5f,
   0.5f,
+  0.5f,
   0.0f,
 
   0.0f,
@@ -553,6 +561,45 @@ const float waveAttackNoiseLevel[] = {
 float WaveData::GetWaveAttackNoiseLevel(int index) {
   return waveAttackNoiseLevel[index];
 }
+
+const int wavePitchDropPos[] = {
+  0,
+  0,
+
+  0,
+  8,
+  0,
+  8,
+  0,
+
+  0,
+  0,
+  0,
+};
+
+int WaveData::GetWavePitchDropPos(int index) {
+  return wavePitchDropPos[index];
+}
+
+const int wavePitchDropLevel[] = {
+  0,
+  0,
+
+  0,
+  8,
+  0,
+  1,
+  0,
+
+  0,
+  0,
+  0,
+};
+
+int WaveData::GetWavePitchDropLevel(int index) {
+  return wavePitchDropLevel[index];
+}
+
 const float* WaveData::GetSinTable() const {
   return sinTable;
 }

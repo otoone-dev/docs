@@ -21,6 +21,10 @@ bool IsAtomS3() {
   return (M5.getBoard() == m5::board_t::board_M5AtomS3 || M5.getBoard() == m5::board_t::board_M5AtomS3Lite);
 }
 
+bool HasLED() {
+  return (M5.getBoard() == m5::board_t::board_M5StampS3 || M5.getBoard() == m5::board_t::board_M5AtomS3Lite);
+}
+
 bool HasDisplay() {
   return (M5.getBoard() == m5::board_t::board_M5StickCPlus || M5.getBoard() == m5::board_t::board_M5StickCPlus2 || M5.getBoard() == m5::board_t::board_M5AtomS3);
 }
@@ -38,9 +42,9 @@ void SerialPrintLn(const char* text) {
 
 //-------------------------------------
 void SetLedColor(int r, int g, int b) {
-#ifdef _STAMPS3_H_
+  if (HasLED()) {
     neopixelWrite(GPIO_NUM_21, r, g, b);
-#endif
+  }
 }
 
 //-------------------------------------
@@ -55,7 +59,6 @@ void setup() {
   auto cfg = M5.config();
   M5.begin(cfg);
   btStop();
-
   WiFi.mode(WIFI_OFF); 
 
   afuue.Initialize();
@@ -63,6 +66,6 @@ void setup() {
 
 //-------------------------------------
 void loop() {
-  afuue.Loop();
+  delay(5000);
 }
 

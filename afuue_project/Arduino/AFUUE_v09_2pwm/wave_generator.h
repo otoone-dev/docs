@@ -7,18 +7,24 @@ public:
   //---------------------------------
   WaveGenerator(volatile WaveInfo* pInfo);
   void Initialize(Menu& menu);
-  void Tick(float note);
+  void Tick(float note, float td);
   void CreateWave(bool enabled);
   //---------------------------------
   float requestedVolume = 0.0f;
   float noiseVolume = 0.0f;
   const float* currentWaveTable = NULL;
 
+  float growlLevel = 0.0f; // 検証中につき OFF
+  float growlPos = 0.9f;
+  float growlBand = 0.1f;
+  float growlPhase = 0.0f;
+
 private:
   //---------------------------------
   volatile WaveInfo* m_pInfo = NULL;
   float phase = 0.0f;
   float currentWaveLevel = 0.0f;
+  float volumeShift = 1.0f;
 
   const static int DELAY_BUFFER_SIZE = 7993;
   float delayBuffer[DELAY_BUFFER_SIZE];
@@ -38,9 +44,9 @@ private:
   float waveShift = 0.0f;
   float lowPassValue = 0.0f;
   //---------------------------------
-  float CalcFrequency(float note);
-  float InteropL(volatile const float* table, int tableCount, float p);
-  float InteropC(volatile const float* table, int tableCount, float p);
+  float CalcFrequency(float note) const;
+  float InteropL(volatile const float* table, int tableCount, float p) const;
+  float InteropC(volatile const float* table, int tableCount, float p) const;
   float LowPass(float value);
 };
 

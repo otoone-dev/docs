@@ -10,6 +10,8 @@ public:
   int GetWaveAttackSoftness(int index);
   float GetWaveNoiseLevel(int index);
   float GetWaveAttackNoiseLevel(int index);
+  int GetWavePitchDropPos(int index);
+  int GetWavePitchDropLevel(int index);
 
   const float* GetSinTable() const;
   const float* GetTanhTable() const;
