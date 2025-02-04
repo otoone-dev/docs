@@ -459,7 +459,7 @@ const int waveLowPassQ[] = {
   3,
 
   5,
-  5,
+  10,
   20,
 };
 
@@ -498,7 +498,7 @@ const int wavePortamento[] = {
 
   80,
   80,
-  93,
+  80,
 };
 
 int WaveData::GetWavePortamento(int index) {
@@ -586,7 +586,7 @@ const int wavePitchDropLevel[] = {
   0,
 
   0,
-  8,
+  6,
   0,
   1,
   0,
