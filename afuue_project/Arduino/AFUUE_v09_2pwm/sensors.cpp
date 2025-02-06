@@ -7,11 +7,9 @@ Sensors::Sensors() {}
 //---------------------------------
 // 初期化
 bool Sensors::Initialize() {
-#ifdef ENABLE_IMU
-  if (HasImu()) {
-    M5.Imu.init();
-    //M5.IMU.setAccelFsr(M5.IMU.AFS_2G);
-  }
+#ifdef HAS_IMU
+  M5.Imu.init();
+  //M5.IMU.setAccelFsr(M5.IMU.AFS_2G);
 #endif
 #ifdef ENABLE_MCP3425
   bool mcp3425OK = InitPressureMCP3425();
@@ -167,15 +165,15 @@ float Sensors::GetBlowPower() const {
 //-------------------------------------
 // 加速度センサー更新
 void Sensors:: UpdateAcc() {
-  if (HasImu()) {
-    float ax = 0.0f;
-    float ay = 0.0f;
-    float az = 1.0f;
-    M5.Imu.getAccelData(&ax,&ay,&az);
-    accx += (ax - accx) * 0.3f;
-    accy += (ay - accy) * 0.3f;
-    accz += (az - accz) * 0.3f;
-  }
+#ifdef HAS_IMU
+  float ax = 0.0f;
+  float ay = 0.0f;
+  float az = 1.0f;
+  M5.Imu.getAccelData(&ax,&ay,&az);
+  accx += (ax - accx) * 0.3f;
+  accy += (ay - accy) * 0.3f;
+  accz += (az - accz) * 0.3f;
+#endif
 }
 
 //-------------------------------------

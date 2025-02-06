@@ -80,12 +80,12 @@ USB-MIDI についてはこちらの記事を参考にさせていただきま�
 
 #ifdef _M5STICKC_H_
 // M5StickC Plus ------------
-#define _M5DISPLAY_H_
+#define HAS_IMU
+#define HAS_DISPLAY
 #define DISPLAY_WIDTH (240) // M5StickC Plus
 #define DISPLAY_HEIGHT (135)
 //#define DISPLAY_WIDTH (128) // M5AtomS3
 //#define DISPLAY_HEIGHT (128)
-#define ENABLE_IMU
 #ifdef SOUND_TWOPWM
 #define PWMPIN_LOW (0)
 #define PWMPIN_HIGH (26)
@@ -101,6 +101,7 @@ USB-MIDI についてはこちらの記事を参考にさせていただきま�
 
 #ifdef _STAMPS3_H_
 // STAMPS3 -------------
+#define HAS_LED
 #ifdef SOUND_TWOPWM
 #define PWMPIN_LOW (39)
 #define PWMPIN_HIGH (40)

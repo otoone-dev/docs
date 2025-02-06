@@ -23,7 +23,7 @@ void Menu::Initialize() {
     }
     LoadPreferences();
   } EndPreferences();
-#ifdef _M5STICKC_H_
+#ifdef HAS_DISPLAY
   canvas->setColorDepth(16);
   canvas->createSprite(DISPLAY_HEIGHT, DISPLAY_WIDTH);
 #endif
@@ -433,7 +433,7 @@ bool Menu::Update(uint16_t key, int pressure) {
 #if ENABLE_RTC
       WriteRtc();
 #endif
-#ifdef DISPLAY_WIDTH
+#ifdef HAS_DISPLAY
       canvas->deleteSprite();
       M5.Lcd.setBrightness(127);
       M5.Lcd.setRotation(0);
@@ -465,7 +465,7 @@ bool Menu::Update(uint16_t key, int pressure) {
 #if ENABLE_RTC
       ReadRtc();
 #endif
-#ifdef DISPLAY_WIDTH
+#ifdef HAS_DISPLAY
       canvas->deleteSprite();
       M5.Lcd.setBrightness(255);
       M5.Lcd.setRotation(3);
@@ -733,7 +733,7 @@ bool Menu::Update2R(volatile WaveInfo* pInfo, const KeySystem* pKey) {
 //--------------------------
 // x, y にバッテリー情報を描画
 void Menu::DrawBattery(int x, int y) {
-#ifdef DISPLAY_WIDTH
+#ifdef HAS_DISPLAY
   bat_per = M5.Power.getBatteryLevel();
   if(bat_per > 100.0f){
       bat_per = 100.0f;
@@ -762,7 +762,7 @@ void Menu::DrawBattery(int x, int y) {
 //--------------------------
 // sx, sy の位置に str を描画（英数字のみです）
 void Menu::DrawString(const char* str, int sx, int sy) {
-#ifdef DISPLAY_WIDTH
+#ifdef HAS_DISPLAY
   const char* ps = str;
   int x = sx;
   int y = sy;
@@ -793,7 +793,7 @@ void Menu::DrawString(const char* str, int sx, int sy) {
 //--------------------------
 // 線をひく
 void Menu::DisplayLine(int line, bool selected, const std::string& title, const std::string& value) {
-#ifdef DISPLAY_WIDTH
+#ifdef HAS_DISPLAY
   if ((line < 0)||(line > 3)) return;
   
   std::string s = "";
@@ -866,7 +866,7 @@ std::string Menu::NoteNumberToStr() const {
 //--------------------------
 // メニュー用の描画
 void Menu::DisplayMenu() {
-#ifdef DISPLAY_WIDTH
+#ifdef HAS_DISPLAY
   if (DISPLAY_WIDTH == 128) {
     // M5AtomS3
     DrawString("[Settings]", 10, 10);
@@ -896,7 +896,7 @@ void Menu::DisplayMenu() {
 //--------------------------
 // 演奏時用の描画
 void Menu::DisplayPerform(bool onlyRefreshTime) {
-#ifdef DISPLAY_WIDTH
+#ifdef HAS_DISPLAY
   if (onlyRefreshTime == false) {
     if (DISPLAY_HEIGHT > 128) {
       canvas->pushImage(0, 240-115, 120, 115, bitmap_logo);
@@ -926,7 +926,7 @@ void Menu::DisplayPerform(bool onlyRefreshTime) {
 //--------------------------
 // 描画窓口
 void Menu::Display() {
-#ifdef DISPLAY_WIDTH
+#ifdef HAS_DISPLAY
   canvas->fillScreen(TFT_BLACK);
 
   if (isEnabled) {

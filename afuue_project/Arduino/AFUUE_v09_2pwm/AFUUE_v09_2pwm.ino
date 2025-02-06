@@ -9,31 +9,6 @@ volatile uint8_t waveOutL = 0;
 Afuue afuue;
 
 //-------------------------------------
-bool IsStickC() {
-  return (M5.getBoard() == m5::board_t::board_M5StickCPlus || M5.getBoard() == m5::board_t::board_M5StickCPlus2);
-}
-
-bool IsStampS3() {
-  return (M5.getBoard() == m5::board_t::board_M5StampS3);
-}
-
-bool IsAtomS3() {
-  return (M5.getBoard() == m5::board_t::board_M5AtomS3 || M5.getBoard() == m5::board_t::board_M5AtomS3Lite);
-}
-
-bool HasLED() {
-  return (M5.getBoard() == m5::board_t::board_M5StampS3 || M5.getBoard() == m5::board_t::board_M5AtomS3Lite);
-}
-
-bool HasDisplay() {
-  return (M5.getBoard() == m5::board_t::board_M5StickCPlus || M5.getBoard() == m5::board_t::board_M5StickCPlus2 || M5.getBoard() == m5::board_t::board_M5AtomS3);
-}
-
-bool HasImu() {
-  return (M5.getBoard() == m5::board_t::board_M5StickCPlus || M5.getBoard() == m5::board_t::board_M5StickCPlus2 || M5.getBoard() == m5::board_t::board_M5AtomS3);
-}
-
-//-------------------------------------
 void SerialPrintLn(const char* text) {
 #if ENABLE_SERIALOUTPUT
   Serial.println(text);
@@ -42,16 +17,16 @@ void SerialPrintLn(const char* text) {
 
 //-------------------------------------
 void SetLedColor(int r, int g, int b) {
-  if (HasLED()) {
-    neopixelWrite(GPIO_NUM_21, r, g, b);
-  }
+#ifdef HAS_LED
+  neopixelWrite(GPIO_NUM_21, r, g, b);
+#endif
 }
 
 //-------------------------------------
 void DrawCenterString(const char* str, int x, int y, int fontId) {
-  if (HasDisplay()) {
-    M5.Lcd.drawCenterString(str, x, y, fontId);
-  }
+#ifdef HAS_DISPLAY
+  M5.Lcd.drawCenterString(str, x, y, fontId);
+#endif
 }
 
 //-------------------------------------

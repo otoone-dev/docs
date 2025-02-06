@@ -99,7 +99,7 @@ void Afuue::Initialize() {
 
   SerialPrintLn("setup done");
 
-#ifdef _M5STICKC_H_
+#ifdef HAS_DISPLAY
   M5.Lcd.fillScreen(TFT_BLACK);
   menu.Display();
 #endif
@@ -213,13 +213,11 @@ void Afuue::Control(float td) {
 void Afuue::MenuExec() {
   key.UpdateMenuKeys(menu.isEnabled);
 
-  bool result;
-  if (HasDisplay()) {
-    result = menu.Update(key.GetKeyPush(), sensors.GetPressureValue(0));
-  }
-  else {
-    result = menu.Update2R(&waveInfo, &key);
-  }
+#ifdef HAS_DISPLAY
+  bool result = menu.Update(key.GetKeyPush(), sensors.GetPressureValue(0));
+#else
+  bool result = menu.Update2R(&waveInfo, &key);
+#endif
   if (result) {
     menu.BeginPreferences(); {
       if (menu.factoryResetRequested) {
@@ -247,16 +245,16 @@ void Afuue::MenuExec() {
     }
   }
 
-  if (HasLED()) {
-    int br = (int)(245 * generator.requestedVolume) + 10;
-    if (!menu.isLipSensorEnabled) {
-      SetLedColor(0, br, 0);
-    }
-    else {
-        float r = -sensors.bendNoteShift;
-        SetLedColor((int)(br * (1 - r)), 0, (int)(br * r));
-    }
+#ifdef HAS_LED
+  int br = (int)(245 * generator.requestedVolume) + 10;
+  if (!menu.isLipSensorEnabled) {
+    SetLedColor(0, br, 0);
   }
+  else {
+      float r = -sensors.bendNoteShift;
+      SetLedColor((int)(br * (1 - r)), 0, (int)(br * r));
+  }
+#endif
 }
 
 //-------------------------------------
