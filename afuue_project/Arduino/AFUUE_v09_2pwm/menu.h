@@ -101,7 +101,6 @@ public:
   bool isEnabled = false;
   bool factoryResetRequested = false;
 
-
   int keySense = 0;
   int breathSense = 0;
   int breathZero = 0;
@@ -115,6 +114,7 @@ public:
   bool isLipSensorEnabled = false;
   bool isMidiEnabled = false;
   bool isUSBMidiMounted = false;
+  int drumVolume = 0;
 
 private:
   void WritePlaySettings(int widx);

@@ -135,6 +135,14 @@ void Menu::Initialize() {
       if (currentWaveSettings.delayRate < 0) currentWaveSettings.delayRate = 0;
     } ));
   m_menus.emplace_back(MenuProperties());
+  m_menus.emplace_back(MenuProperties("AccDrum",
+    [&]() { if (drumVolume==0) return std::string("OFF"); return std::to_string(drumVolume); },
+    [&]() {
+      if (drumVolume < 9) drumVolume++;
+    },
+    [&]() {
+      if (drumVolume > 0) drumVolume--;
+    }));
   m_menus.emplace_back(MenuProperties("KeySense",
     [&](){ return std::to_string(keySense); },
     [&](){

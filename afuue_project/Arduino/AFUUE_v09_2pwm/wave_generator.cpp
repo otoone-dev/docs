@@ -29,6 +29,12 @@ void WaveGenerator::Initialize(Menu& menu) {
   sinTable = menu.waveData.GetSinTable();
   tanhTable = menu.waveData.GetTanhTable();
   currentWaveTable = menu.waveData.GetWaveTable(menu.waveIndex);
+
+  for (int i = 0; i < 2; i++) {
+    drum_data[i] = menu.waveData.GetDrumData(i);
+    drum_size[i] = menu.waveData.GetDrumLength(i);
+    drum_pos[i] = 0;
+  }
 }
 
 //----------------------------
@@ -90,7 +96,7 @@ void WaveGenerator::Tick(float note, float td) {
 
 //-------------------------------------
 // 波形生成のため高速に呼ばれる処理
-void WaveGenerator:: CreateWave(bool enabled) {
+void WaveGenerator::CreateWave(bool enabled) {
   if (!enabled) {
     waveOutH = 0;
     waveOutL = 0;
@@ -113,6 +119,24 @@ void WaveGenerator:: CreateWave(bool enabled) {
     g = LowPass(g);
   }
 
+  float drum = 0.0f;
+  if (drumVolume > 0.0f) {
+    for (int i = 0; i < 2; i++) {
+      if (drum_pos[i] > 0.0f) {
+        drum_pos[i] += drum_wavelength;
+        int p = (int)(drum_pos[i]);
+        if (p >= drum_size[i]) {
+          drum_pos[i] = 0.0f;
+        }
+        else {
+          const float* data = drum_data[i];
+          float d = data[p] / 34000.0f;
+          drum += d * drumVolume;
+        }
+      }
+    }
+  }
+  
   float e = (g * requestedVolume * volumeShift) + delayBuffer[delayPos];
 
   if ( (-0.00002f < e) && (e < 0.00002f) ) {
@@ -121,6 +145,7 @@ void WaveGenerator:: CreateWave(bool enabled) {
   delayBuffer[delayPos] = e * m_pInfo->delayRate;
   delayPos = (delayPos + 1) % DELAY_BUFFER_SIZE;
 
+  e += drum;
   e *= 32000.0f;
   if (e < -32700.0f) e = -32700.0f;
   else if (e > 32700.0f) e = 32700.0f;

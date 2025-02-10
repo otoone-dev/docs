@@ -15,5 +15,8 @@ public:
 
   const float* GetSinTable() const;
   const float* GetTanhTable() const;
+
+  const int GetDrumLength(int index) const;
+  const float* GetDrumData(int index) const;
 };
 

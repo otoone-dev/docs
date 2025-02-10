@@ -124,11 +124,17 @@ void Afuue::Initialize() {
 }
 
 //-------------------------------------
+void Afuue::Loop() {
+  delay(5000);
+}
+
+//-------------------------------------
 void Afuue::GetMenuParams() {
   waveInfo.ApplyFromWaveSettings(menu.currentWaveSettings);
 
   attackNoiseLevel = menu.waveData.GetWaveAttackNoiseLevel(menu.waveIndex);
   keySenseTimeMs = menu.keySense;
+  generator.drumVolume = menu.drumVolume / 10.0f;
   sensors.breathSenseRate = menu.breathSense;
   sensors.breathZero = menu.breathZero;
   sensors.isLipSensorEnabled = menu.isLipSensorEnabled;
@@ -197,6 +203,25 @@ void Afuue::Control(float td) {
   if (generator.requestedVolume < 0.001f) {
     currentNote = targetNote;
     keyTimeMs = 1000.0f;
+  }
+
+  if (generator.drumVolume > 0.0f) {
+    if (generator.drum_mode == 0) {
+      if (sensors.accx > 0.5f) {
+        if (generator.drum_pos[1] <= 0.0f) {
+          generator.drum_pos[1] = 1.0f;
+          generator.drum_mode = 1;
+        }
+      }
+    }
+    else {
+      if (sensors.accx < -0.5f) {
+        if (generator.drum_pos[0] <= 0.0f) {
+          generator.drum_pos[0] = 1.0f;
+          generator.drum_mode = 0;
+        }
+      }
+    }
   }
 
   // キー押されてもしばらくは反応しない処理（ピロ音防止）

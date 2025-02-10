@@ -18,6 +18,7 @@ public:
 
   }
   void Initialize();
+  void Loop();
 
 private:
   M5Canvas canvas;

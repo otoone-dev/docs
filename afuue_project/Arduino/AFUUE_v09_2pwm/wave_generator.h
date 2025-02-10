@@ -14,6 +14,13 @@ public:
   float noiseVolume = 0.0f;
   const float* currentWaveTable = NULL;
 
+  const float* drum_data[2] = {NULL, NULL};
+  volatile int drum_size[2] = {0, 0};
+  volatile float drum_pos[2] = {0.0f, 0.0f};
+  const float drum_wavelength = 11025.0f / 25000.0f;
+  bool drum_mode = 0;
+  float drumVolume = 0.0f;
+
   float growlLevel = 0.0f; // 検証中につき OFF
   float growlPos = 0.9f;
   float growlBand = 0.1f;
