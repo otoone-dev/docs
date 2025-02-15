@@ -206,7 +206,7 @@ void Afuue::Control(float td) {
   }
 
   if (generator.drumVolume > 0.0f) {
-    if (generator.drum_mode == 0) {
+    if (generator.drum_mode == 0 || generator.drum_mode == 2) {
       if (sensors.accx > 0.5f) {
         if (generator.drum_pos[1] <= 0.0f) {
           generator.drum_pos[1] = 1.0f;
@@ -214,12 +214,22 @@ void Afuue::Control(float td) {
         }
       }
     }
-    else {
+    if (generator.drum_mode == 0 || generator.drum_mode == 1) {
       if (sensors.accx < -0.5f) {
         if (generator.drum_pos[0] <= 0.0f) {
           generator.drum_pos[0] = 1.0f;
-          generator.drum_mode = 0;
+          generator.drum_mode = 2;
         }
+      }
+    }
+    if (generator.drum_mode == 1) {
+      if (-0.5f < sensors.accx && sensors.accx < -0.1f ) {
+        generator.drum_mode = 0;
+      }
+    }
+    if (generator.drum_mode == 2) {
+      if (0.1f < sensors.accx && sensors.accx < 0.5f ) {
+        generator.drum_mode = 0;
       }
     }
   }
