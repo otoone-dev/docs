@@ -419,6 +419,16 @@ void Menu::SetNextWave() {
 }
 
 //--------------------------
+bool Menu::SetWaveIndex(int widx) {
+    if (waveData.GetWaveTable(widx) != NULL) {
+      waveIndex = widx;
+      ReadPlaySettings(waveIndex);
+      return true;
+    }
+    return false;
+}
+
+//--------------------------
 // 次のローパスQ値に変更
 bool Menu::SetNextLowPassQ() {
   bool ret = false;
@@ -427,7 +437,6 @@ bool Menu::SetNextLowPassQ() {
     currentWaveSettings.lowPassQ = 0;
     ret = true;
   }
-  WritePlaySettings(waveIndex);
   return ret;
 }
 
@@ -551,10 +560,8 @@ bool Menu::Update(uint16_t key, int pressure) {
 
 //--------------------------
 // メニュー更新処理（AFUUE2R)
-bool Menu::Update2R(volatile WaveInfo* pInfo, const KeySystem* pKey) {
+bool Menu::Update2R(const KeySystem* pKey) {
   M5.update();
-  static int pgNumHigh = 0;
-  static int pgNumLow = 0;
 
   if (pKey->IsKeyLowCs_Down() && pKey->IsKeyGs_Down()) {
     // Config
@@ -566,11 +573,11 @@ bool Menu::Update2R(volatile WaveInfo* pInfo, const KeySystem* pKey) {
       return true;
     }
     else if (pKey->IsKeyF_Push()) {
+      int pgNum = pgNumHigh * 10 + pgNumLow;
       // Change wave index or MIDI:Send Program Change
 #if ENABLE_MIDI
       if (isMidiEnabled) 
       {
-        int pgNum = pgNumHigh * 10 + pgNumLow;
         if (pgNum > 0) {
           afuueMidi->NoteOff();
           delay(500);
@@ -582,53 +589,60 @@ bool Menu::Update2R(volatile WaveInfo* pInfo, const KeySystem* pKey) {
       else
 #endif
       {
-        SetNextWave();
+        if (pgNum > 0) {
+          bool ret = SetWaveIndex(pgNum - 1);
+          if (!ret) {
+            return false;
+          }
+        } else {
+          SetNextWave();
+        }
         forcePlayTime = FORCEPLAYTIME_LENGTH;
-        forcePlayNote = pInfo->baseNote - 1;
+        forcePlayNote = currentWaveSettings.transpose + 61 - 1;
         return true;
       }
     }
     else if (pKey->IsKeyD_Push()) {
       // Transpose--
       if (pKey->IsKeyE_Down()) {
-        pInfo->baseNote = 61;
+        currentWaveSettings.transpose = 0;
       } else {
-        pInfo->baseNote--;
-        if (pInfo->baseNote < 61-12) pInfo->baseNote = 61-12;
+        currentWaveSettings.transpose--;
+        if (currentWaveSettings.transpose < -12) currentWaveSettings.transpose = -12;
       }
 #if ENABLE_MIDI
       if (isMidiEnabled) {
-        afuueMidi->NoteOn(pInfo->baseNote-1, 10);
-        delay(static_cast<int>(pInfo->baseNote == 61 ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH));
+        afuueMidi->NoteOn(currentWaveSettings.transpose+61-1, 10);
+        delay(static_cast<int>(currentWaveSettings.transpose == 0 ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH));
         afuueMidi->NoteOff();
       }
       else
 #endif
       {
-        forcePlayTime = pInfo->baseNote == 61 ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH;
-        forcePlayNote = pInfo->baseNote - 1;
+        forcePlayTime = currentWaveSettings.transpose == 0 ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH;
+        forcePlayNote = currentWaveSettings.transpose + 61 - 1;
         return true;
       }
     }
     else if (pKey->IsKeyE_Push()) {
       // Transpose++
       if (pKey->IsKeyD_Down()) {
-        pInfo->baseNote = 61;
+        currentWaveSettings.transpose = 0;
       } else {
-        pInfo->baseNote++;
-        if (pInfo->baseNote > 61+12) pInfo->baseNote = 61+12;
+        currentWaveSettings.transpose++;
+        if (currentWaveSettings.transpose > 12) currentWaveSettings.transpose = 12;
       }
 #if ENABLE_MIDI
       if (isMidiEnabled) {
-        afuueMidi->NoteOn(pInfo->baseNote-1, 10);
-        delay(static_cast<int>(pInfo->baseNote == 61 ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH));
+        afuueMidi->NoteOn(currentWaveSettings.transpose+61-1, 10);
+        delay(static_cast<int>(currentWaveSettings.transpose == 0 ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH));
         afuueMidi->NoteOff();
       }
       else
 #endif
       {
-        forcePlayTime = pInfo->baseNote == 61 ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH;
-        forcePlayNote = pInfo->baseNote - 1;
+        forcePlayTime = currentWaveSettings.transpose == 0 ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH;
+        forcePlayNote = currentWaveSettings.transpose + 61 - 1;
         return true;
       }
     }
@@ -637,7 +651,7 @@ bool Menu::Update2R(volatile WaveInfo* pInfo, const KeySystem* pKey) {
       if (!isMidiEnabled) {
         bool ret = SetNextLowPassQ();
         forcePlayTime = ret ? FORCEPLAYTIME_LENGTH * 2 : FORCEPLAYTIME_LENGTH;
-        forcePlayNote = pInfo->baseNote - 1;
+        forcePlayNote = currentWaveSettings.transpose + 61 - 1;
         return true;
       }
     }
@@ -648,43 +662,41 @@ bool Menu::Update2R(volatile WaveInfo* pInfo, const KeySystem* pKey) {
         breathSense = 350;
       }
       forcePlayTime = (breathSense == 200) ? FORCEPLAYTIME_LENGTH * 2 : FORCEPLAYTIME_LENGTH;
-      forcePlayNote = pInfo->baseNote - 1;
+      forcePlayNote = currentWaveSettings.transpose + 61 - 1;
       return true;
     }
     else if (pKey->IsKeyDown_Push()) {
       // Fine Tune
-      switch ((int)pInfo->fineTune) {
+      switch (currentWaveSettings.fineTune) {
         default:
-          pInfo->fineTune = 440.0f;
+          currentWaveSettings.fineTune = 440;
           break;
         case 440:
-          pInfo->fineTune = 442.0f;
+          currentWaveSettings.fineTune = 442;
           break;
         case 442:
-          pInfo->fineTune = 438.0f;
+          currentWaveSettings.fineTune = 438;
           break;
       }
-      forcePlayTime = (pInfo->fineTune == 440) ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH;
-      forcePlayNote = pInfo->baseNote - 1;
+      forcePlayTime = (currentWaveSettings.fineTune == 440) ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH;
+      forcePlayNote = currentWaveSettings.transpose + 61 - 1;
       return true;
     }
     else if (pKey->IsKeyUp_Push()) {
       // Delay Rate
-      switch ((int)(pInfo->delayRate*100)) {
+      switch (currentWaveSettings.delayRate) {
         default:
-          pInfo->delayRate = 0.15f;
+          currentWaveSettings.delayRate = 15;
           break;
-        case 14:
         case 15:
-          pInfo->delayRate = 0.3f;
+          currentWaveSettings.delayRate = 30;
           break;
-        case 29:
         case 30:
-          pInfo->delayRate = 0.0f;
+          currentWaveSettings.delayRate = 0;
           break;
       }
-      forcePlayTime = (pInfo->delayRate == 0.15f) ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH;
-      forcePlayNote = pInfo->baseNote - 1;
+      forcePlayTime = (currentWaveSettings.delayRate == 15) ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH;
+      forcePlayNote = currentWaveSettings.transpose + 61 - 1;
       return true;
     }
 #if ENABLE_MIDI
@@ -694,19 +706,13 @@ bool Menu::Update2R(volatile WaveInfo* pInfo, const KeySystem* pKey) {
         afuueMidi->ChangeBreathControlMode();
       }
     }
+#endif
     else if (pKey->IsKeyLowC_Push()) {
-      if (isMidiEnabled) {
-        // MIDI: Add Program Number +1
-        pgNumLow  = (pgNumLow + 1) % 10;
-      }
+      pgNumLow  = (pgNumLow + 1) % 10;
     }
     else if (pKey->IsKeyEb_Push()) {
-      if (isMidiEnabled) {
-        // MIDI: Add Program Number +10
-        pgNumHigh  = (pgNumHigh + 1) % 10;
-      }
+      pgNumHigh  = (pgNumHigh + 1) % 10;
     }
-#endif
   }
   else {
     pgNumHigh = 0;
@@ -721,7 +727,7 @@ bool Menu::Update2R(volatile WaveInfo* pInfo, const KeySystem* pKey) {
     }
     isMidiEnabled = (ctrlMode >= 2) || isUSBMidiMounted;
 #endif
-    forcePlayNote = pInfo->baseNote-1;
+    forcePlayNote = currentWaveSettings.transpose + 61 - 1;
     forcePlayTime = FORCEPLAYTIME_LENGTH;
     return true;
   }

@@ -130,6 +130,7 @@ void Afuue::Loop() {
 
 //-------------------------------------
 void Afuue::GetMenuParams() {
+
   waveInfo.ApplyFromWaveSettings(menu.currentWaveSettings);
 
   attackNoiseLevel = menu.waveData.GetWaveAttackNoiseLevel(menu.waveIndex);
@@ -205,6 +206,7 @@ void Afuue::Control(float td) {
     keyTimeMs = 1000.0f;
   }
 
+#ifdef HAS_IMU
   if (generator.drumVolume > 0.0f) {
     if (generator.drum_mode == 0 || generator.drum_mode == 2) {
       if (sensors.accx > 0.5f) {
@@ -233,7 +235,7 @@ void Afuue::Control(float td) {
       }
     }
   }
-
+#endif
   // キー押されてもしばらくは反応しない処理（ピロ音防止）
   if (keyTimeMs < 1000.0f) {
     keyTimeMs += td;
@@ -251,7 +253,7 @@ void Afuue::MenuExec() {
 #ifdef HAS_DISPLAY
   bool result = menu.Update(key.GetKeyPush(), sensors.GetPressureValue(0));
 #else
-  bool result = menu.Update2R(&waveInfo, &key);
+  bool result = menu.Update2R(&key);
 #endif
   if (result) {
     menu.BeginPreferences(); {
@@ -266,16 +268,12 @@ void Afuue::MenuExec() {
       generator.currentWaveTable = menu.waveData.GetWaveTable(menu.waveIndex);
       menu.SavePreferences();
     } menu.EndPreferences();
-  }
-  if (menu.isEnabled == false && !result) {
-    // perform mode
   } else {
     // menu mode or menu changed
     GetMenuParams();
     if (menu.forcePlayNote >= 0) {
       forcePlayTime = menu.forcePlayTime;
       currentNote = menu.forcePlayNote;
-      Serial.printf("play note=%1.1f, time=%1.1f\n", currentNote, forcePlayTime);
       menu.forcePlayNote = -1;
     }
   }

@@ -81,10 +81,11 @@ public:
   void Initialize();
   void SetTimer(hw_timer_t * _timer);
   void SetNextWave();
+  bool SetWaveIndex(int widx);
   bool SetNextLowPassQ();
   void ResetPlaySettings(int widx = -1);
   bool Update(uint16_t key, int pressure);
-  bool Update2R(volatile WaveInfo* pInfo, const KeySystem* pKey);
+  bool Update2R(const KeySystem* pKey);
   void BeginPreferences();
   void EndPreferences();
   void SavePreferences();
@@ -110,6 +111,8 @@ public:
   int forcePlayNote = -1;
   int forcePlayTime = 0;
 
+  int pgNumHigh = 0;
+  int pgNumLow = 0;
   int ctrlMode = 0;
   bool isLipSensorEnabled = false;
   bool isMidiEnabled = false;

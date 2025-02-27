@@ -9,7 +9,8 @@
 #define AFUUE_VER (1100) // 16Bit-PWM ADC-MCP3425  (AFUUE2 Second)
 //#define AFUUE_VER (1120) // 16Bit-PWM LPS33        (AFUUE2 Test)
 //#define AFUUE_VER (1110) // 16Bit-PWM ADCx2        (AFUUE2R First)
-//#define AFUUE_VER (1130) // 16Bit-PWM LPS33x2      (AFUUE2R Second)
+//#define AFUUE_VER (1130) // 16Bit-PWM LPS33x2      (AFUUE2R Gen2)
+//#define AFUUE_VER (1140) // 16Bit-PWM ADC-MCP3425  (AFUUE2R Gen2 Lite)
 
 /*
 Arduino IDE 2.3.4
