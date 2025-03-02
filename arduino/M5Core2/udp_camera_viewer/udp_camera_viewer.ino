@@ -13,7 +13,7 @@
 #if APMODE
 // Camera と直接接続する
 const char* ssid = "MTCF110"; // SSID, Password を Camera 側と合わせる
-const char* password = "6F99z1qm_8yp@m"; // 数字の１
+const char* password = "6F99z1qm_8ypm"; // 数字の１
 #else
 // 自宅等の WiFi router 経由で接続 (非推奨)
 const char* ssid = "ssid"; // 自宅等の SSID, Password を入れる
@@ -22,6 +22,11 @@ const char* password = "pass";
 
 std::string ipaddr = "";
 bool show_info = false;
+volatile int cam_batt = 0;
+volatile int mon_batt = 0;
+bool camSuccess = false;
+bool recvError = false;
+unsigned long recvTime = micros();
 
 #define BUFF_SIZE (320*480)
 
@@ -122,6 +127,7 @@ struct Frame {
     }
     Disp(seqTotal);
   }
+
   void Disp(int seqTotal) {
     if (_rendered) {
       return;
@@ -149,12 +155,27 @@ struct Frame {
     {
       M5.Display.startWrite();
       M5.Display.drawJpg(_buffer, _imgSize, 0, 0, 320, 240);
+      unsigned long t = micros();
       if (show_info) {
-        auto dt = M5.Rtc.getDateTime();
+        //auto dt = M5.Rtc.getDateTime();
+        //M5.Display.setCursor(10, 10);
+        //M5.Display.printf("RTC : %04d/%02d/%02d  %02d:%02d:%02d", dt.date.year, dt.date.month, dt.date.date, dt.time.hours, dt.time.minutes, dt.time.seconds);
+        int fps = (int)(1000000.0 / (t - recvTime));
         M5.Display.setCursor(10, 10);
-        M5.Display.printf("RTC : %04d/%02d/%02d  %02d:%02d:%02d", dt.date.year, dt.date.month, dt.date.date, dt.time.hours, dt.time.minutes, dt.time.seconds);
+        M5.Display.printf("BATT: Camera(%d%%) Monitor(%d%%) / %dfps", cam_batt, mon_batt, fps);
+        M5.Display.setCursor(10, 30);
+        if (camSuccess) {
+          //M5.Display.printf("_CAM_SUCCESS_");
+        }
+        else {
+          M5.Display.printf("_CAM_FAILURE_");
+        }
+        if (recvError) {
+          M5.Display.printf("  RECV_ERROR");
+        }
       }
       M5.Display.endWrite();
+      recvTime = t;
       _rendered = true;
     }
   }
@@ -169,7 +190,7 @@ void loop() {
   M5.Display.printf("%s:%d\n", ipaddr.c_str(), PORTNUM);
 
   Frame frame[2];
-  int lastWriteBufferIndex = 1;
+  volatile int lastWriteBufferIndex = 1;
 
   if(udp.listen(PORTNUM)) {
     Serial.printf("UDP Listening on IP: %s (%d)\n", ipaddr.c_str(), PORTNUM);
@@ -181,6 +202,7 @@ void loop() {
           uint8_t seqNum = *buff++;
           uint8_t seqTotal = *buff++;
           uint8_t sum = *buff++;
+          cam_batt = *buff++;
           int d0 = *buff++;
           int d1 = *buff++;
           int dataSize = d0 | (d1 << 8);
@@ -196,30 +218,26 @@ void loop() {
             lastWriteBufferIndex = 1 - lastWriteBufferIndex;
             frame[lastWriteBufferIndex].Write(frameCount, seqNum, seqTotal, buff, dataSize, sum);
           }
+          recvError = false;
         }
         else if (len == 1) {
           uint8_t status = *buff;
-          if (show_info) {
-            M5.Display.startWrite();
-            M5.Display.setCursor(10, 30);
             if (status == 0xEF) {
-              // Sended 
-              M5.Display.printf("Success______");
+              camSuccess = true;
             }
             else if (status == 0xEE) {
-              // Camera Fail
-              M5.Display.printf("Failure______");
+              camSuccess = false;
             }
-            M5.Display.endWrite();
-          }
+            recvError = false;
         }
         else {
-          if (show_info) {
-            M5.Display.startWrite();
-            M5.Display.setCursor(10, 30);
-            M5.Display.printf("Receive Error");
-            M5.Display.endWrite();
-          }
+          recvError = true;
+          //if (show_info) {
+          //  M5.Display.startWrite();
+          //  M5.Display.setCursor(10, 30);
+          //  M5.Display.printf("Receive Error");
+          //  M5.Display.endWrite();
+          //}
         }
 #if 0
             Serial.print("UDP Packet Type: ");
@@ -259,5 +277,6 @@ void loop() {
       }
     }
     delay(200);
+    mon_batt = M5.Power.getBatteryLevel();
   }
 }

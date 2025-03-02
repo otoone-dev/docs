@@ -2,21 +2,53 @@
 #include <WiFi.h>
 #include <AsyncUDP.h>
 #include <string>
-
 #include "esp_camera.h"
+
+#define TIMER_CAM (1)
+#define UNIT_CAM (0)
+#define UNIT_CAM_S3 (0)
+
+//-----------------
+#if TIMER_CAM
 #include "camera_pins.h"
 #include "led.h"
 #include "bmm8563.h"
 #include "battery.h"
-
-#define TIMER_CAM (0)
-#define UNIT_CAM (!TIMER_CAM)
-
-#if TIMER_CAM
 #define LEDPIN (2) // TimerCam
-#else
+#endif
+
+//-----------------
+#if UNIT_CAM
+#include "camera_pins.h"
 #define LEDPIN (4) // UnitCam
 #endif
+
+//-----------------
+#if UNIT_CAM_S3
+// UnitCamS3
+#define LED_GPIO_NUM      14
+
+#define PWDN_GPIO_NUM      0
+#define RESET_GPIO_NUM    21
+#define XCLK_GPIO_NUM     11
+#define SIOD_GPIO_NUM     17
+#define SIOC_GPIO_NUM     41
+
+#define Y9_GPIO_NUM       13
+#define Y8_GPIO_NUM        4
+#define Y7_GPIO_NUM       10
+#define Y6_GPIO_NUM        5
+#define Y5_GPIO_NUM        7
+#define Y4_GPIO_NUM       16
+#define Y3_GPIO_NUM       15
+#define Y2_GPIO_NUM        6
+#define VSYNC_GPIO_NUM    42
+#define HREF_GPIO_NUM     18
+#define PCLK_GPIO_NUM     12
+
+#define LEDPIN (LED_GPIO_NUM)
+#endif // UnitCamS3
+//-----------------
 
 #define PORTNUM (11765)
 
@@ -28,23 +60,23 @@ const int interval_ms = 60*1000; // 60s
 
 volatile int systemStatus = 0;
 
-const double bat_percent_max_vol = 4.1;     // �o�b�e���[�c�ʂ̍ő�d��
-const double bat_percent_min_vol = 3.3;     // �o�b�e���[�c�ʂ̍ŏ��d��
-static double bat_per_inclination = 0;        // �o�b�e���[�c�ʂ̃p�[�Z���e�[�W���̌X��
-static double bat_per_intercept   = 0;        // �o�b�e���[�c�ʂ̃p�[�Z���e�[�W���̐ؕ�
-static double bat_per             = 0;        // �o�b�e���[�c�ʂ̃p�[�Z���e�[�W
-static double bat_vol             = 0;        // �o�b�e���[�d��
+const double bat_percent_max_vol = 4.1;     // バッテリー残量の最大電圧
+const double bat_percent_min_vol = 3.3;     // バッテリー残量の最小電圧
+static double bat_per_inclination = 0;        // バッテリー残量のパーセンテージ式の傾き
+static double bat_per_intercept   = 0;        // バッテリー残量のパーセンテージ式の切片
+static double bat_per             = 0;        // バッテリー残量のパーセンテージ
+static double bat_vol             = 0;        // バッテリー電圧
 
 #if 1
-// Camera Viewer �� AP �ɒ��ڐڑ�
-const char* ssid = "MTCF110"; // SSID, Password �� Camera ���ƍ��킹��
-const char* password = "6F99z1qm_8ypm"; // �����̂P
+// Camera Viewer の AP に直接接続
+const char* ssid = "MTCF110"; // SSID, Password を Camera 側と合わせる
+const char* password = "6F99z1qm_8ypm"; // 数字の１
 IPAddress ipaddr = IPAddress(192,168,4,1);
 #else
-// ����� WiFi router �o�R�Őڑ� (�񐄏�)
-const char* ssid = "ssid"; // ����� SSID, Password ������
+// 自宅等の WiFi router 経由で接続 (非推奨)
+const char* ssid = "ssid"; // 自宅等の SSID, Password を入れる
 const char* password = "pass";
-IPAddress ipaddr = IPAddress(192,168,1,XX); // Camera Viewer �ɕ\�������A�h���X������
+IPAddress ipaddr = IPAddress(192,168,1,XX); // Camera Viewer に表示されるアドレスを入れる
 #endif
 
 
@@ -77,7 +109,7 @@ void camera_setup() {
   //config.pixel_format = PIXFORMAT_RGB565; // for face detection/recognition
   config.grab_mode = CAMERA_GRAB_WHEN_EMPTY;
   config.fb_location = CAMERA_FB_IN_PSRAM;
-  config.jpeg_quality = 30;//12; //jpeg�i�� 0(���i��)�`63(��i��)
+  config.jpeg_quality = 20; //jpeg品質 0(高品質)～63(低品質)
   config.fb_count = 1;
 
   // if PSRAM IC present, init with UXGA resolution and higher JPEG quality
@@ -85,13 +117,13 @@ void camera_setup() {
   if(config.pixel_format == PIXFORMAT_JPEG){
     if(psramFound()){
       Serial.printf("PSRAM found\n");
-      config.jpeg_quality = 10;
+      //config.jpeg_quality = 10;
       config.fb_count = 2;
       config.grab_mode = CAMERA_GRAB_LATEST;
     } else {
       Serial.printf("PSRAM not found\n");
       // Limit the frame size when PSRAM is not available
-      config.frame_size   = FRAMESIZE_QVGA; // 320x240
+      //config.frame_size   = FRAMESIZE_QVGA; // 320x240
       config.fb_location = CAMERA_FB_IN_DRAM;
     }
   } else {
@@ -110,10 +142,34 @@ void camera_setup() {
   }
 
   sensor_t *s = esp_camera_sensor_get();
-  s->set_vflip(s, 1); //�㉺���]
-#if UNIT_CAM
-  s->set_hmirror(s, 1); //���E���]
+  s->set_vflip(s, 1); //上下反転
+#if !TIMER_CAM
+  s->set_hmirror(s, 1); //左右反転
 #endif
+  s->set_saturation(s, 2);
+/*
+s->set_brightness(s, 0);     // -2 to 2
+s->set_contrast(s, 0);       // -2 to 2
+s->set_saturation(s, 0);     // -2 to 2
+s->set_special_effect(s, 0); // 0 to 6 (0 - No Effect, 1 - Negative, 2 - Grayscale, 3 - Red Tint, 4 - Green Tint, 5 - Blue Tint, 6 - Sepia)
+s->set_whitebal(s, 1);       // 0 = disable , 1 = enable
+s->set_awb_gain(s, 1);       // 0 = disable , 1 = enable
+s->set_wb_mode(s, 0);        // 0 to 4 - if awb_gain enabled (0 - Auto, 1 - Sunny, 2 - Cloudy, 3 - Office, 4 - Home)
+s->set_exposure_ctrl(s, 1);  // 0 = disable , 1 = enable
+s->set_aec2(s, 0);           // 0 = disable , 1 = enable
+s->set_ae_level(s, 0);       // -2 to 2
+s->set_aec_value(s, 300);    // 0 to 1200
+s->set_gain_ctrl(s, 1);      // 0 = disable , 1 = enable
+s->set_agc_gain(s, 0);       // 0 to 30
+s->set_gainceiling(s, (gainceiling_t)0);  // 0 to 6
+s->set_bpc(s, 0);            // 0 = disable , 1 = enable
+s->set_wpc(s, 1);            // 0 = disable , 1 = enable
+s->set_raw_gma(s, 1);        // 0 = disable , 1 = enable
+s->set_lenc(s, 1);           // 0 = disable , 1 = enable
+s->set_hmirror(s, 0);        // 0 = disable , 1 = enable
+s->set_vflip(s, 0);          // 0 = disable , 1 = enable
+s->set_dcw(s, 1);            // 0 = disable , 1 = enable
+s->set_colorbar(s, 0);       // 0 = disable , 1 = enable*/
 }
 
 //----------------------------------------
@@ -125,55 +181,55 @@ void TickThread(void *pvParameters) {
         break;
       case 0:
       case 1:
-        led_brightness(10);
+        analogWrite(LEDPIN, 1);
         delay(400);
-        led_brightness(0);
+        analogWrite(LEDPIN, 0);
         delay(400);
         break;
       case 2: // get camera data
-        led_brightness(500);
+        analogWrite(LEDPIN, 255);
         delay(100);
-        led_brightness(10);
+        analogWrite(LEDPIN, 1);
         delay(400);
         break;
       case 3: // send data
       case 4:
       case 5:
-        led_brightness(10);
+        analogWrite(LEDPIN, 1);
         delay(100);
-        led_brightness(0);
+        analogWrite(LEDPIN, 0);
         delay(100);
         break;
       case 6: // after send
       case 7:
       case 8:
-        led_brightness(10);
+        analogWrite(LEDPIN, 1);
         delay(200);
-        led_brightness(500);
+        analogWrite(LEDPIN, 255);
         delay(200);
-        led_brightness(10);
+        analogWrite(LEDPIN, 1);
         delay(200);
-        led_brightness(0);
+        analogWrite(LEDPIN, 0);
         delay(200);
         break;
       case 9: // failure
-        led_brightness(1000);
+        analogWrite(LEDPIN, 255);
         delay(200);
-        led_brightness(0);
+        analogWrite(LEDPIN, 0);
         delay(200);
-        led_brightness(10);
+        analogWrite(LEDPIN, 1);
         delay(200);
-        led_brightness(0);
+        analogWrite(LEDPIN, 0);
         delay(200);
         break;
       case 10: // disconnected
-        led_brightness(10);
+        analogWrite(LEDPIN, 1);
         delay(100);
-        led_brightness(0);
+        analogWrite(LEDPIN, 0);
         delay(100);
-        led_brightness(10);
+        analogWrite(LEDPIN, 1);
         delay(100);
-        led_brightness(0);
+        analogWrite(LEDPIN, 0);
         delay(400);
         break;
     }
@@ -188,25 +244,29 @@ void setup() {
   Serial.begin(115200);
   Serial.println("serial start");
 
+#if TIMER_CAM
   Serial.println("bat_init");
   bat_init();
   Serial.println("bmm8563_init");
   bmm8563_init();
   Serial.println("led_init");
   led_init(LEDPIN);
-
+#endif
   // Test LED
-  led_brightness(1023);
+        analogWrite(LEDPIN, 255);
   delay(200);
 
   Serial.println("camera_setup");
   camera_setup();
 
-  pinMode(13, INPUT_PULLUP);
+#if TIMER_CAM
+  pinMode(13, INPUT_PULLUP); // Grove端子での電源OFF検出用
+#endif
 #if UNIT_CAM
   pinMode(0, OUTPUT);
   digitalWrite(0, LOW);
 #endif
+  analogWrite(LEDPIN, 0);
 
   bat_per_inclination = 100.0F/(bat_percent_max_vol-bat_percent_min_vol);
   bat_per_intercept = -1 * bat_percent_min_vol * bat_per_inclination;
@@ -218,11 +278,13 @@ void setup() {
 
 //----------------------------------------
 void checkKeepAlivePin() {
-    if (digitalRead(13)) { // TimerCamera �� SCL(GPIO13) �� Low �ɂ��Ă����ƃo�b�e���쓮����BGrove �[�q���甲���Ɠd��OFF
+#if TIMER_CAM
+    if (digitalRead(13)) { // TimerCamera の SCL(GPIO13) を Low にしておくとバッテリ駆動する。Grove 端子から抜くと電源OFF
       // Halt
       bat_disable_output();
     }
   bat_per = bat_per_inclination * bat_vol + bat_per_intercept;    // %
+#endif
 }
 
 #define BUFF_MAX (2048)
@@ -245,7 +307,7 @@ void loop() {
   while (1) {
     Serial.printf("WiFi connecting (ssid=%s)...\n", ssid);
     //led_brightness(10);
-    while (WiFi.waitForConnectResult(200) != WL_CONNECTED) {
+    while (WiFi.waitForConnectResult(500) != WL_CONNECTED) {
       systemStatus = 1;
         Serial.printf("WiFi Failed (ssid=%s)\n", ssid);
         //led_brightness(1024);
@@ -284,7 +346,11 @@ void loop() {
                 *p++ = seqNum;
                 *p++ = seqTotal;
                 *p++ = 0; // sum
+#if TIMER_CAM
                 *p++ = (unsigned char)M5.Power.getBatteryLevel();
+#else
+                *p++ = 0;
+#endif
                 int sendSize = 0;
                 if (size >= 1024) {
                   sendSize = 1024;
@@ -335,7 +401,7 @@ void loop() {
           }
           else {
       systemStatus = 9;
-            // fb ���Ȃ�����
+            // fb 取れなかった
             for (int i = 0; i < 10; i++) {
               //led_brightness(1024);
               delay(100);
