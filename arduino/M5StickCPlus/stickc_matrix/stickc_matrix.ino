@@ -145,6 +145,7 @@ void setup() {
     screenHeight = 135.0f;
     aspect = screenWidth / screenHeight;
     projectionMatrix = Matrix44::Perspective(fov, aspect, near, far);
+    pinMode(26, OUTPUT_OPEN_DRAIN);
   }
 #if 0
   pinMode(36, INPUT);
@@ -153,7 +154,6 @@ void setup() {
   ledcSetup(0, 12000, 8);
   ledcAttachPin(26, 0);
 #endif
-  pinMode(26, OUTPUT_OPEN_DRAIN);
 
   M5.Lcd.fillScreen(BLACK);
   M5.Lcd.setTextColor(WHITE);
