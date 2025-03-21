@@ -156,7 +156,7 @@ void Menu::Initialize() {
   m_menus.emplace_back(MenuProperties("BrthSense", 
     [&](){ return std::to_string(breathSense); },
     [&](){
-#ifdef ENABLE_MCP3425
+#ifdef USE_MCP3425
       breathSense += 50;
       if (breathSense > 500) breathSense = 500;
 #else
@@ -165,7 +165,7 @@ void Menu::Initialize() {
 #endif
     },
     [&](){
-#ifdef ENABLE_MCP3425
+#ifdef USE_MCP3425
       breathSense -= 50;
       if (breathSense < 0) breathSense = 0;
 #else
@@ -254,7 +254,7 @@ void Menu::EndPreferences() {
 //--------------------------
 // Flashに保存
 void Menu::SavePreferences() {
-#ifdef _M5STICKC_H_
+#if (MAINUNIT == M5STICKC_PLUS)
   for (int i = 0; i < WAVE_MAX; i++) {
     if (waveData.GetWaveTable(i) == NULL) {
       break;
@@ -286,9 +286,8 @@ void Menu::SavePreferences() {
   }
 #endif
   pref.putInt("KeySense", keySense);
-#ifdef ENABLE_MCP3425
   pref.putInt("BreathSense", breathSense);
-#else
+#ifdef HAS_LIPSENSOR
   pref.putInt("BreathSense2", breathSense);
 #endif
   pref.putInt("BreathZero", breathZero);
@@ -339,10 +338,10 @@ void Menu::ResetPlaySettings(int widx) {
 // Flash から読み出し
 void Menu::LoadPreferences() {
   keySense = pref.getInt("KeySense", 50);
-#ifdef ENABLE_MCP3425
+
   breathSense = pref.getInt("BreathSense", 150);
   breathZero = pref.getInt("BreathZero", 170);
-#else
+#ifdef HAS_LIPSENSOR
   breathSense = pref.getInt("BreathSense2", 200);
   breathZero = pref.getInt("BreathZero", 50);
 #endif
@@ -382,7 +381,7 @@ void Menu::LoadPreferences() {
   ReadPlaySettings(waveIndex);
 }
 
-#if ENABLE_RTC
+#if HAS_RTC
 //--------------------------
 // RTC 時刻変更
 void Menu::WriteRtc() {
@@ -447,7 +446,7 @@ bool Menu::Update(uint16_t key, int pressure) {
   if (M5.BtnA.pressedFor(100)) {
     if (isEnabled) {
       cursorPos = 0;
-#if ENABLE_RTC
+#if HAS_RTC
       WriteRtc();
 #endif
 #ifdef HAS_DISPLAY
@@ -479,7 +478,7 @@ bool Menu::Update(uint16_t key, int pressure) {
   }
   if (M5.BtnB.pressedFor(100)) {
     if (isEnabled == false) {
-#if ENABLE_RTC
+#if HAS_RTC
       ReadRtc();
 #endif
 #ifdef HAS_DISPLAY
@@ -545,7 +544,7 @@ bool Menu::Update(uint16_t key, int pressure) {
     currentPressure = pressure;
   }
   else {
-#if ENABLE_RTC
+#if HAS_RTC
     m5::rtc_time_t TimeStruct;
     M5.Rtc.getTime(&TimeStruct);
     if ((hour != TimeStruct.hours) || (minute != TimeStruct.minutes)) {
@@ -919,7 +918,7 @@ void Menu::DisplayPerform(bool onlyRefreshTime) {
     DrawString(TransposeToStr().c_str(), 10, 100);
   }
   {
-#if ENABLE_RTC
+#if HAS_RTC
     m5::rtc_time_t TimeStruct;
     M5.Rtc.getTime(&TimeStruct);
     if (hour == TimeStruct.hours) {

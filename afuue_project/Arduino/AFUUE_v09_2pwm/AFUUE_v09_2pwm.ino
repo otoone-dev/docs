@@ -17,8 +17,8 @@ void SerialPrintLn(const char* text) {
 
 //-------------------------------------
 void SetLedColor(int r, int g, int b) {
-#ifdef HAS_LED
-  neopixelWrite(GPIO_NUM_21, r, g, b);
+#ifdef NEOPIXEL_PIN
+  neopixelWrite(NEOPIXEL_PIN, r, g, b);
 #endif
 }
 

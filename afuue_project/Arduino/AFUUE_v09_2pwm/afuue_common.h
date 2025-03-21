@@ -6,11 +6,11 @@
 #include <M5Unified.h>
 
 //#define AFUUE_VER (1090) // 8Bit-DAC ADC-Direct    (AFUUE2 First)
-#define AFUUE_VER (1100) // 16Bit-PWM ADC-MCP3425  (AFUUE2 Second)
+//#define AFUUE_VER (1100) // 16Bit-PWM ADC-MCP3425  (AFUUE2 Second)
 //#define AFUUE_VER (1120) // 16Bit-PWM LPS33        (AFUUE2 Test)
 //#define AFUUE_VER (1110) // 16Bit-PWM ADCx2        (AFUUE2R First)
 //#define AFUUE_VER (1130) // 16Bit-PWM LPS33x2      (AFUUE2R Gen2)
-//#define AFUUE_VER (1140) // 16Bit-PWM ADC-MCP3425  (AFUUE2R Gen2 Lite)
+#define AFUUE_VER (1140) // 16Bit-PWM ADC-MCP3425  (AFUUE2R Gen2 Lite)
 
 /*
 Arduino IDE 2.3.4
@@ -38,51 +38,73 @@ https://qiita.com/tomoto335/items/d20aa668a62ad49cda36
 USB-MIDI についてはこちらの記事を参考にさせていただきました
 */
 
+#define M5STICKC_PLUS (0)
+#define M5STAMP_S3 (1)
+#define M5ATOM_S3 (2)
+
 #if (AFUUE_VER == 1090)
 // AFUUE2 初代
-#define _M5STICKC_H_
+#define MAINUNIT (M5STICKC_PLUS)
 #define ENABLE_ADC
 
 #elif (AFUUE_VER == 1100)
 // AFUUE2 改良版
-#define _M5STICKC_H_
+#define MAINUNIT (M5STICKC_PLUS)
 #define SOUND_TWOPWM
 #define ENABLE_MCP3425
 
 #elif (AFUUE_VER == 1110)
 // AFUUE2R 初代
-#define _STAMPS3_H_
+#define MAINUNIT (M5STAMP_S3)
 #include <Arduino.h>
 #include <Adafruit_TinyUSB.h>
 #include <MIDI.h>
 #define SOUND_TWOPWM
-#define ENABLE_ADC
-#define ENABLE_LIP
+#define USE_INTERNALADC
+#define HAS_LIPSENSOR
 
 #elif (AFUUE_VER == 1120)
 // AFUUE2 LPS33 Test
-#define _M5STICKC_H_
+#define MAINUNIT (M5STICKC_PLUS)
 #define SOUND_TWOPWM
-#define ENABLE_LPS33
+#define USE_LPS33
 #include <Arduino_LPS22HB.h>
 
 #elif (AFUUE_VER == 1130)
-// AFUUE2R 改良版
-#define _STAMPS3_H_
+// AFUUE2R Gen2
+#define MAINUNIT (M5ATOM_S3)
 #include <Arduino.h>
 #include <Adafruit_TinyUSB.h>
 #include <MIDI.h>
 #define SOUND_TWOPWM
-#define ENABLE_LPS33
+#define USE_LPS33
+#define HAS_LIPSENSOR
+#define LEDPIN (8)
+#define I2CPIN_SDA (38)
+#define I2CPIN_SCL (39)
+
+#elif (AFUUE_VER == 1140)
+// AFUUE2R Gen2 Lite
+#define MAINUNIT (M5ATOM_S3)
+#include <Arduino.h>
+#include <Adafruit_TinyUSB.h>
+#include <MIDI.h>
+#define SOUND_TWOPWM
+#define USE_MCP3425
+#define LEDPIN (8)
+#define I2CPIN_SDA (38)
+#define I2CPIN_SCL (39)
 #endif
 
 #define CORE0 (0)
 #define CORE1 (1)
 
-#ifdef _M5STICKC_H_
+#if (MAINUNIT == M5STICKC_PLUS)
 // M5StickC Plus ------------
 #define HAS_IMU
+#define HAS_RTC
 #define HAS_DISPLAY
+#define HAS_IOEXPANDER
 #define DISPLAY_WIDTH (240) // M5StickC Plus
 #define DISPLAY_HEIGHT (135)
 //#define DISPLAY_WIDTH (128) // M5AtomS3
@@ -96,46 +118,43 @@ USB-MIDI についてはこちらの記事を参考にさせていただきま�
 
 #define LEDPIN (10)
 #define ADCPIN (ADC2) // 36
-#define ENABLE_RTC (1)
 #define ENABLE_MIDI (0)
-#endif //--------------
 
-#ifdef _STAMPS3_H_
+#elif (MAINUNIT == M5STAMP_S3)
 // STAMPS3 -------------
-#define HAS_LED
+#define NEOPIXEL_PIN (21)
 #ifdef SOUND_TWOPWM
 #define PWMPIN_LOW (39)
 #define PWMPIN_HIGH (40)
 #else
 #define DACPIN (39)
 #endif
-#ifdef ENABLE_LIP
+#ifdef HAS_LIPSENSOR
 #define ADCPIN (11)
 #define ADCPIN2 (12)
-#endif //ENABLE_LIP
-#define ENABLE_RTC (0)
+#endif //HAS_LIPSENSOR
 #define ENABLE_MIDI (1)
 #define MIDI_IN_PIN (42)
 #define MIDI_OUT_PIN (41)
+
+#elif (MAINUNIT == M5ATOM_S3)
+#define NEOPIXEL_PIN (35)
+#define HAS_IOEXPANDER
+#define PWMPIN_LOW (5)
+#define PWMPIN_HIGH (6)
+#define ENABLE_MIDI (1)
+#define MIDI_IN_PIN (9) // not use
+#define MIDI_OUT_PIN (7)
 #endif //--------------
 
-#if 0
-// ESP32 Devkit -------------
-#define DACPIN (DAC1) // 25
-#define LEDPIN (33) // ESP32-Devkit
-#define ENABLE_RTC (0)
-#define ENABLE_MIDI (0)
-#endif //--------------
 
-
-#ifdef ENABLE_MCP3425
+#ifdef USE_MCP3425
 #define MCP3425_ADDR (0x68)
 #endif
 
-#ifdef ENABLE_LPS33
+#ifdef USE_LPS33
 #define LPS33_ADDR (0x5C)
 #endif
-
 
 
 #define CLOCK_DIVIDER (80)
@@ -154,13 +173,6 @@ extern volatile uint8_t waveOutH;
 extern volatile uint8_t waveOutL;
 extern TaskHandle_t taskHandle;
 extern int baseNote;
-
-extern bool IsStickC();
-extern bool IsStampS3();
-extern bool IsAtomS3();
-extern bool HasLED();
-extern bool HasDisplay();
-extern bool HasImu();
 
 extern void SerialPrintLn(const char* text);
 extern void SetLedColor(int r, int g, int b);

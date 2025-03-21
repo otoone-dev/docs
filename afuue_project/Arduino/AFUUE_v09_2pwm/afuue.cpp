@@ -8,6 +8,7 @@ TaskHandle_t taskHandle;
 
 //---------------------------------
 void Afuue::Initialize() {
+
 #if ENABLE_MIDI
   menu.isUSBMidiMounted = afuueMidi.Initialize();
   if (menu.isUSBMidiMounted) {
@@ -15,7 +16,7 @@ void Afuue::Initialize() {
   }
 #endif
 
-#ifdef _M5STICKC_H_
+#ifdef HAS_DISPLAY
   M5.Lcd.setBrightness(255);
   M5.Lcd.setRotation(0);
   M5.Lcd.fillScreen(TFT_WHITE);
@@ -31,7 +32,7 @@ void Afuue::Initialize() {
   M5.Lcd.setBrightness(127);
 #endif // _M5STICKC_H_
 
-#ifdef _STAMPS3_H_
+#ifdef NEOPIXEL_PIN
   SetLedColor(10, 10, 10);
   delay(300);
   SetLedColor(0, 0, 0);
@@ -43,14 +44,19 @@ void Afuue::Initialize() {
   SerialPrintLn("------");
 #endif
 
+#if defined(I2CPIN_SDA) || defined(I2CPIN_SCL)
+  Wire.begin(I2CPIN_SDA, I2CPIN_SCL);
+#else
   Wire.begin();
+#endif
   SerialPrintLn("wire begin");
 
   int keyInitResult = key.Initialize();
 
   bool i2cError = false;
-#ifdef _M5STICKC_H_
+#ifdef HAS_DISPLAY
   M5.Lcd.fillScreen(TFT_BLACK);
+#ifdef HAS_IOEXPANDER
   M5.Lcd.setCursor(10, 10);
   DrawCenterString("Check IOExpander...", 67, 80, 2);
   if (keyInitResult < 0) {
@@ -59,6 +65,7 @@ void Afuue::Initialize() {
     DrawCenterString(s, 67, 95, 2);
     i2cError = true;
   }
+#endif
 #endif
   SerialPrintLn("key begin");
 
@@ -71,13 +78,13 @@ void Afuue::Initialize() {
 
   if (i2cError) {
     for(;;) {
-#ifdef _M5STICKC_H_
+#ifdef LEDPIN
       digitalWrite(LEDPIN, HIGH);
       delay(200);
       digitalWrite(LEDPIN, LOW);
       delay(500);
 #endif
-#ifdef _STAMPS3_H_
+#ifdef NEOPIXEL_PIN
       SetLedColor(60, 30, 0);
       delay(300);
       SetLedColor(0, 60, 30);
@@ -278,7 +285,7 @@ void Afuue::MenuExec() {
     }
   }
 
-#ifdef HAS_LED
+#ifdef NEOPIXEL_PIN
   int br = (int)(245 * generator.requestedVolume) + 10;
   if (!menu.isLipSensorEnabled) {
     SetLedColor(0, br, 0);

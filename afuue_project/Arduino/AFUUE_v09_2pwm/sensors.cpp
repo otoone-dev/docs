@@ -11,16 +11,16 @@ bool Sensors::Initialize() {
   M5.Imu.init();
   //M5.IMU.setAccelFsr(M5.IMU.AFS_2G);
 #endif
-#ifdef ENABLE_MCP3425
+#ifdef USE_MCP3425
   bool mcp3425OK = InitPressureMCP3425();
   if (!mcp3425OK) {
     return false;
   }
 #endif
 
-#ifdef ENABLE_LPS33
+#ifdef USE_LPS33
   bool lps33OK = InitPressureLPS33(0);
-#ifdef ENABLE_LIP
+#ifdef HAS_LIPSENSOR
   lps33OK &= InitPressureLPS33(1);
 #endif
   if (!lps33OK) {
@@ -28,31 +28,31 @@ bool Sensors::Initialize() {
   }
 #endif
 
-#ifdef ENABLE_ADC
+#ifdef USE_INTERNALADC
   pinMode(ADCPIN, INPUT);
-#ifdef ENABLE_LIP
+#ifdef HAS_LIPSENSOR
   pinMode(ADCPIN2, INPUT);
 #endif
 #endif
 
-#ifdef _M5STICKC_H_
+#if (MAINUNIT == M5STICKC_PLUS)
   gpio_pulldown_dis(GPIO_NUM_25);
   gpio_pullup_dis(GPIO_NUM_25);
 #endif
   analogSetAttenuation(ADC_0db);
   analogReadResolution(12); // 4096
-#ifdef _STAMPS3_H_
+#if (MAINUNIT == M5STAMP_S3)
   adc2_config_channel_atten(ADC2_CHANNEL_0, ADC_ATTEN_DB_0);
   adc2_config_channel_atten(ADC2_CHANNEL_1, ADC_ATTEN_DB_0);
 #endif
 
   int pressure = 0;
   int lowestPressure = 0;
-#ifdef ENABLE_LPS33
+#ifdef USE_LPS33
   lowestPressure = 2000;
   delay(1000);
   defaultPressureValue = GetPressureValue(0) + lowestPressure;
-#ifdef ENABLE_LIP
+#ifdef HAS_LIPSENSOR
   defaultPressureValue2 = GetPressureValue(1) + lowestPressure;
 #endif
 #else
@@ -61,7 +61,7 @@ bool Sensors::Initialize() {
     delay(30);
   }
   defaultPressureValue = (pressure / 10) + lowestPressure;
-#ifdef ENABLE_LIP
+#ifdef HAS_LIPSENSOR
   pressure = 0;
   for (int i = 0; i < 10; i++) {
     pressure += GetPressureValue(1);
@@ -77,26 +77,26 @@ bool Sensors::Initialize() {
 // センサー更新
 void Sensors::Update() {
     pressureValue = GetPressureValue(0);
-#ifdef ENABLE_LIP
+#ifdef HAS_LIPSENSOR
     if (isLipSensorEnabled) {
       //気圧センサー (ピッチベンド用)
       pressureValue2 = GetPressureValue(1);
     }
 #endif
     int defPressure = defaultPressureValue + breathZero;
-#ifdef ENABLE_MCP3425
+#ifdef USE_MCP3425
     float vol = (pressureValue - defPressure) / ((2047.0f-breathSenseRate)-defPressure); // 0 - 1
     if (vol < 0.0f) vol = 0.0f;
     if (vol > 1.0f) vol = 1.0f;
     blowPower = pow(vol,2.0f) * (1.0f-bendVolume);
 #endif
-#ifdef ENABLE_LPS33
+#ifdef USE_LPS33
     float vol = (pressureValue - defPressure) / 70000.0f; // 0 - 1
     if (vol < 0.0f) vol = 0.0f;
     if (vol > 1.0f) vol = 1.0f;
     blowPower = pow(vol,2.0f);
 #endif
-#ifdef ENABLE_ADC
+#ifdef USE_INTERNALADC
     float vol = (pressureValue - defPressure) / breathSenseRate; // 0 - 1
     if (vol < 0.0f) vol = 0.0f;
     if (vol > 1.0f) vol = 1.0f;
@@ -107,7 +107,7 @@ void Sensors::Update() {
 //---------------------------------
 // ベンド処理
 void Sensors::BendExec(float td, float vol, bool bendKeysDown) {
-#ifdef ENABLE_LIP
+#ifdef HAS_LIPSENSOR
   if (isLipSensorEnabled) {
     float b2 = (pressureValue2 - (defaultPressureValue2 + breathZero)) / breathSenseRate;
     if (b2 < 0.0f) b2 = 0.0f;
@@ -178,7 +178,7 @@ void Sensors:: UpdateAcc() {
 
 //-------------------------------------
 // MCP3425 初期化
-#ifdef ENABLE_MCP3425
+#ifdef USE_MCP3425
 bool Sensors::InitPressureMCP3425() {
   Wire.beginTransmission(MCP3425_ADDR);
   int error = Wire.endTransmission();
@@ -192,7 +192,7 @@ bool Sensors::InitPressureMCP3425() {
   return true;
 }
 #endif
-#ifdef ENABLE_LPS33
+#ifdef USE_LPS33
 
 //-------------------------------------
 // LPS33 初期化    todo:アドレス違いに対応すべし
@@ -211,13 +211,13 @@ int32_t Sensors::GetPressureValueLPS33(int side) {
 //-------------------------------------
 // ADC から値取得
 #define PRESSURE_AVERAGE_COUNT (20)
-#ifdef ENABLE_ADC
+#ifdef USE_INTERNALADC
 int Sensors::GetPressureValueADC(int index) {
   float averaged = 0;
   int average_count = 0;
   while (average_count == 0) {
     for (int i = 0; i < PRESSURE_AVERAGE_COUNT; i++) {
-#ifdef ENABLE_LIP
+#ifdef HAS_LIPSENSOR
       if (index == 1) {
         //averaged += analogRead(ADCPIN2);
         int value;
@@ -246,23 +246,23 @@ int Sensors::GetPressureValueADC(int index) {
 //-------------------------------------
 // 気圧センサーの値取得窓口
 float Sensors::GetPressureValue(int index) {
-#ifdef ENABLE_LIP
+#ifdef HAS_LIPSENSOR
   // ADC x 2
-#ifdef ENABLE_LPS33
+#ifdef USE_LPS33
   return GetPressureValueLPS33(index);
 #else
   return GetPressureValueADC(index);
 #endif
 #else
   // ADC x 1
-#ifdef ENABLE_MCP3425
+#ifdef USE_MCP3425
   Wire.requestFrom(MCP3425_ADDR, 2);
   return (Wire.read() << 8 ) | Wire.read();
 #endif
-#ifdef ENABLE_LPS33
+#ifdef USE_LPS33
   return GetPressureValueLPS33(0);
 #endif
-#ifdef ENABLE_ADC
+#ifdef USE_INTERNALADC
   return GetPressureValueADC(0);
 #endif
   // ----

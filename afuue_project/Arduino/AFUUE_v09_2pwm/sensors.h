@@ -30,15 +30,15 @@ private:
   float bendDownTime = 0.0f;
   float bendVolume = 0.0f;
 
-#ifdef ENABLE_MCP3425
+#ifdef USE_MCP3425
   bool InitPressureMCP3425();
 #endif
-#ifdef ENABLE_LPS33
+#ifdef USE_LPS33
   bool InitPressureLPS33(int side);
   int32_t GetPressureValueLPS33(int side);
 #endif
 
-#ifdef ENABLE_ADC
+#ifdef USE_INTERNALADC
   int GetPressureValueADC(int index);
 #endif
 };

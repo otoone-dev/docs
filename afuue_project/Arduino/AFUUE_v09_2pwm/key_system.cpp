@@ -1,7 +1,7 @@
 #include "afuue_common.h"
 #include "key_system.h"
 
-#ifdef _M5STICKC_H_
+#ifdef HAS_IOEXPANDER
 #include "io_expander.h"
 #endif
 
@@ -11,28 +11,23 @@ KeySystem::KeySystem() {}
 //---------------------------------
 // 初期化
 int KeySystem::Initialize() {
-#ifdef _M5STICKC_H_
+#ifdef HAS_IOEXPANDER
   return setupIOExpander();
-#else
-#ifdef _STAMPS3_H_
+#endif
+
+#if (MAINUNIT == M5STAMP_S3)
   const int keyPortList[14] = { 0, 1, 2, 3, 4, 5, 6, 7, 8 ,9, 10, 44, 46 };
   for (int i = 0; i < 14; i++) {
     pinMode(keyPortList[i], INPUT_PULLUP); // INPUT FOR SWITCHES
   }
-#else
-  const int keyPortList[13] = { 13, 12, 14, 27, 26, 16, 17, 5,18, 19, 23, 3, 4 };
-  for (int i = 0; i < 13; i++) {
-    pinMode(keyPortList[i], INPUT_PULLUP); // INPUT FOR SWITCHES
-  }
 #endif
   return 0;
-#endif
 }
 
 //---------------------------------
 // 演奏用のキー処理
 void KeySystem::UpdateKeys() {
-#ifdef _M5STICKC_H_
+#ifdef HAS_IOEXPANDER
   uint16_t mcpKeys = readFromIOExpander();
   keyLowC = ((mcpKeys & 0x0001) != 0);
   keyEb = ((mcpKeys & 0x0002) != 0);
@@ -47,7 +42,7 @@ void KeySystem::UpdateKeys() {
   octDown = ((mcpKeys & 0x4000) != 0);
   octUp = ((mcpKeys & 0x8000) != 0);
 #endif
-#ifdef _STAMPS3_H_
+#if (MAINUNIT == M5STAMP_S3)
   keyLowC = digitalRead(1);
   keyEb = digitalRead(2);
   keyD = digitalRead(3);
@@ -60,20 +55,6 @@ void KeySystem::UpdateKeys() {
   keyB = digitalRead(10);
   octDown = digitalRead(44);
   octUp = digitalRead(46);
-#endif
-#if 0
-  keyLowC = digitalRead(16);
-  keyEb = digitalRead(17);
-  keyD = digitalRead(5);
-  keyE = digitalRead(18);
-  keyF = digitalRead(19);
-  keyLowCs = digitalRead(13);
-  keyGs =digitalRead(12);
-  keyG = digitalRead(14);
-  keyA = digitalRead(27);
-  keyB = digitalRead(26);
-  octDown = digitalRead(23);
-  octUp = digitalRead(3) && digitalRead(4); // before1.5:RXD0 after1.6:GPIO4
 #endif
 }
 
@@ -93,8 +74,11 @@ void KeySystem::UpdateMenuKeys(bool isKeyRepeatEnabled) {
   if (keyB == LOW) k |= (1 << 9);
   if (octDown == LOW) k |= (1 << 10);
   if (octUp == LOW) k |= (1 << 11);
-#ifdef _STAMPS3_H_
+#if (MAINUNIT == M5STAMP_S3)
   if (digitalRead(0) == LOW) k |= (1 << 12);
+#endif
+#if (MAINUNIT == M5ATOM_S3)
+  if (digitalRead(41) == LOW) k |= (1 << 12);
 #endif
 
   keyData = k;
