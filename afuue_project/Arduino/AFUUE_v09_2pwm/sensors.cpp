@@ -1,12 +1,16 @@
 #include "afuue_common.h"
 #include "sensors.h"
 
+#ifdef USE_LPS33
+#include "lps33.h"
+#endif
+
 //---------------------------------
 Sensors::Sensors() {}
 
 //---------------------------------
 // 初期化
-bool Sensors::Initialize() {
+int32_t Sensors::Initialize() {
 #ifdef HAS_IMU
   M5.Imu.init();
   //M5.IMU.setAccelFsr(M5.IMU.AFS_2G);
@@ -14,19 +18,21 @@ bool Sensors::Initialize() {
 #ifdef USE_MCP3425
   bool mcp3425OK = InitPressureMCP3425();
   if (!mcp3425OK) {
-    return false;
+    return 5;
   }
 #endif
 
 #ifdef USE_LPS33
-  bool lps33OK = InitPressureLPS33(0);
+  int32_t lps33ret = InitPressureLPS33(0);
 #ifdef HAS_LIPSENSOR
-  lps33OK &= InitPressureLPS33(1);
-#endif
-  if (!lps33OK) {
-    return false;
+  if (lps33ret == 0) {
+    lps33ret = InitPressureLPS33(1);
   }
 #endif
+  if (lps33ret != 0) {
+    return lps33ret;
+  }
+#endif //USE_LPS33
 
 #ifdef USE_INTERNALADC
   pinMode(ADCPIN, INPUT);
@@ -55,6 +61,7 @@ bool Sensors::Initialize() {
 #ifdef HAS_LIPSENSOR
   defaultPressureValue2 = GetPressureValue(1) + lowestPressure;
 #endif
+
 #else
   for (int i = 0; i < 10; i++) {
     pressure += GetPressureValue(0);
@@ -70,7 +77,7 @@ bool Sensors::Initialize() {
   defaultPressureValue2 = (pressure / 10) + lowestPressure;
 #endif
 #endif //LPS33
-  return true;
+  return 0;
 }
 
 //---------------------------------
@@ -195,16 +202,20 @@ bool Sensors::InitPressureMCP3425() {
 #ifdef USE_LPS33
 
 //-------------------------------------
-// LPS33 初期化    todo:アドレス違いに対応すべし
-bool Sensors::InitPressureLPS33(int side) {
-  return BARO.begin();
+// LPS33 初期化
+int32_t Sensors::InitPressureLPS33(int side) {
+  return lps33_init(side);
 }
 
 //-------------------------------------
-// LPS33 から値取得    todo:アドレス違いに対応すべし
+// LPS33 から値取得
 int32_t Sensors::GetPressureValueLPS33(int side) {
-  int d = static_cast<int32_t>(BARO.readPressure() * 40960.0f);
-  return d >> 1;
+  float f = 0;
+  if (lps33_readPressure(side, &f)) {
+    int d = (int32_t)(f * 4096.0f);
+    return d >> 1;
+  }
+  return 0;
 }
 #endif
 
@@ -253,6 +264,7 @@ float Sensors::GetPressureValue(int index) {
 #else
   return GetPressureValueADC(index);
 #endif
+
 #else
   // ADC x 1
 #ifdef USE_MCP3425

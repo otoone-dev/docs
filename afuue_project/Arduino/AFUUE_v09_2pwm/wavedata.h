@@ -4,7 +4,7 @@ class WaveData {
 public:
   const float* GetWaveTable(int index);
   const char* GetWaveName(int index);
-  int GetWaveLowPassQ(int index);
+  int GetWaveLowPass(int index, int p);
   int GetWaveTranspose(int index);
   int GetWavePortamento(int index);
   int GetWaveAttackSoftness(int index);

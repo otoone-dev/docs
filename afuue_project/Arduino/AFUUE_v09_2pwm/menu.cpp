@@ -4,6 +4,9 @@
 #include "ascii_fonts.h"
 #include "wavedata.h"
 #include "menu.h"
+#ifdef HAS_IOEXPANDER
+#include "io_expander.h"
+#endif
 
 //--------------------------
 Menu::Menu(M5Canvas* _canvas, AfuueMIDI* _midi) {
@@ -183,6 +186,7 @@ void Menu::Initialize() {
       breathZero -= 10;
       if (breathZero < 0) breathZero = 0;
     } ));
+#ifdef HAS_RTC
   m_menus.emplace_back(MenuProperties("Clock",
     [&](){ return TimeToStr(); },
     [&](){
@@ -199,6 +203,7 @@ void Menu::Initialize() {
       }
       isRtcChanged = true;
     } ));
+#endif
   m_menus.emplace_back(MenuProperties());
   m_menus.emplace_back(MenuProperties("KeyTest",
     [&](){ return currentKey; },
@@ -254,7 +259,7 @@ void Menu::EndPreferences() {
 //--------------------------
 // Flashに保存
 void Menu::SavePreferences() {
-#if (MAINUNIT == M5STICKC_PLUS)
+#ifdef HAS_DISPLAY
   for (int i = 0; i < WAVE_MAX; i++) {
     if (waveData.GetWaveTable(i) == NULL) {
       break;
@@ -328,9 +333,9 @@ void Menu::ResetPlaySettings(int widx) {
   currentWaveSettings.portamentoRate = 15;
   currentWaveSettings.delayRate = 15;
 
-  currentWaveSettings.lowPassP = 5;
-  currentWaveSettings.lowPassR = 5;
-  currentWaveSettings.lowPassQ = waveData.GetWaveLowPassQ(idx);
+  currentWaveSettings.lowPassP = waveData.GetWaveLowPass(idx,0);
+  currentWaveSettings.lowPassR = waveData.GetWaveLowPass(idx,1);
+  currentWaveSettings.lowPassQ = waveData.GetWaveLowPass(idx,2);
   WritePlaySettings(idx);
 }
 
@@ -370,18 +375,18 @@ void Menu::LoadPreferences() {
     waveSettings[i].delayRate = pref.getInt(s, 15);
 
     sprintf(s, "LowPassP%d", i);
-    waveSettings[i].lowPassP = pref.getInt(s, 5);
+    waveSettings[i].lowPassP = pref.getInt(s, waveData.GetWaveLowPass(i,0));
     sprintf(s, "LowPassR%d", i);
-    waveSettings[i].lowPassR = pref.getInt(s, 5);
+    waveSettings[i].lowPassR = pref.getInt(s, waveData.GetWaveLowPass(i,1));
     sprintf(s, "LowPassQ%d", i);
-    waveSettings[i].lowPassQ = pref.getInt(s, waveData.GetWaveLowPassQ(i));
+    waveSettings[i].lowPassQ = pref.getInt(s, waveData.GetWaveLowPass(i,2));
   }
 
   waveIndex = pref.getInt("WaveIndex", 0);
   ReadPlaySettings(waveIndex);
 }
 
-#if HAS_RTC
+#ifdef HAS_RTC
 //--------------------------
 // RTC 時刻変更
 void Menu::WriteRtc() {
@@ -443,10 +448,16 @@ bool Menu::SetNextLowPassQ() {
 // メニュー更新処理 (AFUUE2)
 bool Menu::Update(uint16_t key, int pressure) {
   M5.update();
+#if MAINUNIT == M5STICKC_PLUS
   if (M5.BtnA.pressedFor(100)) {
+#elif MAINUNIT == M5ATOM_S3
+  if (M5.BtnA.pressedFor(1000)) {
+#else
+  if (true) {
+#endif
     if (isEnabled) {
       cursorPos = 0;
-#if HAS_RTC
+#ifdef HAS_RTC
       WriteRtc();
 #endif
 #ifdef HAS_DISPLAY
@@ -468,17 +479,24 @@ bool Menu::Update(uint16_t key, int pressure) {
       M5.update();
       if (M5.BtnA.isReleased()) break;
 
-      if (!isEnabled && M5.BtnB.pressedFor(10*1000)) {
-        // すべてを出荷時状態に戻す (!isEnabled なのは↑で false にしているから)
+      if (M5.BtnB.pressedFor(10*1000)) {
+        // すべてを出荷時状態に戻す
         factoryResetRequested = true;
         return true;
       }
     }
     return true;
   }
-  if (M5.BtnB.pressedFor(100)) {
+#if MAINUNIT == M5STICKC_PLUS
+  bool buttonNext = M5.BtnB.pressedFor(100);
+#elif MAINUNIT == M5ATOM_S3
+  bool buttonNext = M5.BtnA.pressedFor(100);
+#else
+  bool buttonNext = false;
+#endif
+  if (buttonNext) {
     if (isEnabled == false) {
-#if HAS_RTC
+#ifdef HAS_RTC
       ReadRtc();
 #endif
 #ifdef HAS_DISPLAY
@@ -500,9 +518,17 @@ bool Menu::Update(uint16_t key, int pressure) {
     while (1) {
       delay(100);
       M5.update();
-      if (M5.BtnB.isReleased()) break;
 
+#if MAINUNIT == M5STICKC_PLUS
+      if (M5.BtnB.isReleased()) break;
       if (isEnabled && M5.BtnB.pressedFor(5*1000)) {
+#elif MAINUNIT == M5ATOM_S3
+      if (M5.BtnA.isReleased()) break;
+      if (isEnabled && M5.BtnA.pressedFor(5*1000)) {
+#else
+      break;
+      if (false) {
+#endif
         // この波形のパラメータを出荷時状態に戻す
         ResetPlaySettings(waveIndex);
         cursorPos = 0;
@@ -544,7 +570,7 @@ bool Menu::Update(uint16_t key, int pressure) {
     currentPressure = pressure;
   }
   else {
-#if HAS_RTC
+#ifdef HAS_RTC
     m5::rtc_time_t TimeStruct;
     M5.Rtc.getTime(&TimeStruct);
     if ((hour != TimeStruct.hours) || (minute != TimeStruct.minutes)) {
@@ -564,6 +590,7 @@ bool Menu::Update2R(const KeySystem* pKey) {
 
   if (pKey->IsKeyLowCs_Down() && pKey->IsKeyGs_Down()) {
     // Config
+#if !defined(HAS_DISPLAY)
     if ((pKey->IsKeyLowC_Down() && pKey->IsKeyEb_Push()) || (pKey->IsKeyEb_Down() && pKey->IsKeyLowC_Push())) {
       // この波形のパラメータを出荷時状態に戻す
       ResetPlaySettings(waveIndex);
@@ -571,7 +598,9 @@ bool Menu::Update2R(const KeySystem* pKey) {
       forcePlayNote = 84;
       return true;
     }
-    else if (pKey->IsKeyF_Push()) {
+    else
+#endif
+    if (pKey->IsKeyF_Push()) {
       int pgNum = pgNumHigh * 10 + pgNumLow;
       // Change wave index or MIDI:Send Program Change
 #if ENABLE_MIDI
@@ -645,6 +674,7 @@ bool Menu::Update2R(const KeySystem* pKey) {
         return true;
       }
     }
+#if !defined(HAS_DISPLAY)
     else if (pKey->IsKeyG_Push()) {
       // LowPassQ (Resonance)
       if (!isMidiEnabled) {
@@ -706,6 +736,7 @@ bool Menu::Update2R(const KeySystem* pKey) {
       }
     }
 #endif
+#endif //!defined(HAS_DISPLAY)
     else if (pKey->IsKeyLowC_Push()) {
       pgNumLow  = (pgNumLow + 1) % 10;
     }
@@ -717,6 +748,7 @@ bool Menu::Update2R(const KeySystem* pKey) {
     pgNumHigh = 0;
     pgNumLow = 0;
   }
+#if !defined(HAS_DISPLAY)
   if (pKey->IsFuncBtn_Push()) {
     ctrlMode = (ctrlMode + 1) % 4; // 0:normal, 1:lip-bend, 2:MIDI-normal, 3:MIDI-lip-bend
     isLipSensorEnabled = (ctrlMode % 2);
@@ -740,13 +772,14 @@ bool Menu::Update2R(const KeySystem* pKey) {
   else {
     funcDownCount = 0;
   }
+#endif //!defined(HAS_DISPLAY)
   return false;
 }
 
 //--------------------------
 // x, y にバッテリー情報を描画
 void Menu::DrawBattery(int x, int y) {
-#ifdef HAS_DISPLAY
+#if defined(HAS_DISPLAY) && defined(HAS_INTERNALBATTERY)
   bat_per = M5.Power.getBatteryLevel();
   if(bat_per > 100.0f){
       bat_per = 100.0f;
@@ -918,7 +951,7 @@ void Menu::DisplayPerform(bool onlyRefreshTime) {
     DrawString(TransposeToStr().c_str(), 10, 100);
   }
   {
-#if HAS_RTC
+#ifdef HAS_RTC
     m5::rtc_time_t TimeStruct;
     M5.Rtc.getTime(&TimeStruct);
     if (hour == TimeStruct.hours) {
@@ -946,7 +979,9 @@ void Menu::Display() {
     DisplayMenu();
   }
   else {
+#ifdef HAS_RTC
     ReadRtc();
+#endif
     DisplayPerform();
   }
 

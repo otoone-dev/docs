@@ -8,14 +8,23 @@ TaskHandle_t taskHandle;
 
 //---------------------------------
 void Afuue::Initialize() {
+#if ENABLE_SERIALOUTPUT
+  Serial.begin(115200);
+  SerialPrintLn("------");
+#endif
 
 #if ENABLE_MIDI
+SerialPrintLn("Initialize MIDI...");
+delay(100);
   menu.isUSBMidiMounted = afuueMidi.Initialize();
   if (menu.isUSBMidiMounted) {
     menu.isMidiEnabled = true;
   }
+  SerialPrintLn("MIDI Initialize done.");
 #endif
 
+SerialPrintLn("Initialize Key...");
+delay(100);
 #ifdef HAS_DISPLAY
   M5.Lcd.setBrightness(255);
   M5.Lcd.setRotation(0);
@@ -37,11 +46,6 @@ void Afuue::Initialize() {
   delay(300);
   SetLedColor(0, 0, 0);
   delay(300);
-#endif
-
-#if ENABLE_SERIALOUTPUT
-  Serial.begin(115200);
-  SerialPrintLn("------");
 #endif
 
 #if defined(I2CPIN_SDA) || defined(I2CPIN_SCL)
@@ -70,8 +74,8 @@ void Afuue::Initialize() {
   SerialPrintLn("key begin");
 
   DrawCenterString("Check BrthSensor...", 67, 120, 2);
-  bool sensorOK = sensors.Initialize();
-  if (!sensorOK) {
+  int32_t sensorRet = sensors.Initialize();
+  if (sensorRet != 0) {
     DrawCenterString("[ NG ]", 67, 135, 2);
     i2cError = true;
   }
@@ -79,16 +83,22 @@ void Afuue::Initialize() {
   if (i2cError) {
     for(;;) {
 #ifdef LEDPIN
-      digitalWrite(LEDPIN, HIGH);
-      delay(200);
-      digitalWrite(LEDPIN, LOW);
-      delay(500);
+      for (int i = 0; i < sensorRet; i++) {
+        digitalWrite(LEDPIN, HIGH);
+        delay(200);
+        digitalWrite(LEDPIN, LOW);
+        delay(200);
+      }
+      delay(1000);
 #endif
 #ifdef NEOPIXEL_PIN
-      SetLedColor(60, 30, 0);
-      delay(300);
-      SetLedColor(0, 60, 30);
-      delay(300);
+      for (int i = 0; i < sensorRet; i++) {
+        SetLedColor(60, 30, 0);
+        delay(200);
+        SetLedColor(10, 5, 0);
+        delay(200);
+      }
+      delay(1000);
 #endif
       delay(500);
     }
@@ -109,6 +119,11 @@ void Afuue::Initialize() {
 #ifdef HAS_DISPLAY
   M5.Lcd.fillScreen(TFT_BLACK);
   menu.Display();
+#endif
+#if defined(LEDPIN) && (MAINUNIT == M5ATOM_S3)
+  ledcSetup(5, 156250, 8);
+  ledcAttachPin(LEDPIN, 5);
+  ledcWrite(5, 0);
 #endif
 
   if (!menu.isUSBMidiMounted) {
@@ -178,23 +193,11 @@ void Afuue::Update(float td) {
 
 //-------------------------------------
 void Afuue::Control(float td) {
-  //気圧センサー
-  sensors.Update();
-  float blow = sensors.GetBlowPower();
-
-  generator.requestedVolume += (blow - generator.requestedVolume) * (1.0f - waveInfo.attackSoftness);
-
-  if (waveInfo.pitchDropPos > 0.0f && generator.requestedVolume < waveInfo.pitchDropPos) {
-    // 音量によるピッチダウン
-    volumeDropNoteShift = (1.0f-(generator.requestedVolume / waveInfo.pitchDropPos)) * waveInfo.pitchDropLevel;
-  }
-  else {
-    volumeDropNoteShift = 0.0f;
-  }
-
-  //キー操作や加速度センサー
+  //キー、気圧センサー、加速度センサー
   key.UpdateKeys();
   sensors.UpdateAcc();
+  sensors.Update();
+  float blow = sensors.GetBlowPower();
   sensors.BendExec(td, blow, key.IsBendKeysDown());
 
   float n = key.GetNoteNumber(waveInfo.baseNote);
@@ -202,6 +205,7 @@ void Afuue::Control(float td) {
     generator.requestedVolume = 0.1f;
     forcePlayTime -= td;
   } else {
+    generator.requestedVolume += (blow - generator.requestedVolume) * (1.0f - waveInfo.attackSoftness);
     if (targetNote != n) {
       keyTimeMs = 0.0f;
       startNote = currentNote;
@@ -211,6 +215,14 @@ void Afuue::Control(float td) {
   if (generator.requestedVolume < 0.001f) {
     currentNote = targetNote;
     keyTimeMs = 1000.0f;
+  }
+
+  if (waveInfo.pitchDropPos > 0.0f && generator.requestedVolume < waveInfo.pitchDropPos) {
+    // 音量によるピッチダウン
+    volumeDropNoteShift = (1.0f-(generator.requestedVolume / waveInfo.pitchDropPos)) * waveInfo.pitchDropLevel;
+  }
+  else {
+    volumeDropNoteShift = 0.0f;
   }
 
 #ifdef HAS_IMU
@@ -259,6 +271,7 @@ void Afuue::MenuExec() {
 
 #ifdef HAS_DISPLAY
   bool result = menu.Update(key.GetKeyPush(), sensors.GetPressureValue(0));
+  result |= menu.Update2R(&key);
 #else
   bool result = menu.Update2R(&key);
 #endif
@@ -284,9 +297,17 @@ void Afuue::MenuExec() {
       menu.forcePlayNote = -1;
     }
   }
+  menu.Display();
+#if TOUCHPIN
+  int touch = touchRead(TOUCHPIN);
+  if (touch < 20) {
+    SetLedColor(0, 0, 200);
+    return;
+  }
+#endif
 
-#ifdef NEOPIXEL_PIN
   int br = (int)(245 * generator.requestedVolume) + 10;
+#if defined(NEOPIXEL_PIN)
   if (!menu.isLipSensorEnabled) {
     SetLedColor(0, br, 0);
   }
@@ -294,6 +315,12 @@ void Afuue::MenuExec() {
       float r = -sensors.bendNoteShift;
       SetLedColor((int)(br * (1 - r)), 0, (int)(br * r));
   }
+#endif
+#if defined(LEDPIN) && (MAINUNIT == M5ATOM_S3)
+  int br2 = (int)(245 * pow(generator.requestedVolume,2));
+  if (br2 < 1) br2 = 0;
+  if (br2 > 244) br2 = 255;
+  ledcWrite(5, br2);
 #endif
 }
 

@@ -5,7 +5,7 @@
 class Sensors {
 public:
   Sensors();
-  bool Initialize();
+  int32_t Initialize();
   void Update();
   void UpdateAcc();
   void BendExec(float td, float vol, bool bendKeysDown);
@@ -24,7 +24,7 @@ private:
   int defaultPressureValue2 = 0;
   float pressureValue = 0;
   float pressureValue2 = 0;
-  int bendCounter = 0;
+  int32_t bendCounter = 0;
   const float BENDRATE = -1.0f;
   const float BENDDOWNTIME_LENGTH = 100.0f; //ms
   float bendDownTime = 0.0f;
@@ -34,12 +34,11 @@ private:
   bool InitPressureMCP3425();
 #endif
 #ifdef USE_LPS33
-  bool InitPressureLPS33(int side);
+  int32_t InitPressureLPS33(int side);
   int32_t GetPressureValueLPS33(int side);
 #endif
 
 #ifdef USE_INTERNALADC
-  int GetPressureValueADC(int index);
+  int32_t GetPressureValueADC(int index);
 #endif
 };
-

@@ -29,6 +29,7 @@ int KeySystem::Initialize() {
 void KeySystem::UpdateKeys() {
 #ifdef HAS_IOEXPANDER
   uint16_t mcpKeys = readFromIOExpander();
+#if (MAINUNIT == M5STICKC_PLUS)
   keyLowC = ((mcpKeys & 0x0001) != 0);
   keyEb = ((mcpKeys & 0x0002) != 0);
   keyD = ((mcpKeys & 0x0004) != 0);
@@ -41,6 +42,20 @@ void KeySystem::UpdateKeys() {
   keyB = ((mcpKeys & 0x2000) != 0);
   octDown = ((mcpKeys & 0x4000) != 0);
   octUp = ((mcpKeys & 0x8000) != 0);
+#elif (MAINUNIT == M5ATOM_S3)
+  keyLowC = ((mcpKeys & 0x0001) != 0);
+  keyEb = ((mcpKeys & 0x0002) != 0);
+  keyD = ((mcpKeys & 0x0004) != 0);
+  keyE = ((mcpKeys & 0x0008) != 0);
+  keyF = ((mcpKeys & 0x0010) != 0);
+  keyLowCs = ((mcpKeys & 0x0020) != 0);
+  keyGs = ((mcpKeys & 0x0040) != 0);
+  keyG = ((mcpKeys & 0x0080) != 0);
+  keyA = ((mcpKeys & 0x0100) != 0);
+  keyB = ((mcpKeys & 0x0200) != 0);
+  octUp = ((mcpKeys & 0x0400) != 0);
+  octDown = ((mcpKeys & 0x0800) != 0);
+#endif
 #endif
 #if (MAINUNIT == M5STAMP_S3)
   keyLowC = digitalRead(1);
