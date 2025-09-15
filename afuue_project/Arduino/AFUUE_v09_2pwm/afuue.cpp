@@ -194,11 +194,11 @@ void Afuue::Update(float td) {
 //-------------------------------------
 void Afuue::Control(float td) {
   //キー、気圧センサー、加速度センサー
-  key.UpdateKeys();
   sensors.UpdateAcc();
   sensors.Update();
   float blow = sensors.GetBlowPower();
   sensors.BendExec(td, blow, key.IsBendKeysDown());
+  key.UpdateKeys(sensors.exKeys);
 
   float n = key.GetNoteNumber(waveInfo.baseNote);
   if (forcePlayTime > 0.0f) {

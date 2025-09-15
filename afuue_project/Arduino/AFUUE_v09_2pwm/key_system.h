@@ -4,7 +4,7 @@ class KeySystem {
 public:
   KeySystem();
   int Initialize();
-  void UpdateKeys();
+  void UpdateKeys(uint16_t exKeys = 0);
   void UpdateMenuKeys(bool isKeyRepeatEnabled);
   float GetNoteNumber(int baseNote) const;
   bool IsBendKeysDown() const;

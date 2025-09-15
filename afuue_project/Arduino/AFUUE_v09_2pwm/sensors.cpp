@@ -1,6 +1,10 @@
 #include "afuue_common.h"
 #include "sensors.h"
 
+#ifdef HAS_IOEXPANDER
+#include "io_expander.h"
+#endif
+
 #ifdef USE_LPS33
 #include "lps33.h"
 #endif
@@ -19,6 +23,12 @@ int32_t Sensors::Initialize() {
   bool mcp3425OK = InitPressureMCP3425();
   if (!mcp3425OK) {
     return 5;
+  }
+#endif
+
+#ifdef HAS_IOEXPANDER
+  if (setupIOExpander() <= 0) {
+    return 6;
   }
 #endif
 
@@ -53,13 +63,11 @@ int32_t Sensors::Initialize() {
 #endif
 
   int pressure = 0;
-  int lowestPressure = 0;
 #ifdef USE_LPS33
-  lowestPressure = 2000;
   delay(1000);
-  defaultPressureValue = GetPressureValue(0) + lowestPressure;
+  defaultPressureValue = GetPressureValue(0);
 #ifdef HAS_LIPSENSOR
-  defaultPressureValue2 = GetPressureValue(1) + lowestPressure;
+  defaultPressureValue2 = GetPressureValue(1);
 #endif
 
 #else
@@ -67,14 +75,14 @@ int32_t Sensors::Initialize() {
     pressure += GetPressureValue(0);
     delay(30);
   }
-  defaultPressureValue = (pressure / 10) + lowestPressure;
+  defaultPressureValue = (pressure / 10);
 #ifdef HAS_LIPSENSOR
   pressure = 0;
   for (int i = 0; i < 10; i++) {
     pressure += GetPressureValue(1);
     delay(30);
   }
-  defaultPressureValue2 = (pressure / 10) + lowestPressure;
+  defaultPressureValue2 = (pressure / 10);
 #endif
 #endif //LPS33
   return 0;
@@ -98,7 +106,7 @@ void Sensors::Update() {
     blowPower = pow(vol,2.0f) * (1.0f-bendVolume);
 #endif
 #ifdef USE_LPS33
-    float vol = (pressureValue - defPressure) / 70000.0f; // 0 - 1
+    float vol = (pressureValue - defPressure) / breathSenseRate; // 0 - 1
     if (vol < 0.0f) vol = 0.0f;
     if (vol > 1.0f) vol = 1.0f;
     blowPower = pow(vol,2.0f);
@@ -108,6 +116,10 @@ void Sensors::Update() {
     if (vol < 0.0f) vol = 0.0f;
     if (vol > 1.0f) vol = 1.0f;
     blowPower = pow(vol,2.0f);
+#endif
+
+#ifdef HAS_IOEXPANDER
+    exKeys = readFromIOExpander();
 #endif
 }
 
@@ -212,8 +224,8 @@ int32_t Sensors::InitPressureLPS33(int side) {
 int32_t Sensors::GetPressureValueLPS33(int side) {
   float f = 0;
   if (lps33_readPressure(side, &f)) {
-    int d = (int32_t)(f * 4096.0f);
-    return d >> 1;
+    int32_t d = (int32_t)(f * 4096.0f);
+    return d >> 8; // 16200 - 16700 とか
   }
   return 0;
 }

@@ -1,9 +1,6 @@
 #include "afuue_common.h"
 #include "key_system.h"
-
-#ifdef HAS_IOEXPANDER
-#include "io_expander.h"
-#endif
+#include "sensors.h"
 
 //---------------------------------
 KeySystem::KeySystem() {}
@@ -12,7 +9,7 @@ KeySystem::KeySystem() {}
 // 初期化
 int KeySystem::Initialize() {
 #ifdef HAS_IOEXPANDER
-  return setupIOExpander();
+  return 0;//setupIOExpander();
 #endif
 
 #if (MAINUNIT == M5STAMP_S3)
@@ -26,9 +23,9 @@ int KeySystem::Initialize() {
 
 //---------------------------------
 // 演奏用のキー処理
-void KeySystem::UpdateKeys() {
+void KeySystem::UpdateKeys(uint16_t exKeys) {
 #ifdef HAS_IOEXPANDER
-  uint16_t mcpKeys = readFromIOExpander();
+  uint16_t mcpKeys = exKeys;// readFromIOExpander();
 #if (MAINUNIT == M5STICKC_PLUS)
   keyLowC = ((mcpKeys & 0x0001) != 0);
   keyEb = ((mcpKeys & 0x0002) != 0);

@@ -19,6 +19,8 @@ public:
   float breathZero = 0.0f;
   bool isLipSensorEnabled = false;
 
+  uint16_t exKeys = 0;
+
 private:
   int defaultPressureValue = 0;
   int defaultPressureValue2 = 0;
