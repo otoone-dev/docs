@@ -353,9 +353,9 @@ void Afuue::UpdateTask(void *pvParameters) {
     system->Update(td);
     
     unsigned long t1 = micros();
-    int wait = 5;
+    int wait = 10;
     if (t1 > t0) {
-      wait = 5-(int)((t1 - t0)/1000);
+      wait = 10-(int)((t1 - t0)/1000);
       if (wait < 1) wait = 1;
     }
     delay(wait);
