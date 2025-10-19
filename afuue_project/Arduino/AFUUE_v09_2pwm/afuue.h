@@ -30,7 +30,7 @@ private:
   KeySystem key;
   Sensors sensors;
 
-  hw_timer_t * timer = NULL;
+  hw_timer_t* timer = NULL;
   QueueHandle_t xQueue;
   bool enablePlay = false;
 

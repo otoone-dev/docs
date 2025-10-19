@@ -38,6 +38,7 @@ USB DFU On Boot  : "Disabled"
 Events Run On    : Core1
 JTAG Adapter     : "Disabled"
 Arduino Runs On  : Core1
+Events Run On    : Core1
 USB Firmware MSC On Boot: "Disabled"
 Upload Mode      : "UART0/Hardware CDC"
 USB Mode         : "USB-OTG (TinyUSB)"

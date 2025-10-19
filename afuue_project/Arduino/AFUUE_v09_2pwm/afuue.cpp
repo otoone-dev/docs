@@ -128,9 +128,9 @@ delay(100);
 
   if (!menu.isUSBMidiMounted) {
     xQueue = xQueueCreate(QUEUE_LENGTH, sizeof(int8_t));
-    xTaskCreatePinnedToCore(CreateWaveTask, "createWaveTask", 16384, this, configMAX_PRIORITIES, &taskHandle, CORE0);
+    xTaskCreatePinnedToCore(CreateWaveTask, "createWaveTask", 16384, this, configMAX_PRIORITIES-1, &taskHandle, CORE0); // 波形生成は Core0 が専念
 
-    timer = timerBegin(0, CLOCK_DIVIDER, true); // Events Run On は Core1 想定
+    timer = timerBegin(0, CLOCK_DIVIDER, true); // ISR は Core1 で波形生成のタイミングと PWM への更新だけ行う
     timerAttachInterrupt(timer, &OnTimer, false);
     timerAlarmWrite(timer, TIMER_ALARM, true);
     timerAlarmEnable(timer);
@@ -138,15 +138,15 @@ delay(100);
     menu.SetTimer(timer);
   }
 
-  xTaskCreatePinnedToCore(UpdateTask, "UpdateTask", 2048, this, 2, NULL, CORE0);
-  xTaskCreatePinnedToCore(ControlTask, "ControlTask", 2048, this, 3, NULL, CORE0);
-  xTaskCreatePinnedToCore(MenuTask, "MenuTask", 4096, this, 1, NULL, CORE0);
+  xTaskCreatePinnedToCore(UpdateTask, "UpdateTask", 2048, this, 2, NULL, CORE1);
+  xTaskCreatePinnedToCore(MenuTask, "MenuTask", 4096, this, 1, NULL, CORE1);
 
   enablePlay = true;
 }
 
 //-------------------------------------
 void Afuue::Loop() {
+  // Arduino Runs On 設定で Core1 動作
   delay(5000);
 }
 
@@ -351,33 +351,12 @@ void Afuue::UpdateTask(void *pvParameters) {
     loopTime = t0;
 
     system->Update(td);
+    system->Control(td);
     
     unsigned long t1 = micros();
     int wait = 10;
     if (t1 > t0) {
       wait = 10-(int)((t1 - t0)/1000);
-      if (wait < 1) wait = 1;
-    }
-    delay(wait);
-  }
-}
-
-//-------------------------------------
-void Afuue::ControlTask(void *pvParameters) {
-  Afuue* system = reinterpret_cast<Afuue*>(pvParameters);
-
-  unsigned long loopTime = 0;
-  while (1) {
-    unsigned long t0 = micros();
-    float td = (t0 - loopTime)/1000.0f;
-    loopTime = t0;  
-
-    system->Control(td);
-
-    unsigned long t1 = micros();
-    int wait = 8;
-    if (t1 > t0) {
-      wait = 8-(int)((t1 - t0)/1000);
       if (wait < 1) wait = 1;
     }
     delay(wait);
