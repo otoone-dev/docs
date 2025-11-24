@@ -162,9 +162,19 @@ void UpdateTask(void *pvParameters) {
     }
   
     int br = (value % 10) * 10;
-    neopixelWrite(NEOPIXEL_PIN, 1, 1, br);
-    generator.requestedVolume = ((digitalRead(15) == LOW) ? 0.2f : 0.0f);
-    generator.Tick(61 + value, td);
+    neopixelWrite(NEOPIXEL_PIN, 1, br, 1);
+    float vol = 0.0f;
+    float note = 0.0f;
+    if (playing) {
+      vol = playingBC / 127.0f;
+      note = playingNote;
+    }
+    else {
+      note = 61 + value;
+    }
+    if (digitalRead(15) == LOW) vol = 0.2f;
+    generator.requestedVolume = vol;
+    generator.Tick(note, td);
 
     delay(10);
   }
@@ -200,12 +210,13 @@ void setup() {
   pinMode(PIN_BUTTON, INPUT);   // 本体ボタン（入力）（INPUT_PULLUPでプルアップ指定）
   pinMode(PIN_OUTPUT, OUTPUT);  // 外付けLED（出力）
 
-  neopixelWrite(NEOPIXEL_PIN, 100, 100, 100);
+  neopixelWrite(NEOPIXEL_PIN, 0, 0, 100);
 
   auto cfg = M5.config();
   M5.begin(cfg);
 
   Wire.begin(I2CPIN_SDA, I2CPIN_SCL);
+  Wire.setClock(400*1000); // 400kHz
   ssd1306_init();
 
   clearBuffer();
@@ -213,6 +224,7 @@ void setup() {
   ssd1306_update();
   delay(1000);
 
+  neopixelWrite(NEOPIXEL_PIN, 1, 1, 1);
     generator.Initialize();
 
     xQueue = xQueueCreate(QUEUE_LENGTH, sizeof(int8_t));
