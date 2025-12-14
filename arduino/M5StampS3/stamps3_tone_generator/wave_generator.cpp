@@ -120,25 +120,6 @@ void WaveGenerator::CreateWave(bool enabled) {
   if (m_pInfo->lowPassQ > 0.0f) {
     g = LowPass(g);
   }
-
-  float drum = 0.0f;
-  if (drumVolume > 0.0f) {
-    for (int i = 0; i < 2; i++) {
-      if (drum_pos[i] > 0.0f) {
-        drum_pos[i] += drum_wavelength;
-        int p = (int)(drum_pos[i]);
-        if (p >= drum_size[i]) {
-          drum_pos[i] = 0.0f;
-        }
-        else {
-          const float* data = drum_data[i];
-          float d = data[p] / 34000.0f;
-          drum += d * drumVolume;
-        }
-      }
-    }
-  }
-  
   float e = (g * requestedVolume * volumeShift) + delayBuffer[delayPos];
 
   if ( (-0.00002f < e) && (e < 0.00002f) ) {
@@ -147,7 +128,6 @@ void WaveGenerator::CreateWave(bool enabled) {
   delayBuffer[delayPos] = e * m_pInfo->delayRate;
   delayPos = (delayPos + 1) % DELAY_BUFFER_SIZE;
 
-  e += drum;
   e *= 32000.0f;
   if (e < -32700.0f) e = -32700.0f;
   else if (e > 32700.0f) e = 32700.0f;

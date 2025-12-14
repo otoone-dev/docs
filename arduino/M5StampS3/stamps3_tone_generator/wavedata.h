@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _WAVEDATA_H_
+#define _WAVEDATA_H_
 
 class WaveData {
 public:
@@ -20,3 +21,4 @@ public:
   const float* GetDrumData(int index) const;
 };
 
+#endif // _WAVEDATA_H_

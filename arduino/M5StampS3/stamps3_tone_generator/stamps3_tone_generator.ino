@@ -16,6 +16,12 @@ TaskHandle_t taskHandle;
 hw_timer_t* timer = NULL;
 QueueHandle_t xQueue;
 unsigned long loopTime;
+volatile float currentNote = 61.0f;
+volatile float currentBC = 0.0f;
+volatile float currentBend = 0.0f;
+volatile float currentVol = 0.0f;
+volatile bool isPlaying = false;
+volatile bool isPressed = false;
 
 #define SOUND_TWOPWM
 #define I2CPIN_SDA (11)
@@ -37,105 +43,34 @@ unsigned long loopTime;
 // 変数宣言
 bool state = false;     // 本体ボタン状態格納用
 bool led_value = false; // LED状態格納用
-std::string msg[3] = {"MIDI Ready", "", ""};
 int32_t recv_cnt = 0;
 
 // ロータリエンコーダータスク -------------------------------------------------
+static const int enc_step[16] = {
+   0,-1, 1, 0,
+   1, 0, 0,-1,
+  -1, 0, 0, 1,
+   0, 1,-1, 0 
+};
 volatile int value = 0;
 volatile int mode = 0;
-volatile bool d13 = HIGH;
-volatile bool d14 = HIGH;
+volatile int prev_enc = 0;
+volatile int enc_p = 0;
+int ReadEnc() {
+  return (((int)digitalRead(13)) << 1) | (int)digitalRead(14);
+}
 void Enc() {
-  uint8_t d = ((uint8_t)d14) << 1 | d13;
-  switch (mode) {
-    case 0:
-    {
-      if (d == 0b10) {
-        mode = 1; // +
-      }
-      else if (d == 0b01) {
-        mode = 11; // -
-      }
-    }
-    break;
-    case 1: // 10
-    {
-      if (d == 0b00) {
-        mode = 2;
-      }
-      else if (d == 0b11) {
-        mode = 0;
-      }
-    }
-    break;
-    case 2: // 00
-    {
-      if (d == 0b01) {
-        mode = 3;
-      }
-      else if (d == 0b10) {
-        mode = 1;
-      }
-    }
-    break;
-    case 3: // 01
-    if (d == 0b11) {
-      value++;
-      mode = 0;
-    }
-    else if (d == 0b10) {
-      mode = 1;
-    }
-    break;
-
-    case 11: // 01
-    {
-      if (d == 0b00) {
-        mode = 12;
-      }
-      else if (d == 0b11) {
-        mode = 0;
-      }
-    }
-    break;
-    case 12: // 00
-    {
-      if (d == 0b10) 
-      {
-        mode = 13;
-      }
-      else if (d == 0b01) {
-        mode = 11;
-      }
-    }
-    break;
-    case 13: // 10
-    {
-      if (d == 0b11) 
-      {
-        value--;
-        mode = 0;
-      }
-      else if (d == 0b00) {
-        mode = 12;
-      }
-    }
-    break;
+  int d = ReadEnc();
+  enc_p += enc_step[(prev_enc << 2) | d];
+  prev_enc = d;
+  if (enc_p <= -4) {
+    enc_p = 0;
+    value--;
   }
-}
-void Enc13() {
-  d13 = digitalRead(13);
-  Enc();
-}
-void Enc14() {
-  d14 = digitalRead(14);
-  Enc();
-}
-
-volatile int32_t testCnt = 0;
-//------------------
-void Test() {
-  testCnt++;
+  else if (enc_p >= 4) {
+    enc_p = 0;
+    value++;
+  }
 }
 
 // 波形生成 -------------------------------------------------
@@ -149,6 +84,9 @@ void CreateWaveTask(void *pvParameters) {
   }
 }
 
+unsigned long pressTime = 0;
+unsigned long msgTime = 0;
+char msg[256];
 // 更新 -------------------------------------------------
 void UpdateTask(void *pvParameters) {
   while (1) {
@@ -165,20 +103,58 @@ void UpdateTask(void *pvParameters) {
     neopixelWrite(NEOPIXEL_PIN, 1, br, 1);
     float vol = 0.0f;
     float note = 0.0f;
-    if (playing) {
-      vol = playingBC / 127.0f;
+    if (isMidiPlaying) {
+      float bc = (playingBC - 10) / 117.0f;
+      currentBC += (bc - currentBC) * 0.5f;
+      float bend = (pitchBend / 8192.0f);
+      if (bend < -2.0f) bend = -2.0f;
+      if (bend > 2.0f) bend = 2.0f;
+      currentBend += (bend - currentBend) * 0.2f;
+      vol = currentBC;
+      if (vol < 0.0f) {
+        vol = 0.0f;
+      }
+      if (vol > 1.0f) {
+        vol = 1.0f;
+      }
       note = playingNote;
+      if (note < 2) note = 2;
+      if (note > 125) note = 125;
     }
     else {
       note = 61 + value;
     }
+    currentNote += (note - currentNote) * 0.9f;
     if (digitalRead(15) == LOW) vol = 0.2f;
+    currentVol = vol;
     generator.requestedVolume = vol;
-    generator.Tick(note, td);
+    generator.Tick(currentNote + currentBend * 2.0f, td);
 
+    unsigned long t = micros();
+    if (digitalRead(15) == LOW) {
+      if (pressTime == 0) {
+        pressTime = t;
+      }
+    }
+    else 
+    {
+      if (pressTime > 0) {
+        unsigned long dt = t - pressTime;
+        if (dt > 1000*1000) {
+          // got to menu
+        }
+        else if (dt > 100*1000) {
+          // change instrument
+          msgTime = t;
+          sprintf(msg, "TEST");
+        }
+        pressTime = 0;
+      }
+    }
     delay(10);
   }
 }
+
 //---------------------------------
 void IRAM_ATTR OnTimer() {
   portENTER_CRITICAL_ISR(&timerMux);
@@ -239,18 +215,32 @@ void setup() {
   pinMode(13, INPUT);
   pinMode(14, INPUT);
   pinMode(15, INPUT);
-  attachInterrupt(13, Enc13, CHANGE);
-  attachInterrupt(14, Enc14, CHANGE);
+  prev_enc = ReadEnc();
+  attachInterrupt(13, Enc, CHANGE);
+  attachInterrupt(14, Enc, CHANGE);
   pinMode(MIDI_IN_PIN, INPUT);
   xTaskCreatePinnedToCore(UpdateTask, "UpdateTask", 2048, NULL, 2, NULL, 0);
   loopTime = micros();
-
-  midiMsg = "READY";
 }
+
 // メイン ---------------------------------------------------
 void loop() {
-  clearBuffer();
-  DrawString(midiMsg.c_str(), 2, 2);
-  ssd1306_update();
-  delay(1);
+    clearBuffer();
+    fillRect(2, 32+2, (int)(120.0f*currentVol), 14, true);
+    fillRect(2, 32+25, 120, 2, true);
+    int x = 64 + (int)(60.0f * currentBend);
+    fillRect(x-5, 32+20, 5, 14, true);
+    if (msgTime > 0) {
+      DrawString(msg, 2, 0);
+      if (msgTime + 1000*1000 < micros()) {
+        msgTime = 0;
+      }
+    }
+    else {
+      char s[32];
+      sprintf(s, "%1.1f, %1.1f", currentVol, currentBend);
+      DrawString(s, 2, 0);
+    }
+    ssd1306_update();
+  delay(10);
 }

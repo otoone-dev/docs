@@ -1,4 +1,5 @@
-#pragma once
+#ifndef _WAVE_GENERATOR_H_
+#define _WAVE_GENERATOR_H_
 
 #include <Arduino.h>
 #include "wavedata.h"
@@ -118,3 +119,5 @@ private:
 #define WAVEOUT_BUFFERSIZE (3)
 extern volatile uint16_t* waveOut;
 extern volatile uint32_t waveOutWriteIdx;
+
+#endif // _WAVE_GENERATOR_H_
