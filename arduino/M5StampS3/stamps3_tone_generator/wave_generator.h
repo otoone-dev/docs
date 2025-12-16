@@ -3,23 +3,9 @@
 
 #include <Arduino.h>
 #include "wavedata.h"
+#include "menu.h"
 
-//---------------------------------
-struct WaveSettings {
-  bool isAccControl = false; // (未対応)加速度センサーを使用するかどうか
-  int fineTune = 442; // A3(ラ) の周波数 440Hz とか 442Hz とか。
-  int transpose = 0;  // 移調 0:C管 +3(-9):Eb管
-  int attackSoftness = 0; // 吹き始めの音量立ち上がりの柔らかさ (0:一番硬い) で数字が増えるほど柔らかくなる
-  int portamentoRate = 30; // ポルタメント。音の切り替わりを滑らかにする。0 で即時変更。数字が増えるほどゆっくりになる。
-  int delayRate = 15; // ディレイのかかり具合。0 でディレイ無し。
-  int pitchDropLevel = 0; // 音量でピッチが下がる量 1/10
-  int pitchDropPos = 8; // ピッチが正しい音程になる音量位置 0 - 10 で 0.0-1.0
-
-  int lowPassP = 5; // 音量に対してどこのあたりでフィルタがかかるか 5 が音量中レベル、1 は音量最小、10 が音量MAX
-  int lowPassR = 5; // 音量に対してどれくらいの範囲でフィルタがかかるか(フィルタの立ち上がりの急峻度) 1-30
-  int lowPassQ = 0; // Q factor(1/10単位) 0 でローパス無効、5 で強調されないローパス、5 より大きくなると高い周波数が元の波形より強調されていきます。
-};
-
+// 再生用
 struct WaveInfo {
   int baseNote = 61; // 49 61 73
   float fineTune = 440.0f;
@@ -50,21 +36,17 @@ struct WaveInfo {
 //---------------------------------
 class WaveGenerator {
 public:
-  WaveGenerator(volatile WaveInfo* pInfo);
-  void Initialize();
+  WaveGenerator();
+  void Initialize(WaveData* pWaveData);
+  WaveInfo* GetWaveInfo() {
+    return &m_info;
+  }
   void Tick(float note, float td);
   void CreateWave(bool enabled);
   //---------------------------------
   float requestedVolume = 0.0f;
   float noiseVolume = 0.0f;
   const float* currentWaveTable = NULL;
-
-  const float* drum_data[2] = {NULL, NULL};
-  volatile int drum_size[2] = {0, 0};
-  volatile float drum_pos[2] = {0.0f, 0.0f};
-  const float drum_wavelength = 11025.0f / 25000.0f;
-  int drum_mode = 0;
-  float drumVolume = 0.0f;
 
   float growlLevel = 0.0f; // 検証中につき OFF
   float growlPos = 0.9f;
@@ -73,9 +55,7 @@ public:
 
 private:
   //------
-  volatile WaveInfo* m_pInfo = NULL;
-  WaveData m_waveData;
-  int32_t m_waveIndex;
+  WaveInfo m_info;
   float phase = 0.0f;
   float currentWaveLevel = 0.0f;
   float volumeShift = 1.0f;

@@ -1831,7 +1831,7 @@ const unsigned short* FontTable[] = {
 };
 
 //--------------------------
-// sx, sy ‚ÌˆÊ’u‚É str ‚ğ•`‰æi‰p”š‚Ì‚İ‚Å‚·j
+// sx, sy ï¿½ÌˆÊ’uï¿½ï¿½ str ï¿½ï¿½`ï¿½ï¿½iï¿½pï¿½ï¿½ï¿½ï¿½ï¿½Ì‚İ‚Å‚ï¿½ï¿½j
 void DrawString(const char* str, int sx, int sy) {
   const char* ps = str;
   int x = sx;
@@ -1843,7 +1843,7 @@ void DrawString(const char* str, int sx, int sy) {
       ps++;
       continue;
     }
-    else if (c == 0x0a) {
+    else if (c == 0x0a || c == 0x0D) {
       x = sx;
       y += 8*2;
       ps++;

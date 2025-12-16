@@ -6,8 +6,7 @@ volatile uint16_t* waveOut = new uint16_t[WAVEOUT_BUFFERSIZE];
 volatile uint32_t waveOutWriteIdx = 0;
 
 //----------------------------
-WaveGenerator::WaveGenerator(volatile WaveInfo* pInfo)
-  : m_pInfo(pInfo)
+WaveGenerator::WaveGenerator()
 {
   for (int i = 0; i < DELAY_BUFFER_SIZE; i++) {
     delayBuffer[i] = 0.0f;
@@ -16,7 +15,7 @@ WaveGenerator::WaveGenerator(volatile WaveInfo* pInfo)
 
 //----------------------------
 // 初期化
-void WaveGenerator::Initialize() {
+void WaveGenerator::Initialize(WaveData* pWaveData) {
 #ifdef SOUND_TWOPWM
   pinMode(PWMPIN_LOW, OUTPUT);
   pinMode(PWMPIN_HIGH, OUTPUT);
@@ -29,15 +28,9 @@ void WaveGenerator::Initialize() {
 #else
   pinMode(DACPIN, OUTPUT);
 #endif
-  sinTable = m_waveData.GetSinTable();
-  tanhTable = m_waveData.GetTanhTable();
-  currentWaveTable = m_waveData.GetWaveTable(m_waveIndex);
-
-  for (int i = 0; i < 2; i++) {
-    drum_data[i] = m_waveData.GetDrumData(i);
-    drum_size[i] = m_waveData.GetDrumLength(i);
-    drum_pos[i] = 0;
-  }
+  sinTable = pWaveData->GetSinTable();
+  tanhTable = pWaveData->GetTanhTable();
+  currentWaveTable = pWaveData->GetWaveTable(0);//m_waveIndex);
 }
 
 //----------------------------
@@ -46,7 +39,7 @@ void WaveGenerator::Tick(float note, float td) {
   // 現在の再生周波数から１サンプルあたりのフェーズの進みを計算
   float rnd = 2.0f * (rand() / (float)RAND_MAX) - 1.0f; // -1.0f - 1.0f
   float wavelength = CalcFrequency(note);
-  currentWavelength += (wavelength - currentWavelength) * m_pInfo->portamentoRate;
+  currentWavelength += (wavelength - currentWavelength) * m_info.portamentoRate;
   currentWavelengthTickCount = (currentWavelength / SAMPLING_RATE);
 
   // グロウル
@@ -69,15 +62,15 @@ void WaveGenerator::Tick(float note, float td) {
 #endif
 
   // ローパスパラメータの更新
-  if (m_pInfo->lowPassQ > 0.0f) {
-    m_pInfo->lowPassIDQ = 1.0f / (2.0f * (m_pInfo->lowPassQ + 1.0f * growlRate));
+  if (m_info.lowPassQ > 0.0f) {
+    m_info.lowPassIDQ = 1.0f / (2.0f * (m_info.lowPassQ + 1.0f * growlRate));
   }
   else {
-    m_pInfo->lowPassIDQ = 0.0f;
+    m_info.lowPassIDQ = 0.0f;
   }
 
-  if (m_pInfo->lowPassQ > 0.0f) {
-    float a = (tanh(m_pInfo->lowPassR*(requestedVolume-m_pInfo->lowPassP)) + 1.0f) * 0.5f;
+  if (m_info.lowPassQ > 0.0f) {
+    float a = (tanh(m_info.lowPassR*(requestedVolume-m_info.lowPassP)) + 1.0f) * 0.5f;
     float lp = 100.0f + 20000.0f * a;
     if (lp > 12000.0f) {
       lp = 12000.0f;
@@ -85,7 +78,7 @@ void WaveGenerator::Tick(float note, float td) {
     lowPassValue += (lp - lowPassValue) * 0.8f;
 
     float omega = lowPassValue / SAMPLING_RATE;
-    float alpha = InteropL(sinTable, 1024, omega) * m_pInfo->lowPassIDQ;
+    float alpha = InteropL(sinTable, 1024, omega) * m_info.lowPassIDQ;
     float cosv = InteropL(sinTable, 1024, omega + 0.25f);
     float one_minus_cosv = 1.0f - cosv;
     lp_a0 =  1.0f + alpha;
@@ -117,7 +110,7 @@ void WaveGenerator::CreateWave(bool enabled) {
     g = (g * (1.0f-noiseVolume) + n * noiseVolume);
   }
 
-  if (m_pInfo->lowPassQ > 0.0f) {
+  if (m_info.lowPassQ > 0.0f) {
     g = LowPass(g);
   }
   float e = (g * requestedVolume * volumeShift) + delayBuffer[delayPos];
@@ -125,7 +118,7 @@ void WaveGenerator::CreateWave(bool enabled) {
   if ( (-0.00002f < e) && (e < 0.00002f) ) {
     e = 0.0f;
   }
-  delayBuffer[delayPos] = e * m_pInfo->delayRate;
+  delayBuffer[delayPos] = e * m_info.delayRate;
   delayPos = (delayPos + 1) % DELAY_BUFFER_SIZE;
 
   e *= 32000.0f;
@@ -138,7 +131,7 @@ void WaveGenerator::CreateWave(bool enabled) {
 
 //--------------------------
 float WaveGenerator::CalcFrequency(float note) const {
-  return m_pInfo->fineTune * pow(2, (note - (69.0f-12.0f))/12.0f);
+  return m_info.fineTune * pow(2, (note - (69.0f-12.0f))/12.0f);
 }
 
 //---------------------------------

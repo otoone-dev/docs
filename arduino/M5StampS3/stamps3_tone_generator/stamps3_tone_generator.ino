@@ -2,13 +2,12 @@
 #include <Wire.h>
 #include "wave_generator.h"
 #include <cstdint>
-#include "ssd1306.h"
-#include "ascii_fonts.h"
 #include "midi.h"
+#include <FastLED.h>
+#include <M5Unified.h>
 
-WaveInfo waveInfo;
-WaveGenerator generator(&waveInfo);
-WaveSettings waveSettings;
+Menu menu;
+WaveGenerator generator;
 // タイマー割り込み用
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 #define QUEUE_LENGTH 1
@@ -29,8 +28,17 @@ volatile bool isPressed = false;
 #define SCREEN_WIDTH (128)
 #define SCREEN_HEIGHT (32)
 
-#include <M5Unified.h>
-#define NEOPIXEL_PIN (21)
+#define LED_PIN   (21)
+#define NUM_LEDS  (1)
+static CRGB leds[NUM_LEDS];
+void setLed(CRGB color) {
+  // change RGB to GRB
+  uint8_t t = color.r;
+  color.r = color.g;
+  color.g = t;
+  leds[0] = color;
+  FastLED.show();
+}
 
 #define PIN_BUTTON 0    // 本体ボタンの使用端子（G0）
 #define PIN_OUTPUT 43   // 外部LED
@@ -73,20 +81,11 @@ void Enc() {
   }
 }
 
-// 波形生成 -------------------------------------------------
-void CreateWaveTask(void *pvParameters) {
-  WaveGenerator* pGenerator = reinterpret_cast<WaveGenerator*>(pvParameters);
-  while (1) {
-    uint32_t data;
-    xTaskNotifyWait(0, 0, &data, portMAX_DELAY);
-
-    pGenerator->CreateWave(true);
-  }
-}
-
-unsigned long pressTime = 0;
-unsigned long msgTime = 0;
-char msg[256];
+volatile unsigned long pressTime = 0;
+volatile unsigned long msgTime = 0;
+volatile bool shortPressed = false;
+volatile bool longPressed = false;
+volatile int menu_value = 0;
 // 更新 -------------------------------------------------
 void UpdateTask(void *pvParameters) {
   while (1) {
@@ -99,8 +98,8 @@ void UpdateTask(void *pvParameters) {
       MidiReceive(d);
     }
   
-    int br = (value % 10) * 10;
-    neopixelWrite(NEOPIXEL_PIN, 1, br, 1);
+    int br = 10 + (int)(currentVol * 245.0f);
+    setLed(CRGB(1, br, 1));
     float vol = 0.0f;
     float note = 0.0f;
     if (isMidiPlaying) {
@@ -110,7 +109,8 @@ void UpdateTask(void *pvParameters) {
       if (bend < -2.0f) bend = -2.0f;
       if (bend > 2.0f) bend = 2.0f;
       currentBend += (bend - currentBend) * 0.2f;
-      vol = currentBC;
+      vol = currentBC * currentBC
+      ;
       if (vol < 0.0f) {
         vol = 0.0f;
       }
@@ -122,7 +122,7 @@ void UpdateTask(void *pvParameters) {
       if (note > 125) note = 125;
     }
     else {
-      note = 61 + value;
+      note = 69;
     }
     currentNote += (note - currentNote) * 0.9f;
     if (digitalRead(15) == LOW) vol = 0.2f;
@@ -142,16 +142,26 @@ void UpdateTask(void *pvParameters) {
         unsigned long dt = t - pressTime;
         if (dt > 1000*1000) {
           // got to menu
+          longPressed = true;
         }
         else if (dt > 100*1000) {
-          // change instrument
-          msgTime = t;
-          sprintf(msg, "TEST");
+          shortPressed = true;
         }
         pressTime = 0;
       }
     }
     delay(10);
+  }
+}
+
+// 波形生成 -------------------------------------------------
+void CreateWaveTask(void *pvParameters) {
+  WaveGenerator* pGenerator = reinterpret_cast<WaveGenerator*>(pvParameters);
+  while (1) {
+    uint32_t data;
+    xTaskNotifyWait(0, 0, &data, portMAX_DELAY);
+
+    pGenerator->CreateWave(true);
   }
 }
 
@@ -173,7 +183,10 @@ void IRAM_ATTR OnTimer() {
 
 // 初期設定 -------------------------------------------------
 void setup() {
-  waveInfo.ApplyFromWaveSettings(waveSettings);
+  auto cfg = M5.config();
+  M5.begin(cfg);
+  FastLED.addLeds<WS2811, LED_PIN, RGB>(leds, NUM_LEDS);
+  setLed(CRGB::Red);
   
   //USBSerial.begin(115200);        // USBシリアル通信初期化
   //USBSerial.println("S3");
@@ -186,22 +199,19 @@ void setup() {
   pinMode(PIN_BUTTON, INPUT);   // 本体ボタン（入力）（INPUT_PULLUPでプルアップ指定）
   pinMode(PIN_OUTPUT, OUTPUT);  // 外付けLED（出力）
 
-  neopixelWrite(NEOPIXEL_PIN, 0, 0, 100);
-
-  auto cfg = M5.config();
-  M5.begin(cfg);
-
   Wire.begin(I2CPIN_SDA, I2CPIN_SCL);
   Wire.setClock(400*1000); // 400kHz
-  ssd1306_init();
 
-  clearBuffer();
-  DrawString("OTOONE", 2, 2);
-  ssd1306_update();
+  menu.Initialize();
+  menu.SetWaveIndex(0);
+  setLed(CRGB::Blue);
+  menu.DisplayMessage("OTOONE");
   delay(1000);
-
-  neopixelWrite(NEOPIXEL_PIN, 1, 1, 1);
-    generator.Initialize();
+  
+  setLed(CRGB::Green);
+    generator.Initialize(&menu.waveData);
+    WaveInfo* pInfo = generator.GetWaveInfo();
+    pInfo->ApplyFromWaveSettings(menu.currentWaveSettings);
 
     xQueue = xQueueCreate(QUEUE_LENGTH, sizeof(int8_t));
     xTaskCreatePinnedToCore(CreateWaveTask, "createWaveTask", 16384, &generator, configMAX_PRIORITIES, &taskHandle, 0);
@@ -225,22 +235,33 @@ void setup() {
 
 // メイン ---------------------------------------------------
 void loop() {
-    clearBuffer();
-    fillRect(2, 32+2, (int)(120.0f*currentVol), 14, true);
-    fillRect(2, 32+25, 120, 2, true);
-    int x = 64 + (int)(60.0f * currentBend);
-    fillRect(x-5, 32+20, 5, 14, true);
-    if (msgTime > 0) {
-      DrawString(msg, 2, 0);
-      if (msgTime + 1000*1000 < micros()) {
-        msgTime = 0;
+  bool nextBtn = (value > menu_value);
+  bool prevBtn = (value < menu_value);
+  menu_value = value;
+  bool ret = menu.Update(shortPressed, longPressed, nextBtn, prevBtn);
+  shortPressed = false;
+  longPressed = false;
+  if (ret) {
+    menu.BeginPreferences(); {
+#if 0
+      if (menu.factoryResetRequested) {
+        //出荷時状態に戻す
+        M5.Lcd.fillScreen(BLACK);
+        menu.DrawString("FACTORY RESET", 10, 10);
+        menu.ClearAllFlash(); // CLEAR ALL FLASH MEMORY
+        delay(2000);
+        ESP.restart();
       }
-    }
-    else {
-      char s[32];
-      sprintf(s, "%1.1f, %1.1f", currentVol, currentBend);
-      DrawString(s, 2, 0);
-    }
-    ssd1306_update();
+#endif
+      setLed(CRGB::Blue);
+      generator.currentWaveTable = menu.waveData.GetWaveTable(menu.waveIndex);
+      generator.GetWaveInfo()->ApplyFromWaveSettings(menu.currentWaveSettings);
+      const char* name = menu.waveData.GetWaveName(menu.waveIndex);
+      menu.DisplayMessage(name);
+      delay(500);
+      menu.SavePreferences();
+    } menu.EndPreferences();
+  }
+  menu.Display(currentVol, currentBend);
   delay(10);
 }
