@@ -1,9 +1,13 @@
 #include <M5Unified.h>
 
+#define AFUUE_VER (100) // 8Bit-PWM ADC (AFUUE2 First)
 //#define AFUUE_VER (110) // 16Bit-PWM ADC-MCP3425  (AFUUE2 Second)
-#define AFUUE_VER (111) // 16Bit-PWM ADCx2        (AFUUE2R First)
+//#define AFUUE_VER (111) // 16Bit-PWM ADCx2        (AFUUE2R First)
 
-#if (AFUUE_VER == 110)
+#if (AFUUE_VER == 100)
+#define _M5STICKC_H_
+#define PWMPIN_HIGH (26)
+#elif (AFUUE_VER == 110)
 // AFUUE2 改良版
 #define _M5STICKC_H_
 #define PWMPIN_LOW (0)
@@ -156,7 +160,9 @@ uint16_t CreateWave() {
 void IRAM_ATTR onTimer(){
   portENTER_CRITICAL_ISR(&timerMux);
   // 現在の値を書き込むだけ（タイマー割込みで重い処理は書かない方がいいので）
+#ifdef PWMPIN_LOW
   ledcWrite(0, outL);
+#endif
   ledcWrite(1, outH);
 
   int8_t data;
@@ -185,11 +191,13 @@ void setup() {
   M5.begin(cfg);
 
   // 2本の PWM を AFUUE2 基板の抵抗の差で 16bit 相当にしている。1本の PWM の場合は HIGH 側だけ使えばよい。
+#ifdef PWMPIN_LOW
   pinMode(PWMPIN_LOW, OUTPUT);
-  pinMode(PWMPIN_HIGH, OUTPUT);
   ledcSetup(0, 156250, 8); // 156250Hz, 8Bit(256段階)
   ledcAttachPin(PWMPIN_LOW, 0);
   ledcWrite(0, 0);
+#endif
+  pinMode(PWMPIN_HIGH, OUTPUT);
   ledcSetup(1, 156250, 8); // 156250Hz, 8Bit(256段階)
   ledcAttachPin(PWMPIN_HIGH, 1);
   ledcWrite(1, 0);
