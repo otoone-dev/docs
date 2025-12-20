@@ -1,8 +1,32 @@
 #include <M5Unified.h>
 
-#define AFUUE_VER (100) // 8Bit-PWM ADC (AFUUE2 First)
+//#define AFUUE_VER (100) // 8Bit-PWM ADC (AFUUE2 First)
 //#define AFUUE_VER (110) // 16Bit-PWM ADC-MCP3425  (AFUUE2 Second)
-//#define AFUUE_VER (111) // 16Bit-PWM ADCx2        (AFUUE2R First)
+#define AFUUE_VER (111) // 16Bit-PWM ADCx2        (AFUUE2R First)
+//#define AFUUE_VER (112) // 16Bit-PWM LPS33x2    (AFUUE2R Gen2)
+
+/*
+Arduino IDE 2.3.4
+
+M5Stack library 0.4.6
+M5Unified library 0.2.0
+*/
+
+/*
+AFUUE2R は USB デバイスとして動作させるために USB-MODE:USB-OTG などを設定する必要がある。書き込み時はFuncボタンを押しながら USB ケーブルを PC に接続する。
+
+Arduino IDE の設定
+USB CDC On Boot  : "Enabled"
+USB DFU On Boot  : "Disabled"
+JTAG Adapter     : "Disabled"
+USB Firmware MSC On Boot: "Disabled"
+Upload Mode      : "UART0/Hardware CDC"
+USB Mode         : "USB-OTG (TinyUSB)"
+
+https://qiita.com/tomoto335/items/d20aa668a62ad49cda36
+USB-MIDI についてはこちらの記事を参考にさせていただきました
+*/
+
 
 #if (AFUUE_VER == 100)
 #define _M5STICKC_H_
@@ -18,6 +42,13 @@
 #define _STAMPS3_H_
 #define PWMPIN_LOW (39)
 #define PWMPIN_HIGH (40)
+#define NEOPIXEL_PIN (21)
+
+#elif (AFUUE_VER == 112)
+#define _ATOMS3_H_
+#define PWMPIN_LOW (5)
+#define PWMPIN_HIGH (6)
+#define NEOPIXEL_PIN (35)
 
 #endif
 
@@ -184,11 +215,25 @@ void createWaveTask(void *pvParameters) {
   }
 }
 
+//-------------------------------------
+void SetLedColor(int r, int g, int b) {
+#ifdef NEOPIXEL_PIN
+  neopixelWrite(GPIO_NUM_21, r, g, b);
+#endif  
+}
 
 //-------------------------------------
 void setup() {
   auto cfg = M5.config();
   M5.begin(cfg);
+  SetLedColor(10, 0, 0);
+  delay(200);
+  SetLedColor(0, 0, 0);
+  delay(200);
+  SetLedColor(10, 0, 0);
+  delay(200);
+  SetLedColor(0, 0, 0);
+  delay(200);
 
   // 2本の PWM を AFUUE2 基板の抵抗の差で 16bit 相当にしている。1本の PWM の場合は HIGH 側だけ使えばよい。
 #ifdef PWMPIN_LOW
@@ -236,7 +281,7 @@ void loop() {
     requestedVolume = 0.01f;
   }
 #endif
-#ifdef _M5STICKC_H_
+#if (defined(_M5STICKC_H_) || defined(_ATOMS3_H_))
   M5.update();
   if (M5.BtnA.isPressed()) {
     requestedVolume = 0.7f;
@@ -254,6 +299,8 @@ void loop() {
     lp = LOWPASS_CUTOFF_LIMIT;
   }
   lowPassValue += (lp - lowPassValue) * 0.8f;
+
+  SetLedColor(0, 10 + (int)(240.0f*requestedVolume), (digitalRead(0) == LOW ? 0 : 100));
 
   delay(5);
 }
