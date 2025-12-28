@@ -10,7 +10,7 @@ Afuue afuue;
 
 //-------------------------------------
 void SerialPrintLn(const char* text) {
-#if ENABLE_SERIALOUTPUT
+#ifdef USE_SERIALOUTPUT
   Serial.println(text);
 #endif
 }
@@ -43,4 +43,3 @@ void setup() {
 void loop() {
   afuue.Loop();
 }
-

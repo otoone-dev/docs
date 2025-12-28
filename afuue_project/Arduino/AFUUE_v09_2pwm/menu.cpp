@@ -603,7 +603,7 @@ bool Menu::Update2R(const KeySystem* pKey) {
     if (pKey->IsKeyF_Push()) {
       int pgNum = pgNumHigh * 10 + pgNumLow;
       // Change wave index or MIDI:Send Program Change
-#if ENABLE_MIDI
+#ifdef USE_MIDI
       if (isMidiEnabled) 
       {
         if (pgNum > 0) {
@@ -638,7 +638,7 @@ bool Menu::Update2R(const KeySystem* pKey) {
         currentWaveSettings.transpose--;
         if (currentWaveSettings.transpose < -12) currentWaveSettings.transpose = -12;
       }
-#if ENABLE_MIDI
+#ifdef USE_MIDI
       if (isMidiEnabled) {
         afuueMidi->NoteOn(currentWaveSettings.transpose+61-1, 10);
         delay(static_cast<int>(currentWaveSettings.transpose == 0 ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH));
@@ -660,7 +660,7 @@ bool Menu::Update2R(const KeySystem* pKey) {
         currentWaveSettings.transpose++;
         if (currentWaveSettings.transpose > 12) currentWaveSettings.transpose = 12;
       }
-#if ENABLE_MIDI
+#ifdef USE_MIDI
       if (isMidiEnabled) {
         afuueMidi->NoteOn(currentWaveSettings.transpose+61-1, 10);
         delay(static_cast<int>(currentWaveSettings.transpose == 0 ? FORCEPLAYTIME_LENGTH*2 : FORCEPLAYTIME_LENGTH));
@@ -728,7 +728,7 @@ bool Menu::Update2R(const KeySystem* pKey) {
       forcePlayNote = currentWaveSettings.transpose + 61 - 1;
       return true;
     }
-#if ENABLE_MIDI
+#ifdef USE_MIDI
     else if (pKey->IsKeyB_Push()) {
       if (isMidiEnabled) {
         // Change MIDI Breath Control Mode
@@ -750,9 +750,13 @@ bool Menu::Update2R(const KeySystem* pKey) {
   }
 #if !defined(HAS_DISPLAY)
   if (pKey->IsFuncBtn_Push()) {
+#ifdef HAS_LIPSENSOR  
     ctrlMode = (ctrlMode + 1) % 4; // 0:normal, 1:lip-bend, 2:MIDI-normal, 3:MIDI-lip-bend
     isLipSensorEnabled = (ctrlMode % 2);
-#if ENABLE_MIDI
+#else
+    ctrlMode = (ctrlMode == 0 ? 2 : 0); // 0:normal, 2:MIDI-normal
+#endif
+#ifdef USE_MIDI
     if (isMidiEnabled) {
       afuueMidi->NoteOff();
     }

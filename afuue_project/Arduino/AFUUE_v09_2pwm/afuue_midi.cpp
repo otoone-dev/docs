@@ -1,16 +1,16 @@
 #include "afuue_common.h"
 #include "afuue_midi.h"
 
-#if ENABLE_MIDI
+#ifdef USE_MIDI
 
-#if ENABLE_BLE_MIDI
+#ifdef USE_BLE_MIDI
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
 #include <BLE2902.h>
 #define SERVICE_UUID        "03b80e5a-ede8-4b33-a751-6ce34ec4c700"  // Apple BLE MIDI とするので固定
 #define CHARACTERISTIC_UUID "7772e5db-3868-4112-a1a9-f2669d106bf3"
-#endif // ENABLE_BLE_MIDI
+#endif // USE_BLE_MIDI
 
 
 Adafruit_USBD_MIDI usb_midi;
@@ -18,7 +18,7 @@ MIDI_CREATE_INSTANCE(Adafruit_USBD_MIDI, usb_midi, MIDI);
 
 //---------------------------------
 bool AfuueMIDI::Initialize() {
-#if ENABLE_BLE_MIDI
+#ifdef USE_BLE_MIDI
     BLEDevice::init("AFUUE2");
       
     // Create the BLE Server
@@ -110,7 +110,7 @@ void AfuueMIDI::NoteOn(int note, int vol) {
       NoteOff();
     }
     //if (playing != false) return;
-#if ENABLE_BLE_MIDI
+#ifdef USE_BLE_MIDI
     midiPacket[0] = 0x80; // header
     midiPacket[1] = 0x80; // timestamp, not implemented
     midiPacket[2] = 0x90 + channelNo; // note down, channel 0
@@ -158,7 +158,7 @@ void AfuueMIDI::NoteOn(int note, int vol) {
 void AfuueMIDI::NoteOff() {
   // vol=0 で NoteOn というのもアリらしい (PSS-A50調べ)
     if ((playing == false) || (prevNoteNumber < 0)) return;
-#if ENABLE_BLE_MIDI
+#ifdef USE_BLE_MIDI
     midiPacket[0] = 0x80; // header
     midiPacket[1] = 0x80; // timestamp, not implemented
     midiPacket[2] = 0x80 + channelNo; // note up, channel 0
@@ -188,7 +188,7 @@ void AfuueMIDI::PicthBendControl(int bend) {
     uint16_t value = static_cast<uint16_t>(bend + 0x8000) >> 2; // 14bit
     uint8_t d0 = value & 0x7F;
     uint8_t d1 = (value >> 7) & 0x7F;
-#if ENABLE_BLE_MIDI
+#ifdef USE_BLE_MIDI
     midiPacket[0] = 0x80; // header
     midiPacket[1] = 0x80; // timestamp, not implemented
     midiPacket[2] = 0xE0 + channelNo; 
@@ -210,7 +210,7 @@ void AfuueMIDI::PicthBendControl(int bend) {
 
 //---------------------------------
 void AfuueMIDI::BreathControl(int vol) {
-#if ENABLE_BLE_MIDI
+#ifdef USE_BLE_MIDI
     midiPacket[0] = 0x80; // header
     midiPacket[1] = 0x80; // timestamp, not implemented
     midiPacket[2] = 0xB0 + channelNo; // control change, channel 0
@@ -253,7 +253,7 @@ void AfuueMIDI::BreathControl(int vol) {
 
 //---------------------------------
 void AfuueMIDI::ProgramChange(int no) {
-#if ENABLE_BLE_MIDI
+#ifdef USE_BLE_MIDI
     midiPacket[0] = 0x80; // header
     midiPacket[1] = 0x80; // timestamp, not implemented
     midiPacket[2] = 0xC0 + channelNo;
@@ -282,7 +282,7 @@ void AfuueMIDI::ChangeBreathControlMode() {
 
 //---------------------------------
 void AfuueMIDI::ActiveNotify() {
-#if ENABLE_BLE_MIDI
+#ifdef USE_BLE_MIDI
     midiPacket[0] = 0x80; // header
     midiPacket[1] = 0x80; // timestamp, not implemented
     midiPacket[2] = 0xFE; // active sense
@@ -299,4 +299,4 @@ void AfuueMIDI::ActiveNotify() {
 #endif
 }
 
-#endif // ENABLE_MIDI
+#endif // USE_MIDI

@@ -2,7 +2,7 @@
 
 #include "afuue_common.h"
 
-#if ENABLE_MIDI
+#ifdef USE_MIDI
 
 enum MIDIMODE {
   BREATHCONTROL,
@@ -82,4 +82,4 @@ public:
   void ChangeBreathControlMode() {}
   void ActiveNotify() {}
 };
-#endif // ENABLE_MIDI
+#endif // USE_MIDI

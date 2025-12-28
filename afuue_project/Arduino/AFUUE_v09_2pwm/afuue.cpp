@@ -8,14 +8,14 @@ TaskHandle_t taskHandle;
 
 //---------------------------------
 void Afuue::Initialize() {
-#if ENABLE_SERIALOUTPUT
+#ifdef USE_SERIALOUTPUT
   Serial.begin(115200);
   SerialPrintLn("------");
 #endif
 
-#if ENABLE_MIDI
-SerialPrintLn("Initialize MIDI...");
-delay(100);
+#ifdef USE_MIDI
+  SerialPrintLn("Initialize MIDI...");
+  delay(100);
   menu.isUSBMidiMounted = afuueMidi.Initialize();
   if (menu.isUSBMidiMounted) {
     menu.isMidiEnabled = true;
@@ -23,8 +23,8 @@ delay(100);
   SerialPrintLn("MIDI Initialize done.");
 #endif
 
-SerialPrintLn("Initialize Key...");
-delay(100);
+  SerialPrintLn("Initialize Key...");
+  delay(100);
 #ifdef HAS_DISPLAY
   M5.Lcd.setBrightness(255);
   M5.Lcd.setRotation(0);
@@ -39,7 +39,7 @@ delay(100);
   M5.Lcd.setTextColor(TFT_WHITE, TFT_BLACK);
   M5.Lcd.setTextSize(1);
   M5.Lcd.setBrightness(127);
-#endif // _M5STICKC_H_
+#endif // HAS_DISPLAY
 
 #ifdef NEOPIXEL_PIN
   SetLedColor(10, 10, 10);
@@ -166,7 +166,7 @@ void Afuue::GetMenuParams() {
 //-------------------------------------
 void Afuue::Update(float td) {
   float reqVolume = generator.requestedVolume;
-#if ENABLE_MIDI
+#ifdef USE_MIDI
   if (menu.isMidiEnabled) {
     afuueMidi.Update((int)currentNote, reqVolume, sensors.isLipSensorEnabled, sensors.bendNoteShift + volumeDropNoteShift);
   } else

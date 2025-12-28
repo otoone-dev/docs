@@ -10,8 +10,8 @@
 //#define AFUUE_VER (1100) // 16Bit-PWM ADC-MCP3425  (AFUUE2 Second)
 //#define AFUUE_VER (1120) // 16Bit-PWM LPS33        (AFUUE2 Gen3)
 //#define AFUUE_VER (1110) // 16Bit-PWM ADCx2        (AFUUE2R First)
-#define AFUUE_VER (1130) // 16Bit-PWM LPS33x2      (AFUUE2R Gen2)
-//#define AFUUE_VER (1140)  // 16Bit-PWM ADC-MCP3425  (AFUUE2R Gen2 Lite)
+//#define AFUUE_VER (1130) // 16Bit-PWM LPS33x2      (AFUUE2R Gen2)
+#define AFUUE_VER (1140)  // 16Bit-PWM ADC-MCP3425  (AFUUE2R Gen2 Lite)
 
 /*
 Arduino IDE 2.3.4
@@ -67,7 +67,7 @@ USB-MIDI についてはこちらの記事を参考にさせていただきま�
 #define MAINUNIT (M5STAMP_S3)
 #include <Arduino.h>
 #include <Adafruit_TinyUSB.h>
-#include <MIDI.h>
+#define USE_MIDI
 #define SOUND_TWOPWM
 #define USE_INTERNALADC
 #define HAS_LIPSENSOR
@@ -84,7 +84,7 @@ USB-MIDI についてはこちらの記事を参考にさせていただきま�
 #define MAINUNIT (M5ATOM_S3)
 #include <Arduino.h>
 #include <Adafruit_TinyUSB.h>
-#include <MIDI.h>
+#define USE_MIDI
 #define SOUND_TWOPWM
 #define USE_LPS33
 #define HAS_LIPSENSOR
@@ -98,7 +98,7 @@ USB-MIDI についてはこちらの記事を参考にさせていただきま�
 #define MAINUNIT (M5ATOM_S3)
 #include <Arduino.h>
 #include <Adafruit_TinyUSB.h>
-#include <MIDI.h>
+#define USE_MIDI
 #define SOUND_TWOPWM
 #define USE_MCP3425
 #define LEDPIN (8)
@@ -131,7 +131,6 @@ USB-MIDI についてはこちらの記事を参考にさせていただきま�
 
 #define LEDPIN (10)
 #define ADCPIN (ADC2)  // 36
-#define ENABLE_MIDI (0)
 
 #elif (MAINUNIT == M5STAMP_S3)
 // STAMPS3 -------------
@@ -146,7 +145,6 @@ USB-MIDI についてはこちらの記事を参考にさせていただきま�
 #define ADCPIN (11)
 #define ADCPIN2 (12)
 #endif  //HAS_LIPSENSOR
-#define ENABLE_MIDI (1)
 #define MIDI_IN_PIN (42)
 #define MIDI_OUT_PIN (41)
 
@@ -155,7 +153,6 @@ USB-MIDI についてはこちらの記事を参考にさせていただきま�
 #define HAS_IOEXPANDER
 #define PWMPIN_LOW (5)
 #define PWMPIN_HIGH (6)
-#define ENABLE_MIDI (1)
 #define MIDI_IN_PIN (9)  // not use
 #define MIDI_OUT_PIN (7)
 
@@ -166,6 +163,9 @@ USB-MIDI についてはこちらの記事を参考にさせていただきま�
 
 #endif  //--------------
 
+#ifdef USE_MIDI
+#include <MIDI.h>
+#endif
 
 #ifdef USE_MCP3425
 #define MCP3425_ADDR (0x68)
@@ -184,9 +184,8 @@ USB-MIDI についてはこちらの記事を参考にさせていただきま�
 //#define SAMPLING_RATE (44077.13f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (55*33) = 44kHz
 //#define SAMPLING_RATE (48019.2f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (49*34) = 48kHz
 
-//#define ENABLE_COMMUNICATETOOL (0)
-#define ENABLE_BLE_MIDI (0)
-#define ENABLE_SERIALOUTPUT (0)
+//#define USE_BLE_MIDI
+//#define USE_SERIALOUTPUT
 
 extern volatile uint8_t waveOutH;
 extern volatile uint8_t waveOutL;
