@@ -1,8 +1,13 @@
 #pragma once
 #include "DeviceBase.h"
 
+struct OutputResult {
+    bool hasCpuLoad = false;
+    float cpuLoad = 0.0f;
+};
+
 class OutputDeviceBase : public DeviceBase {
 public:
-    virtual void Update(float note, float volume) = 0;
+    virtual OutputResult Update(float note, float volume) = 0;
     virtual ~OutputDeviceBase() {}
 };

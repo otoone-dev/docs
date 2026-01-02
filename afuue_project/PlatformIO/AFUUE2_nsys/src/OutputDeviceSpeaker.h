@@ -8,14 +8,14 @@
 #define PWMPIN_HIGH (6)
 
 //---------------------------------
-#define MCPWM_PERIOD_TICKS (1066)
+#define MCPWM_PERIOD_TICKS (256)
 mcpwm_timer_handle_t timer_handle;
 mcpwm_timer_config_t timer_config = {
     .group_id = 0,
     .clk_src = MCPWM_TIMER_CLK_SRC_DEFAULT,
-    .resolution_hz = 160*1000*1000, // 160MHz
+    .resolution_hz = 80*1000*1000, // 80MHz
     .count_mode = MCPWM_TIMER_COUNT_MODE_UP,
-    .period_ticks = MCPWM_PERIOD_TICKS, // 150kHz
+    .period_ticks = MCPWM_PERIOD_TICKS, // 312.5kHz
     .intr_priority = 0,
 };
 mcpwm_oper_handle_t oper_handle;
@@ -38,11 +38,11 @@ mcpwm_comparator_config_t cmp_config = {
 };
 
 //---------------------------------
-#define CLOCK_DIVIDER (80)
-#define TIMER_ALARM (40)
+#define CLOCK_DIVIDER (50)//(80)
+#define TIMER_ALARM (50)//(40)
 //#define SAMPLING_RATE (20000) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (80*50) = 20kHz
-#define SAMPLING_RATE (25000.0f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (80*40) = 25kHz
-//#define SAMPLING_RATE (32000) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (50*50) = 32kHz
+//#define SAMPLING_RATE (25000.0f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (80*40) = 25kHz
+#define SAMPLING_RATE (32000) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (50*50) = 32kHz
 //#define SAMPLING_RATE (44077.13f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (55*33) = 44kHz
 //#define SAMPLING_RATE (48019.2f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (49*34) = 48kHz
 
@@ -60,6 +60,7 @@ class OutputDeviceSpeaker : public OutputDeviceBase {
 public:
     float m_tickCount = 0.0f;
     float m_volume = 0.0f;
+    uint64_t m_dt = 0;
 
     //--------------
     const char* GetName() const override {
@@ -122,9 +123,12 @@ public:
     }
 
     //--------------
-    void Update(float note, float volume) override {
+    OutputResult Update(float note, float volume) override {
+        OutputResult result;
         m_tickCount = CalcFrequency(note) / SAMPLING_RATE;
         m_volume = volume;
+        float load = m_dt / 1000000.0f;
+        return OutputResult{ true, load / (1.0f / SAMPLING_RATE) };
     };
 
     //--------------
@@ -136,38 +140,34 @@ public:
     static void CreateWaveTask(void *parameter) {
         OutputDeviceSpeaker *pSystem = static_cast<OutputDeviceSpeaker *>(parameter);
         float phase = 0.0f;
+        float fmid = (MCPWM_PERIOD_TICKS * MCPWM_PERIOD_TICKS) / 2.0f;
+        const int32_t umid = MCPWM_PERIOD_TICKS * MCPWM_PERIOD_TICKS / 2;
         uint64_t t0 = micros();
         while (1) {
-            uint64_t t1 = micros();
-            //dt1 = t1 - t0;
-            t0 = t1;
-
             phase += pSystem->m_tickCount;
             if (phase >= 1.0f) phase -= 1.0f;
 
-            float f = 60000.0f * (pSystem->m_volume * (-0.5f + phase));
-            //float f = 32000.0f * (pSystem->m_volume * sinf(phase * 2.0f * 3.14159265f));
-            if ( (-0.00002f < f) && (f < 0.00002f) ) {
+            float f = (fmid*1.8f) * (pSystem->m_volume * (-0.5f + phase));
+            //float f = (fmid*0.9f)* (pSystem->m_volume * sinf(phase * 2.0f * 3.14159265f));
+            if ( (-0.000002f < f) && (f < 0.000002f) ) {
                 f = 0.0f;
             }
-            uint16_t d = static_cast<uint16_t>(32768.0f + f);
+            uint32_t d = static_cast<uint32_t>(umid + static_cast<int32_t>(f));
 
-            uint8_t h = (d >> 8) & 0xFF;
-            uint8_t l = d & 0xFF;
-            t1 = micros();
-            //dt2 = t1 - t0;
+            uint32_t h = d / MCPWM_PERIOD_TICKS;
+            uint32_t l = d % MCPWM_PERIOD_TICKS;
+            pSystem->m_dt = micros() - t0;
 
             uint32_t data;
             xTaskNotifyWait(0, 0, &data, portMAX_DELAY);
 
-            t1 = micros();
+            t0 = micros();
 #ifdef SOUND_TWOPWM
-            mcpwm_comparator_set_compare_value(cmp_handle_low, (l * MCPWM_PERIOD_TICKS) / 255);
-            mcpwm_comparator_set_compare_value(cmp_handle_high, (h * MCPWM_PERIOD_TICKS) / 255);
+            mcpwm_comparator_set_compare_value(cmp_handle_low, l);
+            mcpwm_comparator_set_compare_value(cmp_handle_high, h);
 #else
             //dacWrite(DACPIN, h);
 #endif
-            //dt3 = micros() - t1;
         }
     }
 };

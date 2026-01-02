@@ -16,7 +16,8 @@ public:
         return result;
     }
 
-    void Update(float note, float volume) override {
+    OutputResult Update(float note, float volume) override {
         ledcWriteChannel(5, (int)(10 + volume * 245.0f));
+        return OutputResult{ false, 0.0f };
     }
 };

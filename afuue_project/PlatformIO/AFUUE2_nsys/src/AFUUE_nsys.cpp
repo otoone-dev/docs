@@ -45,6 +45,8 @@ char debugMessage[512] = "";
 //---------------------
 class System {
 public:
+    float m_cpuLoad = 0.0f;
+
     //--------------
     void initialize() {
         FastLED.addLeds<WS2811, LED_PIN, RGB>(leds, NUM_LEDS);
@@ -59,6 +61,7 @@ public:
         M5.Lcd.clearDisplay(TFT_BLACK);
         M5.Lcd.setCursor(0, 0);
         Display("AFUUE2R\n\nOTOONE_DEV");
+        delay(500);
 
         setLed(CRGB(200, 0, 0));
         delay(200);
@@ -116,7 +119,7 @@ public:
         xTaskCreatePinnedToCore(UpdateTask, "UpdateTask", 4096, this, 2, NULL, CORE1);
 
         Display("READY");
-        delay(500);
+        M5.Lcd.setTextSize(2);
     }
     bool m_btnPressed = false;
 
@@ -135,7 +138,7 @@ private:
     static void UpdateTask(void *parameter) {
         System *pSystem = static_cast<System *>(parameter);
         TickType_t xLastWakeTime;
-        const TickType_t xFrequency = 10; // 10ms
+        const TickType_t xFrequency = 8; // 8ms
         while (1) {
             uint64_t t = micros();
 
@@ -155,7 +158,10 @@ private:
                 v = 0.2f;
             }
             for (auto& device : pSystem->m_outputDevices) {
-                device->Update(note, v);
+                OutputResult ret = device->Update(note, v);
+                if (ret.hasCpuLoad) {
+                    pSystem->m_cpuLoad += (ret.cpuLoad - pSystem->m_cpuLoad) * 0.01f;
+                }
             }
 
             static int count = 0;
@@ -204,7 +210,8 @@ void loop() {
   static int loopCount = 0;
   M5.Lcd.clear(TFT_BLACK);
   M5.Lcd.setCursor(0, 0);
-  M5.Lcd.printf("PLAYING\n%d", loopCount++);
+  M5.Lcd.printf("PLAYING\n%1.1f%%", sys.m_cpuLoad * 100.0f);
+  //M5.Lcd.printf("PLAYING\n%d", loopCount++);
   //M5.Lcd.printf("%d\n%d\n%1.3f", (int)dt2, (int)dt3, v);
   //M5.Lcd.printf("%d\n%s", (int)dt2, debugMessage);
   M5.update();
