@@ -1,19 +1,20 @@
+#include <vector>
 #include <Arduino.h>
 #include <M5Unified.h>
-#define CORE0 (0)
-#define CORE1 (1)
+
+#include "DeviceBase.h"
+#include "InputDeviceBase.h"
+#include "InputDevicePressure.h"
+#include "InputDeviceKey.h"
+#include "OutputDeviceBase.h"
+#include "OutputDeviceSpeaker.h"
+#include "OutputDeviceLED.h"
 
 //-----------
 #include <Wire.h>
 #define I2CPIN_SDA (38)
 #define I2CPIN_SCL (39)
 #define I2C_FREQ (400000)
-
-#define LPS33_ADDR (0x5C)
-#define LPS33_WHOAMI_REG (0x0F)
-#define LPS33_WHOAMI_RET (0xB1)
-#define LPS33_REG_CTRL (0x10)
-#define LPS33_REG_OUT_XL (0x28)
 
 //-----------
 #include <USB.h>
@@ -26,237 +27,144 @@ USBMIDI MIDI("AFUUE2R");
 #define NUM_LEDS  (1)
 static CRGB leds[NUM_LEDS];
 void setLed(CRGB color) {
-  uint8_t t = color.r;
+#if false
+    uint8_t t = color.r;
   color.r = color.g;
   color.g = t;
   leds[0] = color;
   FastLED.show();
+#endif
 }
 
 //---------------------
-#define SOUND_TWOPWM
-#define PWMPIN_LOW (5)
-#define PWMPIN_HIGH (6)
 #define MIDI_IN_PIN (9)  // not use
 #define MIDI_OUT_PIN (7)
-#define LEDPIN (8)
 
-volatile uint8_t waveOutL = 0;
-volatile uint8_t waveOutH = 0;
-hw_timer_t *timer = NULL;
-portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
-#define QUEUE_LENGTH 1
-volatile QueueHandle_t xQueue;
-TaskHandle_t taskHandle;
-
-#define CLOCK_DIVIDER (80)
-#define TIMER_ALARM (40)
-//#define SAMPLING_RATE (20000) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (80*50) = 20kHz
-#define SAMPLING_RATE (25000.0f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (80*40) = 25kHz
-//#define SAMPLING_RATE (32000) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (50*50) = 32kHz
-//#define SAMPLING_RATE (44077.13f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (55*33) = 44kHz
-//#define SAMPLING_RATE (48019.2f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (49*34) = 48kHz
-
-//---------------------------------
-void IRAM_ATTR OnTimer() {
-
-  portENTER_CRITICAL_ISR(&timerMux);
-    uint8_t h = waveOutH;
-    uint8_t l = waveOutL;
-
-    BaseType_t higherPriorityTaskWoken = pdFALSE;
-    xTaskNotifyFromISR(taskHandle, 0, eNoAction, &higherPriorityTaskWoken);
-  portEXIT_CRITICAL_ISR(&timerMux);
-
-  #ifdef SOUND_TWOPWM
-  ledcWriteChannel(0, l);
-  ledcWriteChannel(1, h);
-#else
-  //dacWrite(DACPIN, h);
-#endif
-}
+char debugMessage[512] = "";
 
 //---------------------
 class System {
 public:
-  void initialize() {
-    FastLED.addLeds<WS2811, LED_PIN, RGB>(leds, NUM_LEDS);
-    setLed(CRGB(100, 0, 0));
-    delay(200);
-    setLed(CRGB(1, 0, 0));
-    delay(200);
-    auto cfg = M5.config();
-    M5.begin(cfg);
-    setLed(CRGB(200, 0, 0));
-    delay(200);
-    setLed(CRGB(1, 0, 0));
-    delay(500);
-
-    Serial.begin(115200);
-    MIDI.begin();
-    USB.begin();
-    delay(1000);
-    if (tud_mounted()) {
-      setLed(CRGB(0, 100, 0));
-      delay(200);
-      setLed(CRGB(0, 0, 0));
-      delay(200);
-    }
-    Wire.begin(I2CPIN_SDA, I2CPIN_SCL, I2C_FREQ);
-    {
-      M5.Lcd.setTextColor(TFT_WHITE);
-      M5.Lcd.setTextSize(2);
-
-      Wire.beginTransmission(LPS33_ADDR);
-      Wire.write(LPS33_WHOAMI_REG);
-      Wire.endTransmission();
-      Wire.requestFrom(LPS33_ADDR, 1);
-      uint8_t whoami = Wire.read();
-      if (whoami != LPS33_WHOAMI_RET) {
-        while (1) {
-          setLed(CRGB(100, 0, 0));
-          delay(200);
-          setLed(CRGB(0, 0, 0));
-          delay(200);
-        }
-      }
-      Wire.beginTransmission(LPS33_ADDR);
-      Wire.write(LPS33_REG_CTRL);
-      Wire.write(0x50); // odr (0x50=75Hz, 0x40=50Hz, 0x30=25Hz, 0x20=10Hz, 0x10=1Hz, 0x00=OFF)
-      Wire.endTransmission();
-      delay(100);
-      m_defaultPressure = GetPressure(0);
-#if 0
-      while (1) {
-        delay(100);
-        Wire.beginTransmission(LPS33_ADDR);
-        Wire.write(LPS33_REG_OUT_XL);
-        Wire.endTransmission();
-        Wire.requestFrom(LPS33_ADDR, 3);
-
-        uint8_t data[3];
-        for (int i = 0; i < 3; i++) {
-          data[i] = Wire.read();
-        }        
-        uint32_t pressure = ((((uint32_t)data[2]) << 16) | (((uint32_t)data[1]) << 8) | data[0]);
-        M5.Lcd.clear(TFT_DARKGREEN);
+    //--------------
+    void initialize() {
+        FastLED.addLeds<WS2811, LED_PIN, RGB>(leds, NUM_LEDS);
+        setLed(CRGB(100, 0, 0));
+        delay(200);
+        setLed(CRGB(1, 0, 0));
+        delay(200);
+        auto cfg = M5.config();
+        M5.begin(cfg);
+        M5.Lcd.setTextColor(TFT_WHITE);
+        M5.Lcd.setTextSize(2);
+        M5.Lcd.clearDisplay(TFT_BLACK);
         M5.Lcd.setCursor(0, 0);
-        M5.Lcd.printf("%02X %02X %02x\n", data[2], data[1], data[0]);
-        M5.Lcd.printf("%4.1f hPa", pressure / 4096.0f);
-      }
-#endif
+        Display("AFUUE2R\n\nOTOONE_DEV");
+
+        setLed(CRGB(200, 0, 0));
+        delay(200);
+        setLed(CRGB(1, 0, 0));
+        delay(500);
+
+        M5.Lcd.clearDisplay(TFT_BLACK);
+        M5.Lcd.setCursor(0, 0);
+        M5.Lcd.setTextSize(1);
+
+        Serial.begin(115200);
+        MIDI.begin();
+        USB.begin();
+        delay(1000);
+        if (tud_mounted()) {
+            Display("USB MIDI");
+            setLed(CRGB(0, 100, 0));
+            delay(200);
+            setLed(CRGB(0, 0, 0));
+            delay(200);
+        }
+        else {
+            Display("PLAY MODE");
+        }
+        Wire.begin(I2CPIN_SDA, I2CPIN_SCL, I2C_FREQ);
+        m_inputDevices.push_back(new InputDevicePressure(Wire));
+        m_inputDevices.push_back(new InputDeviceKey(Wire));
+        m_outputDevices.push_back(new OutputDeviceSpeaker());
+        m_outputDevices.push_back(new OutputDeviceLED());
+
+        std::string errorMessage = "";
+        // Input Devices
+        for (auto& device : m_inputDevices) {
+            Display(device->GetName());
+            auto result = device->Initialize();
+            if (!result.success) {
+                errorMessage += result.errorMessage + "\n";
+            }
+        }
+        // Output Devices
+        for (auto& device : m_outputDevices) {
+            Display(device->GetName());
+            auto result = device->Initialize();
+            if (!result.success) {
+                errorMessage += result.errorMessage + "\n";
+            }
+        }
+        if (errorMessage != "") {
+            Display(errorMessage.c_str(), TFT_RED);
+            while (1) {
+                delay(1000);
+            }
+        }
+
+        xTaskCreatePinnedToCore(UpdateTask, "UpdateTask", 4096, this, 2, NULL, CORE1);
+
+        Display("READY");
+        delay(500);
     }
-
-    pinMode(PWMPIN_LOW, OUTPUT);
-    pinMode(PWMPIN_HIGH, OUTPUT);
-    pinMode(LEDPIN, OUTPUT);
-    ledcAttachChannel(PWMPIN_LOW, 156250, 8, 0); // PWM 156,250Hz, 8Bit(256段階)
-    ledcAttachChannel(PWMPIN_HIGH, 156250, 8, 1); // PWM 156,250Hz, 8Bit(256段階)
-    ledcAttachChannel(LEDPIN, 156250, 8, 5); // PWM 156,250Hz, 8Bit(256段階)
-    ledcWriteChannel(0, 0);
-    ledcWriteChannel(1, 0);
-    ledcWriteChannel(5, 0);
-
-    xQueue = xQueueCreate(QUEUE_LENGTH, sizeof(int8_t));
-    xTaskCreatePinnedToCore(CreateWaveTask, "CreateWaveTask", 16384, this, configMAX_PRIORITIES-1, &taskHandle, CORE0); // 波形生成は Core0 が専念
-    xTaskCreatePinnedToCore(UpdateTask, "UpdateTask", 2048, this, 2, NULL, CORE1);
-
-    timer = timerBegin(80*1000*1000 / CLOCK_DIVIDER);
-    timerAttachInterrupt(timer, &OnTimer);
-    timerAlarm(timer, TIMER_ALARM, true, 0);    
-  }
-  bool m_btnPressed = false;
-  void SetTickCount(float v) {
-    m_tickCount = v;
-  }
-  void SetVolume(float v) {
-    m_volume = v;
-  }
-  float GetVolume() const {
-    return m_volume;
-  }
+    bool m_btnPressed = false;
 
 private:
-  float m_tickCount = 0.0f;
-  float m_volume = 0.0f;
-  float m_defaultPressure = 0.0f;
+    std::vector<InputDeviceBase*> m_inputDevices;
+    std::vector<OutputDeviceBase*> m_outputDevices;
 
-  float GetPressure(uint8_t side) {
-    Wire.beginTransmission(LPS33_ADDR + side);
-    Wire.write(LPS33_REG_OUT_XL);
-    Wire.endTransmission();
-    Wire.requestFrom(LPS33_ADDR + side, 3);
-
-    uint8_t data[3];
-    for (int i = 0; i < 3; i++) {
-      data[i] = Wire.read();
-    }        
-    uint32_t pressure = ((((uint32_t)data[2]) << 16) | (((uint32_t)data[1]) << 8) | data[0]);
-    return pressure / 256.0f;
-  }
-
-  static float CalcFrequency(float note) {
-    return 440.0f * pow(2, (note - (69.0f-12.0f))/12.0f);
-  }
-
-  static void UpdateTask(void *parameter) {
-    System *pSystem = static_cast<System *>(parameter);
-    while (1) {
-      M5.update();
-
-      float p = pSystem->GetPressure(0);
-      float v = (p - pSystem->m_defaultPressure) / 500.0f;
-      v *= v;
-      if (v < 0.0f) {
-        v = 0.0f;
-      }
-      else if (v > 1.0f) {
-        v = 1.0f;
-      }
-
-      if (M5.BtnA.isPressed()) {
-        pSystem->m_btnPressed = true;
-        //noteOn(60, 127);
-        //setLed(CRGB(0, 100, 0));
-        //delay(500);
-        //noteOff();
-        v = 0.2f;
-      }
-      else {
-        pSystem->m_btnPressed = false;
-      }
-      pSystem->SetVolume(v);
-      float wavelength = CalcFrequency(60);
-      pSystem->SetTickCount(wavelength / SAMPLING_RATE);
-
-      static int count = 0;
-      setLed(CRGB(0, 0, (count < 60 ? count : 120-count)));
-      count = (count + 1) % 120;
-      vTaskDelay(pdMS_TO_TICKS(10));
+    //--------------
+    void Display(const char* message, int color = TFT_WHITE) {
+        M5.Lcd.setTextColor(color);
+        M5.Lcd.printf("%s\n", message);
+        delay(100);
     }
-  }
 
-  static void CreateWaveTask(void *parameter) {
-    System *pSystem = static_cast<System *>(parameter);
-    float phase = 0.0f;
-    while (1) {
-      uint32_t data;
-      xTaskNotifyWait(0, 0, &data, portMAX_DELAY);
+    //--------------
+    static void UpdateTask(void *parameter) {
+        System *pSystem = static_cast<System *>(parameter);
+        TickType_t xLastWakeTime;
+        const TickType_t xFrequency = 10; // 10ms
+        while (1) {
+            uint64_t t = micros();
 
-      phase += pSystem->m_tickCount;
-      if (phase >= 1.0f) phase -= 1.0f;
+            float v = 0.0f;
+            float note = 0.1f;
+            for (auto& device : pSystem->m_inputDevices) {
+                InputResult result = device->Update();
+                if (result.hasPressure) {
+                    v = result.pressure;
+                    sprintf(debugMessage, "%s", result.debugMessage.c_str());
+                }
+                if (result.hasNote) {
+                    note = result.note;
+                }
+            }
+            if (pSystem->m_btnPressed) {
+                v = 0.2f;
+            }
+            for (auto& device : pSystem->m_outputDevices) {
+                device->Update(note, v);
+            }
 
-      float f = 60000.0f * (pSystem->GetVolume() * (-0.5f + phase));
-      uint16_t d = static_cast<uint16_t>(32768.0f + f);
+            static int count = 0;
+            setLed(CRGB(0, 0, (count < 60 ? count : 120-count)));
+            count = (count + 1) % 120;
 
-      uint8_t h = (d >> 8) & 0xFF;
-      uint8_t l = d & 0xFF;
-      portENTER_CRITICAL(&timerMux);
-        waveOutH = h;
-        waveOutL = l;
-      portEXIT_CRITICAL(&timerMux);
+            xTaskDelayUntil( &xLastWakeTime, xFrequency );
+        }
     }
-  }
 };
 System sys;
 
@@ -292,11 +200,24 @@ void loop() {
   //  setLed(CRGB(0, 0, 100));
   //  delay(500);
   //}
+#if true
   static int loopCount = 0;
   M5.Lcd.clear(TFT_BLACK);
   M5.Lcd.setCursor(0, 0);
-  float v = sys.GetVolume();
-  M5.Lcd.printf("%d\n%1.2f", loopCount++, v);
+  M5.Lcd.printf("PLAYING\n%d", loopCount++);
+  //M5.Lcd.printf("%d\n%d\n%1.3f", (int)dt2, (int)dt3, v);
+  //M5.Lcd.printf("%d\n%s", (int)dt2, debugMessage);
+  M5.update();
+  if (M5.BtnA.isPressed()) {
+    sys.m_btnPressed = true;
+    //noteOn(60, 127);
+    //setLed(CRGB(0, 100, 0));
+    //delay(500);
+    //noteOff();
+  }
+  else {
+    sys.m_btnPressed = false;
+  }
+#endif
   delay(500);
-  ledcWriteChannel(5, (int)(v * 255));
 }
