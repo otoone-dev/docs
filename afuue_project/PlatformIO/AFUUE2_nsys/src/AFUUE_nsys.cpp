@@ -160,7 +160,7 @@ private:
             for (auto& device : pSystem->m_outputDevices) {
                 OutputResult ret = device->Update(note, v);
                 if (ret.hasCpuLoad) {
-                    pSystem->m_cpuLoad += (ret.cpuLoad - pSystem->m_cpuLoad) * 0.01f;
+                    pSystem->m_cpuLoad += (ret.cpuLoad - pSystem->m_cpuLoad) * 0.1f;
                 }
             }
 
@@ -210,7 +210,7 @@ void loop() {
   static int loopCount = 0;
   M5.Lcd.clear(TFT_BLACK);
   M5.Lcd.setCursor(0, 0);
-  M5.Lcd.printf("PLAYING\n%1.1f%%", sys.m_cpuLoad * 100.0f);
+  M5.Lcd.printf("PLAYING\n%1.3f%%", sys.m_cpuLoad * 100.0f);
   //M5.Lcd.printf("PLAYING\n%d", loopCount++);
   //M5.Lcd.printf("%d\n%d\n%1.3f", (int)dt2, (int)dt3, v);
   //M5.Lcd.printf("%d\n%s", (int)dt2, debugMessage);

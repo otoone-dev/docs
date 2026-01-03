@@ -46,13 +46,33 @@ mcpwm_comparator_config_t cmp_config = {
 //#define SAMPLING_RATE (44077.13f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (55*33) = 44kHz
 //#define SAMPLING_RATE (48019.2f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (49*34) = 48kHz
 
-hw_timer_t *timer = NULL;
-portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
-TaskHandle_t taskHandle;
+/*
+    |   write     read   |   write
+    |   -->|       -->|  |   -->|
+                      |<-- d -->|
 
+    |   read      write  |
+    |   -->|       -->|  |
+    |      |<-- d ^-->|
+*/
+#define WAVEOUT_BUFFERMAX (512)
+#define WAVEOUT_BUFFERING_SIZE (400)
+uint16_t waveOutBuffer[WAVEOUT_BUFFERMAX];
+int32_t waveOutBufferWritePos = 0;
+int32_t waveOutBufferReadPos = WAVEOUT_BUFFERMAX / 2;
+
+hw_timer_t *timer = NULL;
 void IRAM_ATTR OnTimer() {
-    BaseType_t higherPriorityTaskWoken = pdFALSE;
-    xTaskNotifyFromISR(taskHandle, 0, eNoAction, &higherPriorityTaskWoken);
+#if 1
+    uint16_t w = waveOutBuffer[waveOutBufferReadPos];
+#ifdef SOUND_TWOPWM
+    mcpwm_comparator_set_compare_value(cmp_handle_low, w % MCPWM_PERIOD_TICKS);
+    mcpwm_comparator_set_compare_value(cmp_handle_high, w / MCPWM_PERIOD_TICKS);
+#else
+    //dacWrite(DACPIN, h);
+#endif
+    waveOutBufferReadPos = (waveOutBufferReadPos + 1) % WAVEOUT_BUFFERMAX;
+#endif
 }
 
 //---------------------------------
@@ -114,7 +134,7 @@ public:
         mcpwm_timer_enable(timer_handle);
         mcpwm_timer_start_stop(timer_handle, MCPWM_TIMER_START_NO_STOP);
 
-        xTaskCreatePinnedToCore(CreateWaveTask, "CreateWaveTask", 16384, this, configMAX_PRIORITIES-1, &taskHandle, CORE0); // 波形生成は Core0 が専念
+        xTaskCreatePinnedToCore(CreateWaveTask, "CreateWaveTask", 16384, this, configMAX_PRIORITIES-1, NULL, CORE0); // 波形生成は Core0 が専念
 
         timer = timerBegin(80*1000*1000 / CLOCK_DIVIDER);
         timerAttachInterrupt(timer, &OnTimer);
@@ -127,8 +147,9 @@ public:
         OutputResult result;
         m_tickCount = CalcFrequency(note) / SAMPLING_RATE;
         m_volume = volume;
-        float load = m_dt / 1000000.0f;
-        return OutputResult{ true, load / (1.0f / SAMPLING_RATE) };
+        //float load = m_dt / 1000000.0f;
+        //return OutputResult{ true, load / (1.0f / SAMPLING_RATE) };
+        return OutputResult{ true, (float)m_dt };
     };
 
     //--------------
@@ -139,35 +160,40 @@ public:
     //--------------
     static void CreateWaveTask(void *parameter) {
         OutputDeviceSpeaker *pSystem = static_cast<OutputDeviceSpeaker *>(parameter);
+
+        TickType_t xLastWakeTime;
+        const TickType_t xFrequency = 1; // 1ms
+
         float phase = 0.0f;
         float fmid = (MCPWM_PERIOD_TICKS * MCPWM_PERIOD_TICKS) / 2.0f;
         const int32_t umid = MCPWM_PERIOD_TICKS * MCPWM_PERIOD_TICKS / 2;
-        uint64_t t0 = micros();
         while (1) {
-            phase += pSystem->m_tickCount;
-            if (phase >= 1.0f) phase -= 1.0f;
+            int createCount = 0;
+            uint64_t t0 = micros();
+            while (1) {
+                int d = (waveOutBufferWritePos > waveOutBufferReadPos)
+                ? waveOutBufferWritePos - waveOutBufferReadPos
+                : WAVEOUT_BUFFERMAX + waveOutBufferWritePos - waveOutBufferReadPos;
+                if (d > WAVEOUT_BUFFERING_SIZE) {
+                    break;
+                }
+                phase += pSystem->m_tickCount;
+                if (phase >= 1.0f) phase -= 1.0f;
 
-            float f = (fmid*1.8f) * (pSystem->m_volume * (-0.5f + phase));
-            //float f = (fmid*0.9f)* (pSystem->m_volume * sinf(phase * 2.0f * 3.14159265f));
-            if ( (-0.000002f < f) && (f < 0.000002f) ) {
-                f = 0.0f;
+                float f = (fmid*1.8f) * (pSystem->m_volume * (-0.5f + phase));
+                //float f = (fmid*0.9f)* (pSystem->m_volume * sinf(phase * 2.0f * 3.14159265f));
+                if ( (-0.000002f < f) && (f < 0.000002f) ) {
+                    f = 0.0f;
+                }
+                uint32_t w = static_cast<uint32_t>(umid + static_cast<int32_t>(f));
+                waveOutBuffer[waveOutBufferWritePos] = w;
+                waveOutBufferWritePos = (waveOutBufferWritePos + 1) % WAVEOUT_BUFFERMAX;
+                createCount++;
             }
-            uint32_t d = static_cast<uint32_t>(umid + static_cast<int32_t>(f));
-
-            uint32_t h = d / MCPWM_PERIOD_TICKS;
-            uint32_t l = d % MCPWM_PERIOD_TICKS;
-            pSystem->m_dt = micros() - t0;
-
-            uint32_t data;
-            xTaskNotifyWait(0, 0, &data, portMAX_DELAY);
-
-            t0 = micros();
-#ifdef SOUND_TWOPWM
-            mcpwm_comparator_set_compare_value(cmp_handle_low, l);
-            mcpwm_comparator_set_compare_value(cmp_handle_high, h);
-#else
-            //dacWrite(DACPIN, h);
-#endif
+            if (createCount > 0) {
+                pSystem->m_dt = (micros() - t0) / createCount;
+            }
+            xTaskDelayUntil( &xLastWakeTime, xFrequency );
         }
     }
 };
