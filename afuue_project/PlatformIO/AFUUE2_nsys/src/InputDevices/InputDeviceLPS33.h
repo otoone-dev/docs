@@ -53,7 +53,7 @@ public:
         InputResult result;
 
         m_currentPressure += (GetPressure() - m_currentPressure) * 0.8f;
-        float v = (m_currentPressure - m_defaultPressure) / 500.0f;
+        float v = (m_currentPressure - m_defaultPressure) / 400.0f;
         if (v < 0.0f) {
             v = 0.0f;
         }

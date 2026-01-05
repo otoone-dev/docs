@@ -11,13 +11,13 @@ public:
     InitializeResult Initialize() override {
         InitializeResult result;
         pinMode(LEDPIN, OUTPUT);
-        ledcAttachChannel(LEDPIN, 156250, 8, 5); // PWM 156,250Hz, 8Bit(256段階)
-        ledcWriteChannel(5, 0);
+        ledcAttach(LEDPIN, 156250, 8); // PWM 156,250Hz, 8Bit(256段階)
+        ledcWrite(LEDPIN, 0);
         return result;
     }
 
     OutputResult Update(float note, float volume) override {
-        ledcWriteChannel(5, (int)(1 + volume * 250.0f));
+        ledcWrite(LEDPIN, (int)(1 + volume * 250.0f));
         return OutputResult{ false, 0.0f };
     }
 };

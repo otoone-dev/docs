@@ -1,5 +1,6 @@
 #include <vector>
 #include <Arduino.h>
+#include <WiFi.h>
 #include <M5Unified.h>
 
 #include "DeviceBase.h"
@@ -7,7 +8,7 @@
 #include "InputDevicePressure.h"
 #include "InputDeviceKey.h"
 #include "OutputDeviceBase.h"
-#include "OutputDeviceSpeaker.h"
+#include "OutputDeviceSpeaker2.h"
 #include "OutputDeviceLED.h"
 
 //-----------
@@ -23,22 +24,12 @@ USBMIDI MIDI("AFUUE2R");
  
 //-----------
 #include <FastLED.h>
-#define LED_PIN   (35)
-#define NUM_LEDS  (1)
-static CRGB leds[NUM_LEDS];
-void setLed(CRGB color) {
-#if false
-    uint8_t t = color.r;
-  color.r = color.g;
-  color.g = t;
-  leds[0] = color;
-  FastLED.show();
-#endif
-}
-
+//#define FASTLED_PIN   (35)
 //---------------------
 #define MIDI_IN_PIN (9)  // not use
 #define MIDI_OUT_PIN (7)
+
+#define BUTTON_PIN (41)
 
 char debugMessage[512] = "";
 
@@ -46,31 +37,34 @@ char debugMessage[512] = "";
 class System {
 public:
     float m_cpuLoad = 0.0f;
+    bool m_btnPressed = false;
 
     //--------------
     void initialize() {
-        FastLED.addLeds<WS2811, LED_PIN, RGB>(leds, NUM_LEDS);
-        setLed(CRGB(100, 0, 0));
+        InitLED();
+        SetLED(CRGB(100, 0, 0));
         delay(200);
-        setLed(CRGB(1, 0, 0));
+        SetLED(CRGB(1, 0, 0));
         delay(200);
-        auto cfg = M5.config();
-        M5.begin(cfg);
-        M5.Lcd.setTextColor(TFT_WHITE);
-        M5.Lcd.setTextSize(2);
-        M5.Lcd.clearDisplay(TFT_BLACK);
-        M5.Lcd.setCursor(0, 0);
-        Display("AFUUE2R\n\nOTOONE_DEV");
+        //auto cfg = M5.config();
+        //M5.begin(cfg);
+        btStop();
+        WiFi.mode(WIFI_OFF); 
+        //M5.Lcd.setTextColor(TFT_WHITE);
+        //M5.Lcd.setTextSize(2);
+        //M5.Lcd.clearDisplay(TFT_BLACK);
+        //M5.Lcd.setCursor(0, 0);
+        Display(" AFUUE2R");
         delay(500);
 
-        setLed(CRGB(200, 0, 0));
+        SetLED(CRGB(200, 0, 0));
         delay(200);
-        setLed(CRGB(1, 0, 0));
+        SetLED(CRGB(1, 0, 0));
         delay(500);
 
-        M5.Lcd.clearDisplay(TFT_BLACK);
-        M5.Lcd.setCursor(0, 0);
-        M5.Lcd.setTextSize(1);
+        //M5.Lcd.clearDisplay(TFT_BLACK);
+        //M5.Lcd.setCursor(0, 0);
+        //M5.Lcd.setTextSize(1);
 
         Serial.begin(115200);
         MIDI.begin();
@@ -78,9 +72,9 @@ public:
         delay(1000);
         if (tud_mounted()) {
             Display("USB MIDI");
-            setLed(CRGB(0, 100, 0));
+            SetLED(CRGB(0, 100, 0));
             delay(200);
-            setLed(CRGB(0, 0, 0));
+            SetLED(CRGB(0, 0, 0));
             delay(200);
         }
         else {
@@ -116,29 +110,48 @@ public:
             }
         }
 
-        xTaskCreatePinnedToCore(UpdateTask, "UpdateTask", 4096, this, 2, NULL, CORE1);
+        xTaskCreatePinnedToCore(UpdateTask, "UpdateTask", 4096, this, 1, NULL, CORE1);
 
         Display("READY");
-        M5.Lcd.setTextSize(2);
+        //M5.Lcd.setTextSize(2);
     }
-    bool m_btnPressed = false;
+    //--------------
+#ifdef FASTLED_PIN
+    void SetLED(CRGB rgb) {
+        uint8_t t = color.r;
+        color.r = color.g;
+        color.g = t;
+        leds[0] = color;
+        FastLED.show();
+    }
+#else
+    void SetLED(CRGB rgb) {}
+#endif
 
 private:
     std::vector<InputDeviceBase*> m_inputDevices;
     std::vector<OutputDeviceBase*> m_outputDevices;
 
     //--------------
+#ifdef FASTLED_PIN
+    void InitLED() {
+        FastLED.addLeds<WS2811, LED_PIN, RGB>(leds, NUM_LEDS);
+    }
+#else
+    void InitLED() {}
+#endif
+    //--------------
     void Display(const char* message, int color = TFT_WHITE) {
-        M5.Lcd.setTextColor(color);
-        M5.Lcd.printf("%s\n", message);
-        delay(100);
+        //M5.Lcd.setTextColor(color);
+        //M5.Lcd.printf("%s\n", message);
+        //delay(100);
     }
 
     //--------------
     static void UpdateTask(void *parameter) {
         System *pSystem = static_cast<System *>(parameter);
         TickType_t xLastWakeTime;
-        const TickType_t xFrequency = 8; // 8ms
+        const TickType_t xFrequency = 8 / portTICK_PERIOD_MS; // 8ms
         while (1) {
             uint64_t t = micros();
 
@@ -165,10 +178,11 @@ private:
             }
 
             static int count = 0;
-            setLed(CRGB(0, 0, (count < 60 ? count : 120-count)));
+            pSystem->SetLED(CRGB(0, 0, (count < 60 ? count : 120-count)));
             count = (count + 1) % 120;
 
-            xTaskDelayUntil( &xLastWakeTime, xFrequency );
+            //xTaskDelayUntil( &xLastWakeTime, xFrequency );
+            delay(8);
         }
     }
 };
@@ -206,16 +220,14 @@ void loop() {
   //  setLed(CRGB(0, 0, 100));
   //  delay(500);
   //}
-#if true
   static int loopCount = 0;
-  M5.Lcd.clear(TFT_BLACK);
-  M5.Lcd.setCursor(0, 0);
-  M5.Lcd.printf("PLAYING\n%1.3f%%", sys.m_cpuLoad * 100.0f);
-  //M5.Lcd.printf("PLAYING\n%d", loopCount++);
-  //M5.Lcd.printf("%d\n%d\n%1.3f", (int)dt2, (int)dt3, v);
-  //M5.Lcd.printf("%d\n%s", (int)dt2, debugMessage);
-  M5.update();
-  if (M5.BtnA.isPressed()) {
+  //M5.Lcd.clear(TFT_BLACK);
+  //M5.Lcd.setCursor(0, 0);
+  //M5.Lcd.printf("PLAYING\n%1.3f%%", sys.m_cpuLoad * 100.0f);
+  //M5.update();
+  //if (M5.BtnA.isPressed()) {
+#ifdef BUTTON_PIN
+  if (digitalRead(BUTTON_PIN) == LOW) {
     sys.m_btnPressed = true;
     //noteOn(60, 127);
     //setLed(CRGB(0, 100, 0));
