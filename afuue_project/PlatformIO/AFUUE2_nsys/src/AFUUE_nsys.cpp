@@ -1,15 +1,15 @@
-#include <vector>
-#include <Arduino.h>
-#include <WiFi.h>
-#include <M5Unified.h>
-
 #include "DeviceBase.h"
 #include "InputDeviceBase.h"
 #include "InputDevicePressure.h"
 #include "InputDeviceKey.h"
 #include "OutputDeviceBase.h"
-#include "OutputDeviceSpeaker2.h"
+#include "OutputDeviceSpeaker.h"
 #include "OutputDeviceLED.h"
+
+#include <M5Unified.h>
+#include <Arduino.h>
+#include <WiFi.h>
+#include <vector>
 
 //-----------
 #include <Wire.h>
@@ -24,7 +24,10 @@ USBMIDI MIDI("AFUUE2R");
  
 //-----------
 #include <FastLED.h>
-//#define FASTLED_PIN   (35)
+#define HAS_DISPLAY
+#if !defined(HAS_DISPLAY)
+#define FASTLED_PIN   (35)
+#endif
 //---------------------
 #define MIDI_IN_PIN (9)  // not use
 #define MIDI_OUT_PIN (7)
@@ -46,14 +49,11 @@ public:
         delay(200);
         SetLED(CRGB(1, 0, 0));
         delay(200);
-        //auto cfg = M5.config();
-        //M5.begin(cfg);
-        btStop();
-        WiFi.mode(WIFI_OFF); 
-        //M5.Lcd.setTextColor(TFT_WHITE);
-        //M5.Lcd.setTextSize(2);
-        //M5.Lcd.clearDisplay(TFT_BLACK);
-        //M5.Lcd.setCursor(0, 0);
+#ifdef HAS_DISPLAY
+        auto cfg = M5.config();
+        M5.begin(cfg);
+#endif
+        ClearDisplay(2);
         Display(" AFUUE2R");
         delay(500);
 
@@ -62,9 +62,7 @@ public:
         SetLED(CRGB(1, 0, 0));
         delay(500);
 
-        //M5.Lcd.clearDisplay(TFT_BLACK);
-        //M5.Lcd.setCursor(0, 0);
-        //M5.Lcd.setTextSize(1);
+        ClearDisplay(1);
 
         Serial.begin(115200);
         MIDI.begin();
@@ -80,6 +78,9 @@ public:
         else {
             Display("PLAY MODE");
         }
+
+        btStop();
+        WiFi.mode(WIFI_OFF); 
         Wire.begin(I2CPIN_SDA, I2CPIN_SCL, I2C_FREQ);
         m_inputDevices.push_back(new InputDevicePressure(Wire));
         m_inputDevices.push_back(new InputDeviceKey(Wire));
@@ -113,7 +114,6 @@ public:
         xTaskCreatePinnedToCore(UpdateTask, "UpdateTask", 4096, this, 1, NULL, CORE1);
 
         Display("READY");
-        //M5.Lcd.setTextSize(2);
     }
     //--------------
 #ifdef FASTLED_PIN
@@ -141,10 +141,21 @@ private:
     void InitLED() {}
 #endif
     //--------------
+    void ClearDisplay(float textSize) {
+#ifdef HAS_DISPLAY
+        M5.Lcd.setTextColor(TFT_WHITE);
+        M5.Lcd.setTextSize(textSize);
+        M5.Lcd.clearDisplay(TFT_BLACK);
+        M5.Lcd.setCursor(0, 0);
+#endif
+    }
+    //--------------
     void Display(const char* message, int color = TFT_WHITE) {
-        //M5.Lcd.setTextColor(color);
-        //M5.Lcd.printf("%s\n", message);
-        //delay(100);
+#ifdef HAS_DISPLAY
+        M5.Lcd.setTextColor(color);
+        M5.Lcd.printf("%s\n", message);
+        delay(100);
+#endif
     }
 
     //--------------
@@ -181,8 +192,7 @@ private:
             pSystem->SetLED(CRGB(0, 0, (count < 60 ? count : 120-count)));
             count = (count + 1) % 120;
 
-            //xTaskDelayUntil( &xLastWakeTime, xFrequency );
-            delay(8);
+            xTaskDelayUntil( &xLastWakeTime, xFrequency );
         }
     }
 };
@@ -221,9 +231,12 @@ void loop() {
   //  delay(500);
   //}
   static int loopCount = 0;
-  //M5.Lcd.clear(TFT_BLACK);
-  //M5.Lcd.setCursor(0, 0);
-  //M5.Lcd.printf("PLAYING\n%1.3f%%", sys.m_cpuLoad * 100.0f);
+#ifdef HAS_DISPLAY
+  M5.Lcd.clear(TFT_BLACK);
+  M5.Lcd.setCursor(0, 0);
+  M5.Lcd.setTextSize(2);
+  M5.Lcd.printf("PLAYING\n%2.1f%%", sys.m_cpuLoad * 100.0f);
+#endif
   //M5.update();
   //if (M5.BtnA.isPressed()) {
 #ifdef BUTTON_PIN
