@@ -49,7 +49,7 @@ public:
     }
 
     //--------------
-    InputResult Update() override {
+    InputResult Update(const Parameters& parameters) override {
         InputResult result;
 
         m_currentPressure += (GetPressure() - m_currentPressure) * 0.8f;

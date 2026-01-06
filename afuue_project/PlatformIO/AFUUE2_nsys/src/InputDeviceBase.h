@@ -1,6 +1,7 @@
 #pragma once
-#include <functional>
 #include "DeviceBase.h"
+#include "Parameters.h"
+#include <functional>
 
 struct InputResult {
     bool success = true;
@@ -35,5 +36,5 @@ struct InputResult {
 class InputDeviceBase : public DeviceBase {
 public:
   virtual ~InputDeviceBase() = default;
-  virtual InputResult Update() = 0;
+  virtual InputResult Update(const Parameters& parameters) = 0;
 };

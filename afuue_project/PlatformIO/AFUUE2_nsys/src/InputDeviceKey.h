@@ -14,18 +14,24 @@ public:
 
     //--------------
     InitializeResult Initialize() override {
+        m_lastChangeTime = micros();
         return m_mcp23017.Initialize();
     }
 
     //--------------
-    InputResult Update() override {
-        auto result = m_mcp23017.Update();
+    InputResult Update(const Parameters& parameters) override {
+        auto result = m_mcp23017.Update(parameters);
         if (!result.hasKey) {
             result.success = false;
             result.errorMessage = "KEY ERR";
             return result;
         }
+        uint64_t t = micros();
         const uint16_t keyData = result.keyData;
+        if (keyData != m_lastKeyData) {
+            m_lastKeyData = keyData;
+            m_lastChangeTime = t;
+        }
         const bool keyLowC = ((keyData & 0x0001) != 0);
         const bool keyEb = ((keyData & 0x0002) != 0);
         const bool keyD = ((keyData & 0x0004) != 0);
@@ -130,8 +136,10 @@ public:
         if (octUp == LOW) n += 12.0f;
         else if (octDown == LOW) n -= 12.0f;
 
-        float bnote = m_baseNote - 13; // C
-        m_currentNote += ((bnote + n) - m_currentNote) * m_rate;
+        if (t - m_lastChangeTime > 20*1000) { // ピロ音防止
+            m_targetNote = m_baseNote + n;
+        }
+        m_currentNote += (m_targetNote - m_currentNote) * m_rate;
         result.SetNote(m_currentNote);
         return result;
     }
@@ -139,7 +147,10 @@ public:
 private:
     InputDeviceMCP23017 m_mcp23017;
 
+    uint64_t m_lastChangeTime = 0;
+    float m_targetNote = 0.0f;
     float m_currentNote = 0.0f;
     float m_rate = 0.9f;
-    int m_baseNote = 61;
+    int m_baseNote = 48; // C
+    uint16_t m_lastKeyData = 0;
 };

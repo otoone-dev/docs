@@ -53,7 +53,7 @@ public:
     }
 
     //--------------
-    InputResult Update() override {
+    InputResult Update(const Parameters& parameters) override {
         InputResult result;
         result.SetKeyData(GetKeyData());
         return result;

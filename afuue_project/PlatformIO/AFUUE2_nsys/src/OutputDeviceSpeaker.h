@@ -81,8 +81,8 @@ public:
     }
 
     //--------------
-    OutputResult Update(float note, float vol) override {
-        tickCount = CalcFrequency(note) / SAMPLING_RATE;
+    OutputResult Update(const Parameters& parameters, float note, float vol) override {
+        tickCount = CalcFrequency(parameters.fineTune, note) / parameters.samplingRate;
         volume = vol;
 
         for (auto& processor : m_soundProcessors) {
@@ -90,12 +90,12 @@ public:
         }
 
         float load = cpuLoad / 1000000.0f;
-        return OutputResult{ true, load / (1.0f / SAMPLING_RATE) };
+        return OutputResult{ true, load / (1.0f / parameters.samplingRate) };
     }
 
     //--------------
-    static float CalcFrequency(float note) {
-        return 440.0f * pow(2, (note - (69.0f-12.0f))/12.0f);
+    static float CalcFrequency(float fine, float note) {
+        return fine * pow(2, (note - (69.0f-12.0f))/12.0f);
     }
 
     //--------------
@@ -105,9 +105,9 @@ public:
         TickType_t xLastWakeTime;
         const TickType_t xFrequency = 1 / portTICK_PERIOD_MS; // 1ms
 
-        float fmid = 32768.0f;
+        float fmid = 30000.0f;
         const int32_t umid = 32768;
-        SoundInfo info(69.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+        SoundInfo info(60.0f, 0.0f, 0.0f, 0.0f, 0.0f);
         while (1) {
             int createCount = 0;
             uint64_t t0 = micros();
@@ -129,7 +129,14 @@ public:
                 if ( (-0.000002f < f) && (f < 0.000002f) ) {
                     f = 0.0f;
                 }
-                uint16_t w = static_cast<uint16_t>(umid + static_cast<int32_t>(f));
+                int32_t i = umid + static_cast<int32_t>(f);
+                if (i < 0) {
+                    i = 0;
+                }
+                if (i > 65535) {
+                    i = 65535;
+                }
+                uint16_t w = static_cast<uint16_t>(i);
                 waveOutBuffer[waveOutBufferWritePos] = w;
                 waveOutBufferWritePos = (waveOutBufferWritePos + 1) % WAVEOUT_BUFFERMAX;
                 createCount++;
@@ -143,5 +150,4 @@ public:
 
 private:
     std::vector<SoundProcessorBase*> m_soundProcessors;
-    Parameters parameters;
 };

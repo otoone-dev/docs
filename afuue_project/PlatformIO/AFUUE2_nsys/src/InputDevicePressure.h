@@ -18,8 +18,8 @@ public:
     }
 
     //--------------
-    InputResult Update() override {
-        auto result = m_lps33.Update();
+    InputResult Update(const Parameters& parameters) override {
+        auto result = m_lps33.Update(parameters);
         if (!result.success) {
             result.errorMessage = "PRESSURE ERR";
             return result;

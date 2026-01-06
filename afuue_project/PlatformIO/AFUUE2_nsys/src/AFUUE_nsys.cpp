@@ -131,6 +131,8 @@ public:
 private:
     std::vector<InputDeviceBase*> m_inputDevices;
     std::vector<OutputDeviceBase*> m_outputDevices;
+    Parameters m_parameters;
+    int m_counter = 0;
 
     //--------------
 #ifdef FASTLED_PIN
@@ -159,39 +161,42 @@ private:
     }
 
     //--------------
+    void Update() {
+        float v = 0.0f;
+        float note = 0.1f;
+        // 入力
+        for (auto& device : m_inputDevices) {
+            InputResult result = device->Update(m_parameters);
+            if (result.hasPressure) {
+                v = result.pressure;
+                sprintf(debugMessage, "%s", result.debugMessage.c_str());
+            }
+            if (result.hasNote) {
+                note = result.note;
+            }
+        }
+        if (m_btnPressed) {
+            v = 0.2f;
+        }
+        // 出力
+        for (auto& device : m_outputDevices) {
+            OutputResult ret = device->Update(m_parameters, note, v);
+            if (ret.hasCpuLoad) {
+                m_cpuLoad += (ret.cpuLoad - m_cpuLoad) * 0.1f;
+            }
+        }
+
+        SetLED(CRGB(0, 0, (m_counter < 60 ? m_counter : 120 - m_counter)));
+        m_counter = (m_counter + 1) % 120;
+    }
+
+    //--------------
     static void UpdateTask(void *parameter) {
         System *pSystem = static_cast<System *>(parameter);
         TickType_t xLastWakeTime;
         const TickType_t xFrequency = 8 / portTICK_PERIOD_MS; // 8ms
         while (1) {
-            uint64_t t = micros();
-
-            float v = 0.0f;
-            float note = 0.1f;
-            for (auto& device : pSystem->m_inputDevices) {
-                InputResult result = device->Update();
-                if (result.hasPressure) {
-                    v = result.pressure;
-                    sprintf(debugMessage, "%s", result.debugMessage.c_str());
-                }
-                if (result.hasNote) {
-                    note = result.note;
-                }
-            }
-            if (pSystem->m_btnPressed) {
-                v = 0.2f;
-            }
-            for (auto& device : pSystem->m_outputDevices) {
-                OutputResult ret = device->Update(note, v);
-                if (ret.hasCpuLoad) {
-                    pSystem->m_cpuLoad += (ret.cpuLoad - pSystem->m_cpuLoad) * 0.1f;
-                }
-            }
-
-            static int count = 0;
-            pSystem->SetLED(CRGB(0, 0, (count < 60 ? count : 120-count)));
-            count = (count + 1) % 120;
-
+            pSystem->Update();
             xTaskDelayUntil( &xLastWakeTime, xFrequency );
         }
     }
@@ -235,7 +240,7 @@ void loop() {
   M5.Lcd.clear(TFT_BLACK);
   M5.Lcd.setCursor(0, 0);
   M5.Lcd.setTextSize(2);
-  M5.Lcd.printf("PLAYING\n%2.1f%%", sys.m_cpuLoad * 100.0f);
+  M5.Lcd.printf("PLAYING\n%3.2f%%", sys.m_cpuLoad * 100.0f);
 #endif
   //M5.update();
   //if (M5.BtnA.isPressed()) {
