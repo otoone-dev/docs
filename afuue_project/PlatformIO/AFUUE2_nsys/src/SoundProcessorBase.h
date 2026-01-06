@@ -19,7 +19,7 @@ class SoundProcessorBase {
 public:
     virtual void Initialize() = 0;
     virtual void ProcessAudio(SoundInfo& info) = 0;
-    virtual void UpdateParameter(const Parameters& params) = 0;
+    virtual void UpdateParameter(const Parameters& params, float volume) = 0;
 
 protected:
     float InteropL(const float* table, int tableCount, float p) const {

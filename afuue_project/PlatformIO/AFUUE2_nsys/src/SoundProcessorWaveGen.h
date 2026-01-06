@@ -32,7 +32,7 @@ public:
         info.wave = InteropL(waveAfuueCla, 256, m_phase) * info.volume;
     }
 
-    void UpdateParameter(const Parameters& params) override {
+    void UpdateParameter(const Parameters& params, float volume) override {
         // Update parameters for wave generator
     }
 private:

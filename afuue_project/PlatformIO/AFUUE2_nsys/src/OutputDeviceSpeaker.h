@@ -3,23 +3,17 @@
 #include <driver/ledc.h>
 #include <soc/ledc_struct.h>
 #include "SoundProcessorWaveGen.h"
+#include "SoundProcessorFilter.h"
 #include "SoundProcessorDelay.h"
 #include "SoundProcessorBase.h"
 #include "OutputDeviceBase.h"
+#include "Parameters.h"
 
 #define SOUND_TWOPWM
 #define PWMPIN_LOW (GPIO_NUM_5)
 #define PWMPIN_HIGH (GPIO_NUM_6)
 
 //---------------------------------
-#define CLOCK_DIVIDER (50)//(80)
-#define TIMER_ALARM (50)//(40)
-//#define SAMPLING_RATE (20000) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (80*50) = 20kHz
-//#define SAMPLING_RATE (25000.0f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (80*40) = 25kHz
-#define SAMPLING_RATE (32000) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (50*50) = 32kHz
-//#define SAMPLING_RATE (44077.13f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (55*33) = 44kHz
-//#define SAMPLING_RATE (48019.2f) // = (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (49*34) = 48kHz
-
 /*
     |   write     read   |   write
     |   -->|       -->|  |   -->|
@@ -56,8 +50,6 @@ void IRAM_ATTR OnTimer() {
 
 //---------------------------------
 class OutputDeviceSpeaker : public OutputDeviceBase {
-private:
-    std::vector<SoundProcessorBase*> m_soundProcessors;
 public:
     //--------------
     const char* GetName() const override {
@@ -69,6 +61,7 @@ public:
         InitializeResult result;
 
         m_soundProcessors.push_back(new SoundProcessorWaveGen());
+        m_soundProcessors.push_back(new SoundProcessorFilter());
         m_soundProcessors.push_back(new SoundProcessorDelay());
 
         pinMode(PWMPIN_LOW, OUTPUT);
@@ -91,6 +84,11 @@ public:
     OutputResult Update(float note, float vol) override {
         tickCount = CalcFrequency(note) / SAMPLING_RATE;
         volume = vol;
+
+        for (auto& processor : m_soundProcessors) {
+            processor->UpdateParameter(parameters, volume);
+        }
+
         float load = cpuLoad / 1000000.0f;
         return OutputResult{ true, load / (1.0f / SAMPLING_RATE) };
     }
@@ -142,4 +140,8 @@ public:
             xTaskDelayUntil( &xLastWakeTime, xFrequency );
         }
     }
+
+private:
+    std::vector<SoundProcessorBase*> m_soundProcessors;
+    Parameters parameters;
 };

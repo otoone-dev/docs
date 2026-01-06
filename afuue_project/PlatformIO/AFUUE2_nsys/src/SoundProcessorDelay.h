@@ -17,7 +17,7 @@ public:
         m_pos = (m_pos + 1) % DELAY_BUFFER_SIZE;
         info.wave = w;
     }
-    void UpdateParameter(const Parameters& params) override {
+    void UpdateParameter(const Parameters& params, float volume) override {
         // Update parameters based on the provided Parameters struct
     }
 };
