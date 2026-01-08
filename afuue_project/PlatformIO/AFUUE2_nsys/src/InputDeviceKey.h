@@ -27,7 +27,7 @@ public:
             return result;
         }
         uint64_t t = micros();
-        const uint16_t keyData = result.keyData;
+        const uint16_t keyData = result.message.keyData;
         if (keyData != m_lastKeyData) {
             m_lastKeyData = keyData;
             m_lastChangeTime = t;

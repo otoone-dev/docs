@@ -5,31 +5,36 @@
 
 struct InputResult {
     bool success = true;
-    bool hasPressure = false;
+    bool hasVolume = false;
     bool hasNote = false;
+    bool hasBend = false;
     bool hasKey = false;
 
-    float pressure = 0.0f;
-    float note = 0.0f;
-    uint16_t keyData = 0;
+    Message message;
 
     std::string errorMessage = "";
+#ifdef DEBUG
     std::string debugMessage = "";
-
+#endif
     //--------------
-    void SetPressure(float p) {
-        hasPressure = true;
-        pressure = p;
+    void SetVolume(float p) {
+        hasVolume = true;
+        message.volume = p;
     }
     //--------------
     void SetNote(float n) {
         hasNote = true;
-        note = n;
+        message.note = n;
+    }
+    //--------------
+    void SetBend(float b) {
+        hasBend = true;
+        message.bend = b;
     }
     //--------------
     void SetKeyData(uint16_t data) {
         hasKey = true;
-        keyData = data;
+        message.keyData = data;
     }
 };
 

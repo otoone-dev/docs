@@ -1,6 +1,6 @@
 #include "DeviceBase.h"
 #include "InputDeviceBase.h"
-#include "InputDevicePressure.h"
+#include "InputDevices/InputDeviceLPS33.h"
 #include "InputDeviceKey.h"
 #include "OutputDeviceBase.h"
 #include "OutputDeviceSpeaker.h"
@@ -34,14 +34,14 @@ USBMIDI MIDI("AFUUE2R");
 
 #define BUTTON_PIN (41)
 
-char debugMessage[512] = "";
-
 //---------------------
 class System {
 public:
     float m_cpuLoad = 0.0f;
     bool m_btnPressed = false;
-
+#ifdef DEBUG
+    std::string m_debugMessage;
+#endif
     //--------------
     void initialize() {
         InitLED();
@@ -82,7 +82,7 @@ public:
         btStop();
         WiFi.mode(WIFI_OFF); 
         Wire.begin(I2CPIN_SDA, I2CPIN_SCL, I2C_FREQ);
-        m_inputDevices.push_back(new InputDevicePressure(Wire));
+        m_inputDevices.push_back(new InputDeviceLPS33(Wire, InputDeviceLPS33::ReadType::BREATH_AND_BEND));
         m_inputDevices.push_back(new InputDeviceKey(Wire));
         m_outputDevices.push_back(new OutputDeviceSpeaker());
         m_outputDevices.push_back(new OutputDeviceLED());
@@ -162,27 +162,37 @@ private:
 
     //--------------
     void Update() {
-        float v = 0.0f;
-        float note = 0.1f;
-        // 入力
+        Message message;
+#ifdef DEBUG
+        m_debugMessage = "";
+#endif
+        // 入力        
         for (auto& device : m_inputDevices) {
             InputResult result = device->Update(m_parameters);
-            if (result.hasPressure) {
-                v = result.pressure;
-                sprintf(debugMessage, "%s", result.debugMessage.c_str());
+            if (!result.success) {
+                continue;
+            }
+            if (result.hasVolume) {
+                message.volume = result.message.volume;
             }
             if (result.hasNote) {
-                note = result.note;
+                message.note = result.message.note;
             }
+            if (result.hasBend) {
+                message.bend = result.message.bend;
+            }
+#ifdef DEBUG
+            m_debugMessage += result.debugMessage;
+#endif
         }
         if (m_btnPressed) {
-            v = 0.2f;
+            message.volume = 0.2f;
         }
         // 出力
         for (auto& device : m_outputDevices) {
-            OutputResult ret = device->Update(m_parameters, note, v);
-            if (ret.hasCpuLoad) {
-                m_cpuLoad += (ret.cpuLoad - m_cpuLoad) * 0.1f;
+            OutputResult result = device->Update(m_parameters, message);
+            if (result.hasCpuLoad) {
+                m_cpuLoad += (result.cpuLoad - m_cpuLoad) * 0.1f;
             }
         }
 
@@ -240,7 +250,9 @@ void loop() {
   M5.Lcd.clear(TFT_BLACK);
   M5.Lcd.setCursor(0, 0);
   M5.Lcd.setTextSize(2);
+  //M5.Lcd.printf("PLAYING\n%s", sys.m_debugMessage.c_str());
   M5.Lcd.printf("PLAYING\n%3.2f%%", sys.m_cpuLoad * 100.0f);
+
 #endif
   //M5.update();
   //if (M5.BtnA.isPressed()) {

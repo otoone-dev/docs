@@ -8,6 +8,6 @@ struct OutputResult {
 
 class OutputDeviceBase : public DeviceBase {
 public:
-    virtual OutputResult Update(const Parameters& parameters, float note, float volume) = 0;
+    virtual OutputResult Update(const Parameters& parameters, Message& msg) = 0;
     virtual ~OutputDeviceBase() {}
 };

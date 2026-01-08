@@ -16,8 +16,8 @@ public:
         return result;
     }
 
-    OutputResult Update(const Parameters& parameters, float note, float volume) override {
-        ledcWrite(LEDPIN, (int)(1 + volume * 250.0f));
+    OutputResult Update(const Parameters& parameters, Message& msg) override {
+        ledcWrite(LEDPIN, (int)(1 + msg.volume * 250.0f));
         return OutputResult{ false, 0.0f };
     }
 };

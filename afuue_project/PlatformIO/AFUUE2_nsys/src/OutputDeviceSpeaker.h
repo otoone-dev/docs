@@ -81,9 +81,9 @@ public:
     }
 
     //--------------
-    OutputResult Update(const Parameters& parameters, float note, float vol) override {
-        tickCount = CalcFrequency(parameters.fineTune, note) / parameters.samplingRate;
-        volume = vol;
+    OutputResult Update(const Parameters& parameters, Message& msg) override {
+        tickCount = CalcFrequency(parameters.fineTune, msg.note + msg.bend) / parameters.samplingRate;
+        volume = msg.volume;
 
         for (auto& processor : m_soundProcessors) {
             processor->UpdateParameter(parameters, volume);
@@ -129,13 +129,7 @@ public:
                 if ( (-0.000002f < f) && (f < 0.000002f) ) {
                     f = 0.0f;
                 }
-                int32_t i = umid + static_cast<int32_t>(f);
-                if (i < 0) {
-                    i = 0;
-                }
-                if (i > 65535) {
-                    i = 65535;
-                }
+                int32_t i = Clamp<int32_t>(umid + static_cast<int32_t>(f), 0, 65535);
                 uint16_t w = static_cast<uint16_t>(i);
                 waveOutBuffer[waveOutBufferWritePos] = w;
                 waveOutBufferWritePos = (waveOutBufferWritePos + 1) % WAVEOUT_BUFFERMAX;

@@ -1,6 +1,8 @@
 #pragma once
 #include <Wire.h>
 #include "InputDeviceBase.h"
+#include <string>
+#include <format>
 
 #define LPS33_ADDR (0x5C)
 #define LPS33_WHOAMI_REG (0x0F)
@@ -10,8 +12,16 @@
 
 class InputDeviceLPS33 : public InputDeviceBase {
 public:
+    enum class ReadType : uint8_t {
+        BREATH, // addr=0x5C
+        BREATH_AND_BEND,   // addr=0x5D
+    };
+
     //--------------
-    InputDeviceLPS33(TwoWire &wire, int side) : m_wire(wire), m_address(LPS33_ADDR + side) {}
+    InputDeviceLPS33(TwoWire &wire, ReadType readType) 
+        : m_wire(wire)
+        , m_address(LPS33_ADDR)
+        , m_readType(readType) {}
 
     //--------------
     const char* GetName() const override {
@@ -21,46 +31,47 @@ public:
     //--------------
     InitializeResult Initialize() override {
         InitializeResult result;
-        Wire.beginTransmission(LPS33_ADDR);
-        if (Wire.endTransmission() != 0) {
-            result.success = false;
-            result.errorMessage = "NO LPS33";
-            return result;
+        result = StartDevice(m_address); // BREATH
+        if (result.success && m_readType == ReadType::BREATH_AND_BEND) {
+            result = StartDevice(m_address + 1); // BEND
         }
-        m_wire.beginTransmission(LPS33_ADDR);
-        m_wire.write(LPS33_WHOAMI_REG);
-        m_wire.endTransmission();
-        m_wire.requestFrom(LPS33_ADDR, 1);
-        uint8_t whoami = m_wire.read();
-        if (whoami != LPS33_WHOAMI_RET) {
-            result.success = false;
-            result.errorMessage = "LPS33 ERR";
-            return result;
+        if (result.success) {
+            m_defaultPressure = GetPressure(m_address) + 50.0f;
+            m_currentPressure = m_defaultPressure;
+            if (m_readType == ReadType::BREATH_AND_BEND) {
+                m_defaultBendPressure = GetPressure(m_address + 1) + 50.0f;
+                m_currentBendPressure = m_defaultBendPressure;
+            }
         }
-        m_wire.beginTransmission(LPS33_ADDR);
-        m_wire.write(LPS33_REG_CTRL);
-        m_wire.write(0x50); // odr (0x50=75Hz, 0x40=50Hz, 0x30=25Hz, 0x20=10Hz, 0x10=1Hz, 0x00=OFF)
-        m_wire.endTransmission();
-        delay(100);
-        m_defaultPressure = GetPressure() + 50.0f;
-        m_currentPressure = m_defaultPressure;
-
         return result;
     }
 
     //--------------
     InputResult Update(const Parameters& parameters) override {
         InputResult result;
-
-        m_currentPressure += (GetPressure() - m_currentPressure) * 0.8f;
-        float v = (m_currentPressure - m_defaultPressure) / 400.0f;
-        if (v < 0.0f) {
-            v = 0.0f;
+        m_currentPressure += (GetPressure(m_address) - m_currentPressure) * 0.8f;
+        float v = Clamp<float>((m_currentPressure - m_defaultPressure) / 400.0f, 0.0f, 1.0f);
+        result.SetVolume(v * v);
+        if (m_readType == ReadType::BREATH_AND_BEND) {
+            m_currentBendPressure += (GetPressure(m_address + 1) - m_currentBendPressure) * 0.8f;
+            float b = Clamp<float>((m_currentBendPressure - m_defaultBendPressure) / 400.0f, 0.0f, v);
+            float bendNoteShiftTarget = 0.0f;
+            if (v > 0.0001f) {
+                bendNoteShiftTarget = -1.0f + ((v - b) / v) * 1.2f;
+                if (bendNoteShiftTarget > 0.0f) {
+                    bendNoteShiftTarget = 0.0f;
+                }
+            }
+            else {
+                bendNoteShiftTarget = 0.0f;
+            }
+            result.SetBend(bendNoteShiftTarget);
         }
-        else if (v > 1.0f) {
-            v = 1.0f;
-        }
-        result.SetPressure(v);
+#ifdef DEBUG
+        //char s[32];
+        //sprintf(s, "%1.1f\n%1.1f", m_currentPressure, m_currentBendPressure);
+        //result.debugMessage = s;
+#endif
         return result;
     }
 private:
@@ -68,17 +79,46 @@ private:
     int m_address;
     float m_defaultPressure = 0.0f;
     float m_currentPressure = 0.0f;
+    float m_defaultBendPressure = 0.0f;
+    float m_currentBendPressure = 0.0f;
+    ReadType m_readType;
 
     //--------------
-    float GetPressure() {
-        Wire.beginTransmission(m_address);
+    InitializeResult StartDevice(int address) {
+        InitializeResult result;
+        m_wire.beginTransmission(address);
+        if (m_wire.endTransmission() != 0) {
+            result.success = false;
+            result.errorMessage = std::format("NO LPS33:{0}", address);
+            return result;
+        }
+        m_wire.beginTransmission(address);
+        m_wire.write(LPS33_WHOAMI_REG);
+        m_wire.endTransmission();
+        m_wire.requestFrom(address, 1);
+        uint8_t whoami = m_wire.read();
+        if (whoami != LPS33_WHOAMI_RET) {
+            result.success = false;
+            result.errorMessage = std::format("LPS33 ERR:{0}", address);
+            return result;
+        }
+        m_wire.beginTransmission(address);
+        m_wire.write(LPS33_REG_CTRL);
+        m_wire.write(0x50); // odr (0x50=75Hz, 0x40=50Hz, 0x30=25Hz, 0x20=10Hz, 0x10=1Hz, 0x00=OFF)
+        m_wire.endTransmission();
+        return result;
+    }
+
+    //--------------
+    float GetPressure(int address) {
+        Wire.beginTransmission(address);
         Wire.write(LPS33_REG_OUT_XL);
         Wire.endTransmission();
-        Wire.requestFrom(m_address, 3);
+        Wire.requestFrom(address, 3);
 
         uint8_t data[3];
         for (int i = 0; i < 3; i++) {
-        data[i] = Wire.read();
+            data[i] = Wire.read();
         }        
         uint32_t pressure = ((((uint32_t)data[2]) << 16) | (((uint32_t)data[1]) << 8) | data[0]);
         return pressure / 256.0f;

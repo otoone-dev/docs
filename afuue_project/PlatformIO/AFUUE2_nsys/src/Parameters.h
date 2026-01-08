@@ -12,3 +12,21 @@ struct Parameters {
     float fineTune = 440.0f;
     float samplingRate = 44077.135f;
 };
+
+struct Message {
+    float volume;
+    float note;
+    float bend;
+    uint16_t keyData;
+};
+
+template<typename T>
+T Clamp(T v, T min, T max) {
+    if (v < min) {
+        return min;
+    }
+    else if (v > max) {
+        return max;
+    }
+    return v;
+}
