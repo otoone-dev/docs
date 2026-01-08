@@ -35,6 +35,7 @@ public:
         if (result.success && m_readType == ReadType::BREATH_AND_BEND) {
             result = StartDevice(m_address + 1); // BEND
         }
+        delay(20);
         if (result.success) {
             m_defaultPressure = GetPressure(m_address) + 50.0f;
             m_currentPressure = m_defaultPressure;

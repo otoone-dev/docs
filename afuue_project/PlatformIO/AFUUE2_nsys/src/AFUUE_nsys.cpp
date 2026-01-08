@@ -44,7 +44,6 @@ public:
 #endif
     //--------------
     void initialize() {
-        InitLED();
         SetLED(CRGB(100, 0, 0));
         delay(200);
         SetLED(CRGB(1, 0, 0));
@@ -117,11 +116,11 @@ public:
     }
     //--------------
 #ifdef FASTLED_PIN
-    void SetLED(CRGB rgb) {
+    void SetLED(CRGB color) {
         uint8_t t = color.r;
         color.r = color.g;
         color.g = t;
-        leds[0] = color;
+        m_leds[0] = color;
         FastLED.show();
     }
 #else
@@ -133,11 +132,10 @@ private:
     std::vector<OutputDeviceBase*> m_outputDevices;
     Parameters m_parameters;
     int m_counter = 0;
-
-    //--------------
 #ifdef FASTLED_PIN
+    CRGB m_leds[1];
     void InitLED() {
-        FastLED.addLeds<WS2811, LED_PIN, RGB>(leds, NUM_LEDS);
+        FastLED.addLeds<WS2811, FASTLED_PIN, RGB>(m_leds, 1);
     }
 #else
     void InitLED() {}
