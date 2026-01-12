@@ -19,7 +19,7 @@ const float waveAfuueCla[256] = {
     0.97421f,0.94513f,0.91605f,0.86423f,0.78708f,0.70996f,0.61624f,0.51779f,0.42032f,0.33359f,0.24683f,0.16879f,0.10437f,0.03995f,-0.02530f,-0.09091f,
 };
 
-class SoundProcessorWaveGen : public SoundProcessorBase {
+class WaveGenerator : public SoundProcessorBase {
 public:
     void Initialize() override {
         // Preferences からデータ復帰したり？

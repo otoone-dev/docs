@@ -4,7 +4,7 @@
 
 #define LEDPIN (8)
 
-class OutputDeviceLED : public OutputDeviceBase {
+class LED : public OutputDeviceBase {
 public:
     const char* GetName() const override { return "LED"; }
 

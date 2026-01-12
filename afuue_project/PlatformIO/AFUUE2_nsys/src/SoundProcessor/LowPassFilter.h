@@ -3,7 +3,7 @@
 #include "SoundProcessorBase.h"
 #include <cmath>
 
-class SoundProcessorFilter : public SoundProcessorBase {
+class LowPassFilter : public SoundProcessorBase {
 public:
     void Initialize() override {}
     void ProcessAudio(SoundInfo& info) override {

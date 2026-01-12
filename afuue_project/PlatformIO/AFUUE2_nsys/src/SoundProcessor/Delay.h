@@ -4,7 +4,7 @@
 
 #define DELAY_BUFFER_SIZE (7993)
 
-class SoundProcessorDelay : public SoundProcessorBase {
+class Delay : public SoundProcessorBase {
 private:
     float m_buffer[DELAY_BUFFER_SIZE];
     float m_rate = 0.15f;

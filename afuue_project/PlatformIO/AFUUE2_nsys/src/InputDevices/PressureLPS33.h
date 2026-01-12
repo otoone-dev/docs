@@ -10,7 +10,7 @@
 #define LPS33_REG_CTRL (0x10)
 #define LPS33_REG_OUT_XL (0x28)
 
-class InputDeviceLPS33 : public InputDeviceBase {
+class PressureLPS33 : public InputDeviceBase {
 public:
     enum class ReadType : uint8_t {
         BREATH, // addr=0x5C
@@ -18,7 +18,7 @@ public:
     };
 
     //--------------
-    InputDeviceLPS33(TwoWire &wire, ReadType readType) 
+    PressureLPS33(TwoWire &wire, ReadType readType) 
         : m_wire(wire)
         , m_address(LPS33_ADDR)
         , m_readType(readType) {}
@@ -122,6 +122,6 @@ private:
             data[i] = Wire.read();
         }        
         uint32_t pressure = ((((uint32_t)data[2]) << 16) | (((uint32_t)data[1]) << 8) | data[0]);
-        return pressure / 256.0f;
+        return pressure / 256.0f; // 1/4096 で hPa 単位だが、ESP32のADCに合わせるため 1/256にする。
     }
 };

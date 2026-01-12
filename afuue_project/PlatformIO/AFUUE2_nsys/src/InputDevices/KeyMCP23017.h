@@ -1,6 +1,6 @@
 #pragma once
 #include <Wire.h>
-#include "InputDeviceBase.h"
+#include "Key.h"
 
 #define MCP23017_ADDR (0x20)
 #define MCP23017_IODIRA (0x00)
@@ -10,10 +10,12 @@
 #define MCP23017_GPIOA (0x12)
 #define MCP23017_GPIOB (0x13)
 
-class InputDeviceMCP23017 : public InputDeviceBase {
+class KeyMCP23017 : public Key {
 public:
     //--------------
-    InputDeviceMCP23017(TwoWire &wire) : m_wire(wire) {}
+    KeyMCP23017(TwoWire &wire)
+     : Key(wire)
+     , m_wire(wire) {}
 
     //--------------
     const char* GetName() const override {
@@ -55,7 +57,7 @@ public:
     //--------------
     InputResult Update(const Parameters& parameters) override {
         InputResult result;
-        result.SetKeyData(GetKeyData());
+        result.SetNote(GetNote(parameters, GetKeyData()));
         return result;
     }
 
@@ -76,6 +78,7 @@ private:
         m_wire.requestFrom(MCP23017_ADDR, 1);
         uint8_t gpiob = m_wire.read();
 
-        return (gpiob << 8) | gpioa;
+        uint16_t d = (gpiob << 8) | gpioa;
+        return ~d; // push で LOW(0) なので反転
     }
 };

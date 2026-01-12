@@ -1,58 +1,33 @@
 #pragma once
-#include "InputDeviceBase.h"
-#include "InputDevices/InputDeviceMCP23017.h"
+#include "DeviceBase.h"
+#include "../Parameters.h"
+#include <functional>
 
-class InputDeviceKey : public InputDeviceBase {
-public:
-    InputDeviceKey(TwoWire &wire)
-        : InputDeviceBase(), m_mcp23017(wire) {}
-
-    //--------------
-    const char* GetName() const override {
-        return "Key";
+struct Keys {
+    uint16_t data;
+    Keys(uint16_t d) : data(d) {
     }
-
-    //--------------
-    InitializeResult Initialize() override {
-        m_lastChangeTime = micros();
-        return m_mcp23017.Initialize();
-    }
-
-    //--------------
-    InputResult Update(const Parameters& parameters) override {
-        auto result = m_mcp23017.Update(parameters);
-        if (!result.hasKey) {
-            result.success = false;
-            result.errorMessage = "KEY ERR";
-            return result;
-        }
-        uint64_t t = micros();
-        const uint16_t keyData = result.message.keyData;
-        if (keyData != m_lastKeyData) {
-            m_lastKeyData = keyData;
-            m_lastChangeTime = t;
-        }
-        const bool keyLowC = ((keyData & 0x0001) != 0);
-        const bool keyEb = ((keyData & 0x0002) != 0);
-        const bool keyD = ((keyData & 0x0004) != 0);
-        const bool keyE = ((keyData & 0x0008) != 0);
-        const bool keyF = ((keyData & 0x0010) != 0);
-        const bool keyLowCs = ((keyData & 0x0020) != 0);
-        const bool keyGs = ((keyData & 0x0040) != 0);
-        const bool keyG = ((keyData & 0x0080) != 0);
-        const bool keyA = ((keyData & 0x0100) != 0);
-        const bool keyB = ((keyData & 0x0200) != 0);
-        const bool octUp = ((keyData & 0x0400) != 0);
-        const bool octDown = ((keyData & 0x0800) != 0);
-
+    bool KeyLowC() const { return (data & 0x0001); }
+    bool KeyEb() const { return (data & 0x0002); }
+    bool KeyD() const { return (data & 0x0004); }
+    bool KeyE() const { return (data & 0x0008); }
+    bool KeyF() const { return (data & 0x0010); }
+    bool KeyLowCs() const { return (data & 0x0020); }
+    bool KeyGs() const { return (data & 0x0040); }
+    bool KeyG() const { return (data & 0x0080); }
+    bool KeyA() const { return (data & 0x0100); }
+    bool KeyB() const { return (data & 0x0200); }
+    bool KeyUp() const { return (data & 0x0400); }
+    bool KeyDown() const { return (data & 0x0800); }
+    float GetNote(float baseNote) const {
         int b = 0;
-        if (keyLowC == LOW) b |= (1 << 7);
-        if (keyD == LOW) b |= (1 << 6);
-        if (keyE == LOW) b |= (1 << 5);
-        if (keyF == LOW) b |= (1 << 4);
-        if (keyG == LOW) b |= (1 << 3);
-        if (keyA == LOW) b |= (1 << 2);
-        if (keyB == LOW) b |= (1 << 1);
+        if (KeyLowC()) b |= (1 << 7);
+        if (KeyD()) b |= (1 << 6);
+        if (KeyE()) b |= (1 << 5);
+        if (KeyF()) b |= (1 << 4);
+        if (KeyG()) b |= (1 << 3);
+        if (KeyA()) b |= (1 << 2);
+        if (KeyB()) b |= (1 << 1);
 
         float n = 0.0f;
 
@@ -62,7 +37,7 @@ public:
         if ((g == 0b00001110) || (g == 0b00001100)) {      // [*][*][*] or [*][*][ ]
             if ((b & 0b11110000) == 0b11110000) {
                 n = 0.0f; // C
-                if (keyEb == LOW) n = 2.0f; // D
+                if (KeyEb()) n = 2.0f; // D
             }
             else if ((b & 0b11110000) == 0b01110000) {
                 n = 2.0f; // D
@@ -129,28 +104,55 @@ public:
             if (b & 0b00010000) n -= 1.0f;
         }
 
-        if ((keyEb == LOW)&&(keyLowC != LOW)) n += 1.0f; // #
-        if (keyGs == LOW) n += 1.0f; // #
-        if (keyLowCs == LOW) n -= 1.0f; // b
+        if ((KeyEb())&&(!KeyLowC())) n += 1.0f; // #
+        if (KeyGs()) n += 1.0f; // #
+        if (KeyLowCs()) n -= 1.0f; // b
 
-        if (octUp == LOW) n += 12.0f;
-        else if (octDown == LOW) n -= 12.0f;
+        if (KeyUp()) n += 12.0f;
+        else if (KeyDown()) n -= 12.0f;
 
-        if (t - m_lastChangeTime > 20*1000) { // ピロ音防止
-            m_targetNote = m_baseNote + n;
-        }
-        m_currentNote += (m_targetNote - m_currentNote) * m_rate;
-        result.SetNote(m_currentNote);
-        return result;
+        return baseNote + n;
     }
+};
 
-private:
-    InputDeviceMCP23017 m_mcp23017;
+struct InputResult {
+    bool success = true;
+    bool hasVolume = false;
+    bool hasNote = false;
+    bool hasBend = false;
+    bool hasKey = false;
 
-    uint64_t m_lastChangeTime = 0;
-    float m_targetNote = 0.0f;
-    float m_currentNote = 0.0f;
-    float m_rate = 0.9f;
-    int m_baseNote = 48; // C
-    uint16_t m_lastKeyData = 0;
+    Message message;
+
+    std::string errorMessage = "";
+#ifdef DEBUG
+    std::string debugMessage = "";
+#endif
+    //--------------
+    void SetVolume(float p) {
+        hasVolume = true;
+        message.volume = p;
+    }
+    //--------------
+    void SetNote(float n) {
+        hasNote = true;
+        message.note = n;
+    }
+    //--------------
+    void SetBend(float b) {
+        hasBend = true;
+        message.bend = b;
+    }
+    //--------------
+    void SetKeyData(uint16_t data) {
+        hasKey = true;
+        message.keyData = data;
+    }
+};
+
+class InputDeviceBase : public DeviceBase {
+public:
+  InputDeviceBase() = default;
+  virtual ~InputDeviceBase() = default;
+  virtual InputResult Update(const Parameters& parameters) = 0;
 };

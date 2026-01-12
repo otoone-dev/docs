@@ -2,10 +2,10 @@
 #include <Arduino.h>
 #include <driver/ledc.h>
 #include <soc/ledc_struct.h>
-#include "SoundProcessorWaveGen.h"
-#include "SoundProcessorFilter.h"
-#include "SoundProcessorDelay.h"
-#include "SoundProcessorBase.h"
+#include "../SoundProcessor/WaveGenerator.h"
+#include "../SoundProcessor/LowPassFilter.h"
+#include "../SoundProcessor/Delay.h"
+#include "../SoundProcessor/SoundProcessorBase.h"
 #include "OutputDeviceBase.h"
 #include "Parameters.h"
 
@@ -32,7 +32,7 @@ volatile float tickCount = 0;
 volatile float volume = 0;
 volatile uint64_t cpuLoad = 0;
 
-hw_timer_t *timer = NULL;
+hw_timer_t* timer = NULL;
 volatile uint32_t waveHigh = 0;
 volatile uint32_t waveLow = 0;
 void IRAM_ATTR OnTimer() {
@@ -49,7 +49,7 @@ void IRAM_ATTR OnTimer() {
 }
 
 //---------------------------------
-class OutputDeviceSpeaker : public OutputDeviceBase {
+class Speaker : public OutputDeviceBase {
 public:
     //--------------
     const char* GetName() const override {
@@ -60,9 +60,9 @@ public:
     InitializeResult Initialize() override {
         InitializeResult result;
 
-        m_soundProcessors.push_back(new SoundProcessorWaveGen());
-        m_soundProcessors.push_back(new SoundProcessorFilter());
-        m_soundProcessors.push_back(new SoundProcessorDelay());
+        m_soundProcessors.push_back(new WaveGenerator());
+        m_soundProcessors.push_back(new LowPassFilter());
+        m_soundProcessors.push_back(new Delay());
 
         pinMode(PWMPIN_LOW, OUTPUT);
         pinMode(PWMPIN_HIGH, OUTPUT);
@@ -99,8 +99,8 @@ public:
     }
 
     //--------------
-    static void CreateWaveTask(void *parameter) {
-        OutputDeviceSpeaker *pSystem = static_cast<OutputDeviceSpeaker *>(parameter);
+    static void CreateWaveTask(void* parameter) {
+        Speaker* pSystem = static_cast<Speaker*>(parameter);
 
         TickType_t xLastWakeTime;
         const TickType_t xFrequency = 1 / portTICK_PERIOD_MS; // 1ms

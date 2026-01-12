@@ -1,10 +1,11 @@
 #include "DeviceBase.h"
-#include "InputDeviceBase.h"
-#include "InputDevices/InputDeviceLPS33.h"
-#include "InputDeviceKey.h"
-#include "OutputDeviceBase.h"
-#include "OutputDeviceSpeaker.h"
-#include "OutputDeviceLED.h"
+#include "InputDevices/InputDeviceBase.h"
+#include "InputDevices/PressureLPS33.h"
+#include "InputDevices/KeyMCP23017.h"
+#include "InputDevices/Key.h"
+#include "OutputDevices/OutputDeviceBase.h"
+#include "OutputDevices/Speaker.h"
+#include "OutputDevices/LED.h"
 
 #include <M5Unified.h>
 #include <Arduino.h>
@@ -81,10 +82,10 @@ public:
         btStop();
         WiFi.mode(WIFI_OFF); 
         Wire.begin(I2CPIN_SDA, I2CPIN_SCL, I2C_FREQ);
-        m_inputDevices.push_back(new InputDeviceLPS33(Wire, InputDeviceLPS33::ReadType::BREATH_AND_BEND));
-        m_inputDevices.push_back(new InputDeviceKey(Wire));
-        m_outputDevices.push_back(new OutputDeviceSpeaker());
-        m_outputDevices.push_back(new OutputDeviceLED());
+        m_inputDevices.push_back(new PressureLPS33(Wire, PressureLPS33::ReadType::BREATH_AND_BEND));
+        m_inputDevices.push_back(new KeyMCP23017(Wire));
+        m_outputDevices.push_back(new Speaker());
+        m_outputDevices.push_back(new LED());
 
         std::string errorMessage = "";
         // Input Devices
