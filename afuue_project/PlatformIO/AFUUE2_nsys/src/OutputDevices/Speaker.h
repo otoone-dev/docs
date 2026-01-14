@@ -9,10 +9,6 @@
 #include "OutputDeviceBase.h"
 #include "Parameters.h"
 
-#define SOUND_TWOPWM
-#define PWMPIN_LOW (GPIO_NUM_5)
-#define PWMPIN_HIGH (GPIO_NUM_6)
-
 //---------------------------------
 /*
     |   write     read   |   write
@@ -35,6 +31,7 @@ volatile uint64_t cpuLoad = 0;
 hw_timer_t* timer = NULL;
 volatile uint32_t waveHigh = 0;
 volatile uint32_t waveLow = 0;
+//---------------------------------
 void IRAM_ATTR OnTimer() {
 #ifdef SOUND_TWOPWM
     ledcWriteChannel(LEDC_CHANNEL_1, waveLow);
@@ -51,6 +48,11 @@ void IRAM_ATTR OnTimer() {
 //---------------------------------
 class Speaker : public OutputDeviceBase {
 public:
+    Speaker(gpio_num_t low, gpio_num_t high)
+    : m_lowPin(low)
+    , m_highPin(high) {
+    }
+
     //--------------
     const char* GetName() const override {
         return "Speaker";
@@ -64,11 +66,12 @@ public:
         m_soundProcessors.push_back(new LowPassFilter());
         m_soundProcessors.push_back(new Delay());
 
-        pinMode(PWMPIN_LOW, OUTPUT);
-        pinMode(PWMPIN_HIGH, OUTPUT);
+        pinMode(m_lowPin, OUTPUT);
+        pinMode(m_highPin, OUTPUT);
         // LEDC set up
-        ledcAttachChannel(PWMPIN_HIGH, 156250, 8, LEDC_CHANNEL_2);
-        ledcAttachChannel(PWMPIN_LOW, 156250, 8, LEDC_CHANNEL_1);
+        ledcAttachChannel(m_highPin, 156250, 8, LEDC_CHANNEL_2);
+        ledcAttachChannel(m_lowPin, 156250, 8, LEDC_CHANNEL_1);
+
         for (int i = 0; i < WAVEOUT_BUFFERMAX; i++) {
             waveOutBuffer[i] = 0x8000;
         }
@@ -125,11 +128,7 @@ public:
                     processor->ProcessAudio(info);
                 }
 
-                float f = info.wave * fmid;
-                if ( (-0.000002f < f) && (f < 0.000002f) ) {
-                    f = 0.0f;
-                }
-                int32_t i = Clamp<int32_t>(umid + static_cast<int32_t>(f), 0, 65535);
+                int32_t i = Clamp<int32_t>(umid + static_cast<int32_t>(info.wave * fmid), 0, 65535);
                 uint16_t w = static_cast<uint16_t>(i);
                 waveOutBuffer[waveOutBufferWritePos] = w;
                 waveOutBufferWritePos = (waveOutBufferWritePos + 1) % WAVEOUT_BUFFERMAX;
@@ -144,4 +143,6 @@ public:
 
 private:
     std::vector<SoundProcessorBase*> m_soundProcessors;
+    gpio_num_t m_lowPin;
+    gpio_num_t m_highPin;
 };

@@ -14,7 +14,7 @@ class KeyMCP23017 : public Key {
 public:
     //--------------
     KeyMCP23017(TwoWire &wire)
-     : Key(wire)
+     : Key()
      , m_wire(wire) {}
 
     //--------------

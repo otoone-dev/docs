@@ -1,7 +1,9 @@
 #include "DeviceBase.h"
 #include "InputDevices/InputDeviceBase.h"
 #include "InputDevices/PressureLPS33.h"
+//#include "InputDevices/PressureADC.h"
 #include "InputDevices/KeyMCP23017.h"
+//#include "InputDevices/KeyDigitalAFUUE2R.h"
 #include "InputDevices/Key.h"
 #include "OutputDevices/OutputDeviceBase.h"
 #include "OutputDevices/Speaker.h"
@@ -14,8 +16,6 @@
 
 //-----------
 #include <Wire.h>
-#define I2CPIN_SDA (38)
-#define I2CPIN_SCL (39)
 #define I2C_FREQ (400000)
 
 //-----------
@@ -24,16 +24,9 @@
 USBMIDI MIDI("AFUUE2R");
  
 //-----------
+#ifdef FASTLED_PIN
 #include <FastLED.h>
-#define HAS_DISPLAY
-#if !defined(HAS_DISPLAY)
-#define FASTLED_PIN   (35)
 #endif
-//---------------------
-#define MIDI_IN_PIN (9)  // not use
-#define MIDI_OUT_PIN (7)
-
-#define BUTTON_PIN (41)
 
 //---------------------
 class System {
@@ -45,6 +38,7 @@ public:
 #endif
     //--------------
     void initialize() {
+        InitLED();
         SetLED(CRGB(100, 0, 0));
         delay(200);
         SetLED(CRGB(1, 0, 0));
@@ -54,7 +48,7 @@ public:
         M5.begin(cfg);
 #endif
         ClearDisplay(2);
-        Display(" AFUUE2R");
+        Display("\n\n AFUUE2R");
         delay(500);
 
         SetLED(CRGB(200, 0, 0));
@@ -78,13 +72,17 @@ public:
         else {
             Display("PLAY MODE");
         }
-
         btStop();
         WiFi.mode(WIFI_OFF); 
+
+#if defined(I2CPIN_SDA) && defined(I2CPIN_SCL)
         Wire.begin(I2CPIN_SDA, I2CPIN_SCL, I2C_FREQ);
+#endif
         m_inputDevices.push_back(new PressureLPS33(Wire, PressureLPS33::ReadType::BREATH_AND_BEND));
+        //m_inputDevices.push_back(new PressureADC(ADCPIN_BREATH, ADCPIN_BEND, PressureADC::ReadType::BREATH_AND_BEND));
         m_inputDevices.push_back(new KeyMCP23017(Wire));
-        m_outputDevices.push_back(new Speaker());
+        //m_inputDevices.push_back(new KeyDigitalAFUUE2R());        
+        m_outputDevices.push_back(new Speaker(PWMPIN_LOW, PWMPIN_HIGH));
         m_outputDevices.push_back(new LED());
 
         std::string errorMessage = "";
@@ -163,7 +161,7 @@ private:
     void Update() {
         Message message;
 #ifdef DEBUG
-        m_debugMessage = "";
+        std::string debugMessage = "";
 #endif
         // 入力        
         for (auto& device : m_inputDevices) {
@@ -173,6 +171,7 @@ private:
             }
             if (result.hasVolume) {
                 message.volume = result.message.volume;
+                char s[32];
             }
             if (result.hasNote) {
                 message.note = result.message.note;
@@ -181,9 +180,12 @@ private:
                 message.bend = result.message.bend;
             }
 #ifdef DEBUG
-            m_debugMessage += result.debugMessage;
+            debugMessage += result.debugMessage;
 #endif
         }
+#ifdef DEBUG
+        m_debugMessage = debugMessage;
+#endif
         if (m_btnPressed) {
             message.volume = 0.2f;
         }
@@ -249,8 +251,13 @@ void loop() {
   M5.Lcd.clear(TFT_BLACK);
   M5.Lcd.setCursor(0, 0);
   M5.Lcd.setTextSize(2);
-  //M5.Lcd.printf("PLAYING\n%s", sys.m_debugMessage.c_str());
+#ifdef DEBUG
+  M5.Lcd.printf("PLAYING\n%s", sys.m_debugMessage.c_str());
+  delay(100);
+  return;
+#else
   M5.Lcd.printf("PLAYING\n%3.2f%%", sys.m_cpuLoad * 100.0f);
+#endif
 
 #endif
   //M5.update();

@@ -3,7 +3,7 @@
 
 class Key : public InputDeviceBase {
 public:
-    Key(TwoWire &wire)
+    Key()
         : InputDeviceBase() {
         m_lastChangeTime = micros();
     }
