@@ -13,10 +13,9 @@
 #define SOUND_TWOPWM
 #define PWMPIN_LOW (GPIO_NUM_5) // AFUUE2R Gen2
 #define PWMPIN_HIGH (GPIO_NUM_6)
-#define FASTLED_PIN  (GPIO_NUM_35)
-#define HAS_DISPLAY
+//#define HAS_DISPLAY
 #ifndef HAS_DISPLAY
-#define FASTLED_PIN   (GPIO_NUM_35)
+#define NEOPIXEL_PIN (GPIO_NUM_35)
 #endif
 #define MIDI_IN_PIN (GPIO_NUM_9)  // not use
 #define MIDI_OUT_PIN (GPIO_NUM_7)
@@ -29,7 +28,7 @@
 #define PWMPIN_HIGH (GPIO_NUM_40)
 #define ADCPIN_BREATH (GPIO_NUM_11)
 #define ADCPIN_BEND (GPIO_NUM_12)
-#define FASTLED_PIN   (GPIO_NUM_21)
+#define NEOPIXEL_PIN   (GPIO_NUM_21)
 #define MIDI_IN_PIN (GPIO_NUM_42)  // not use
 #define MIDI_OUT_PIN (GPIO_NUM_41)
 #define BUTTON_PIN (GPIO_NUM_0)

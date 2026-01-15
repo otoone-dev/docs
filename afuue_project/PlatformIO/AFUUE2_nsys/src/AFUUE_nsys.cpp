@@ -23,11 +23,6 @@
 #include <USBMIDI.h>
 USBMIDI MIDI("AFUUE2R");
  
-//-----------
-#ifdef FASTLED_PIN
-#include <FastLED.h>
-#endif
-
 //---------------------
 class System {
 public:
@@ -38,10 +33,9 @@ public:
 #endif
     //--------------
     void initialize() {
-        InitLED();
-        SetLED(CRGB(100, 0, 0));
+        SetLED(100, 0, 0);
         delay(200);
-        SetLED(CRGB(1, 0, 0));
+        SetLED(1, 0, 0);
         delay(200);
 #ifdef HAS_DISPLAY
         auto cfg = M5.config();
@@ -51,9 +45,9 @@ public:
         Display("\n\n AFUUE2R");
         delay(500);
 
-        SetLED(CRGB(200, 0, 0));
+        SetLED(200, 0, 0);
         delay(200);
-        SetLED(CRGB(1, 0, 0));
+        SetLED(1, 0, 0);
         delay(500);
 
         ClearDisplay(1);
@@ -64,9 +58,9 @@ public:
         delay(1000);
         if (tud_mounted()) {
             Display("USB MIDI");
-            SetLED(CRGB(0, 100, 0));
+            SetLED(0, 100, 0);
             delay(200);
-            SetLED(CRGB(0, 0, 0));
+            SetLED(0, 0, 0);
             delay(200);
         }
         else {
@@ -114,16 +108,12 @@ public:
         Display("READY");
     }
     //--------------
-#ifdef FASTLED_PIN
-    void SetLED(CRGB color) {
-        uint8_t t = color.r;
-        color.r = color.g;
-        color.g = t;
-        m_leds[0] = color;
-        FastLED.show();
+#if defined(NEOPIXEL_PIN)
+    void SetLED(int r, int g, int b) {
+        neopixelWrite(NEOPIXEL_PIN, r, g, b);
     }
 #else
-    void SetLED(CRGB rgb) {}
+    void SetLED(int r, int g, int b) {}
 #endif
 
 private:
@@ -131,14 +121,6 @@ private:
     std::vector<OutputDeviceBase*> m_outputDevices;
     Parameters m_parameters;
     int m_counter = 0;
-#ifdef FASTLED_PIN
-    CRGB m_leds[1];
-    void InitLED() {
-        FastLED.addLeds<WS2811, FASTLED_PIN, RGB>(m_leds, 1);
-    }
-#else
-    void InitLED() {}
-#endif
     //--------------
     void ClearDisplay(float textSize) {
 #ifdef HAS_DISPLAY
@@ -197,7 +179,7 @@ private:
             }
         }
 
-        SetLED(CRGB(0, 0, (m_counter < 60 ? m_counter : 120 - m_counter)));
+        SetLED(0, 0, (m_counter < 60 ? m_counter : 120 - m_counter));
         m_counter = (m_counter + 1) % 120;
     }
 
