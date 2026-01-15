@@ -1,4 +1,5 @@
 #include "DeviceBase.h"
+#include "WaveTable.h"
 #include "InputDevices/InputDeviceBase.h"
 #include "InputDevices/PressureLPS33.h"
 //#include "InputDevices/PressureADC.h"
@@ -77,12 +78,14 @@ public:
         m_inputDevices.push_back(new KeyMCP23017(Wire));
         //m_inputDevices.push_back(new KeyDigitalAFUUE2R());        
 
-        m_soundProcessors.push_back(new WaveGenerator());
+        m_soundProcessors.push_back(new WaveGenerator()); // サウンドプロセッサは登録順が重要
         m_soundProcessors.push_back(new LowPassFilter());
         m_soundProcessors.push_back(new Delay());
 
         m_outputDevices.push_back(new Speaker(PWMPIN_LOW, PWMPIN_HIGH, m_soundProcessors));
         m_outputDevices.push_back(new LED());
+
+        m_parameters.pWaveTable = waveAfuueCla;
 
         std::string errorMessage = "";
         // Input Devices
@@ -92,6 +95,10 @@ public:
             if (!result.success) {
                 errorMessage += result.errorMessage + "\n";
             }
+        }
+        //  Sound Processors
+        for (auto& processor : m_soundProcessors) {
+            processor->Initialize(m_parameters);
         }
         // Output Devices
         for (auto& device : m_outputDevices) {
@@ -127,6 +134,8 @@ private:
     std::vector<SoundProcessorBase*> m_soundProcessors;
     Parameters m_parameters;
     int m_counter = 0;
+    bool m_btnWasPressed = false;
+
     //--------------
     void ClearDisplay(float textSize) {
 #ifdef HAS_DISPLAY
@@ -176,7 +185,17 @@ private:
 #endif
         if (m_btnPressed) {
             message.volume = 0.2f;
+            if (!m_btnWasPressed) {
+                if (m_parameters.pWaveTable == waveAfuueCla) {
+                    m_parameters.pWaveTable = waveAfuueBrass;
+                }
+                else {
+                    m_parameters.pWaveTable = waveAfuueCla;
+                }
+            }
         }
+        m_btnWasPressed = m_btnPressed;
+
         // 出力
         for (auto& device : m_outputDevices) {
             OutputResult result = device->Update(m_parameters, message);

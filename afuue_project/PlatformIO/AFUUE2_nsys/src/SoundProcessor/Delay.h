@@ -10,7 +10,7 @@ private:
     float m_rate = 0.15f;
     int m_pos = 0;
 public:
-    void Initialize() override {}
+    void Initialize(const Parameters& params) override {}
     void ProcessAudio(SoundInfo& info) override {
         float w = info.wave + m_buffer[m_pos];
         m_buffer[m_pos] = w * m_rate;

@@ -5,7 +5,7 @@
 
 class LowPassFilter : public SoundProcessorBase {
 public:
-    void Initialize() override {}
+    void Initialize(const Parameters& params) override {}
     void ProcessAudio(SoundInfo& info) override {
         if (m_lp_a0 != 0.0f) {
             info.wave = LowPass(info.wave);

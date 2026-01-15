@@ -38,6 +38,7 @@
 struct Parameters {
     float fineTune = 440.0f;
     float samplingRate = 44077.135f;
+    const float* pWaveTable = nullptr;
 };
 
 struct Message {
