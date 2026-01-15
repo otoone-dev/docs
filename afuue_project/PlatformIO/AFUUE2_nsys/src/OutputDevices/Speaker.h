@@ -48,9 +48,10 @@ void IRAM_ATTR OnTimer() {
 //---------------------------------
 class Speaker : public OutputDeviceBase {
 public:
-    Speaker(gpio_num_t low, gpio_num_t high)
+    Speaker(gpio_num_t low, gpio_num_t high, std::vector<SoundProcessorBase*>& soundProcessors)
     : m_lowPin(low)
-    , m_highPin(high) {
+    , m_highPin(high)
+    , m_soundProcessors(soundProcessors) {
     }
 
     //--------------
@@ -61,11 +62,6 @@ public:
     //--------------
     InitializeResult Initialize() override {
         InitializeResult result;
-
-        m_soundProcessors.push_back(new WaveGenerator());
-        m_soundProcessors.push_back(new LowPassFilter());
-        m_soundProcessors.push_back(new Delay());
-
         pinMode(m_lowPin, OUTPUT);
         pinMode(m_highPin, OUTPUT);
         // LEDC set up
@@ -142,7 +138,7 @@ public:
     }
 
 private:
-    std::vector<SoundProcessorBase*> m_soundProcessors;
+    std::vector<SoundProcessorBase*>& m_soundProcessors;
     gpio_num_t m_lowPin;
     gpio_num_t m_highPin;
 };

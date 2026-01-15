@@ -76,7 +76,12 @@ public:
         //m_inputDevices.push_back(new PressureADC(ADCPIN_BREATH, ADCPIN_BEND, PressureADC::ReadType::BREATH_AND_BEND));
         m_inputDevices.push_back(new KeyMCP23017(Wire));
         //m_inputDevices.push_back(new KeyDigitalAFUUE2R());        
-        m_outputDevices.push_back(new Speaker(PWMPIN_LOW, PWMPIN_HIGH));
+
+        m_soundProcessors.push_back(new WaveGenerator());
+        m_soundProcessors.push_back(new LowPassFilter());
+        m_soundProcessors.push_back(new Delay());
+
+        m_outputDevices.push_back(new Speaker(PWMPIN_LOW, PWMPIN_HIGH, m_soundProcessors));
         m_outputDevices.push_back(new LED());
 
         std::string errorMessage = "";
@@ -119,6 +124,7 @@ public:
 private:
     std::vector<InputDeviceBase*> m_inputDevices;
     std::vector<OutputDeviceBase*> m_outputDevices;
+    std::vector<SoundProcessorBase*> m_soundProcessors;
     Parameters m_parameters;
     int m_counter = 0;
     //--------------
