@@ -6,9 +6,16 @@
 #include "InputDevices/KeyMCP23017.h"
 //#include "InputDevices/KeyDigitalAFUUE2R.h"
 #include "InputDevices/Key.h"
+
+#include "SoundProcessor/WaveGenerator.h"
+#include "SoundProcessor/LowPassFilter.h"
+#include "SoundProcessor/Delay.h"
+
 #include "OutputDevices/OutputDeviceBase.h"
 #include "OutputDevices/Speaker.h"
 #include "OutputDevices/LED.h"
+
+#include "Menu/MenuForKey.h"
 
 #include <M5Unified.h>
 #include <Arduino.h>
@@ -32,6 +39,10 @@ public:
 #ifdef DEBUG
     std::string m_debugMessage;
 #endif
+    //--------------
+    System() : m_keys(0) {
+    }
+
     //--------------
     void initialize() {
         SetLED(100, 0, 0);
@@ -85,6 +96,8 @@ public:
         m_outputDevices.push_back(new Speaker(PWMPIN_LOW, PWMPIN_HIGH, m_soundProcessors));
         m_outputDevices.push_back(new LED());
 
+        m_menus.push_back(new MenuForKey());
+
         m_parameters.pWaveTable = waveAfuueCla;
 
         std::string errorMessage = "";
@@ -108,6 +121,11 @@ public:
                 errorMessage += result.errorMessage + "\n";
             }
         }
+        // Menus
+        for (auto& menu : m_menus) {
+            menu->Initialize();
+        }
+
         if (errorMessage != "") {
             Display(errorMessage.c_str(), TFT_RED);
             while (1) {
@@ -132,7 +150,9 @@ private:
     std::vector<InputDeviceBase*> m_inputDevices;
     std::vector<OutputDeviceBase*> m_outputDevices;
     std::vector<SoundProcessorBase*> m_soundProcessors;
+    std::vector<MenuBase*> m_menus;
     Parameters m_parameters;
+    Keys m_keys;
     int m_counter = 0;
     bool m_btnWasPressed = false;
 
@@ -195,6 +215,13 @@ private:
             }
         }
         m_btnWasPressed = m_btnPressed;
+        {
+            // メニュー
+            m_keys.Update(message.keyData);
+            for (auto& menu : m_menus) {
+                menu->Update(m_parameters, m_keys);
+            }
+        }
 
         // 出力
         for (auto& device : m_outputDevices) {

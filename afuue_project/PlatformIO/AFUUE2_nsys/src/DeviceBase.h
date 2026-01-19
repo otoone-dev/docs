@@ -1,9 +1,6 @@
 #pragma once
 #include <string>
 
-#define CORE0 (0)
-#define CORE1 (1)
-
 struct InitializeResult {
     bool success = true;
     std::string errorMessage = "";

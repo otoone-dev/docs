@@ -2,12 +2,9 @@
 #include <Arduino.h>
 #include <driver/ledc.h>
 #include <soc/ledc_struct.h>
-#include "../SoundProcessor/WaveGenerator.h"
-#include "../SoundProcessor/LowPassFilter.h"
-#include "../SoundProcessor/Delay.h"
-#include "../SoundProcessor/SoundProcessorBase.h"
-#include "OutputDeviceBase.h"
-#include "Parameters.h"
+#include <SoundProcessor/SoundProcessorBase.h>
+#include <OutputDevices/OutputDeviceBase.h>
+#include <Parameters.h>
 
 //---------------------------------
 /*

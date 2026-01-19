@@ -1,11 +1,19 @@
 #pragma once
-#include "DeviceBase.h"
-#include "../Parameters.h"
+#include <DeviceBase.h>
+#include <Parameters.h>
 #include <functional>
 
 struct Keys {
     uint16_t data;
-    Keys(uint16_t d) : data(d) {
+    uint16_t lastData;
+    uint16_t clicked;
+    Keys(uint16_t d)
+        : data(d)
+        , lastData(d) {
+    }
+    void Update(uint16_t d) {
+        data = d;
+        // ここに実装
     }
     bool KeyLowC() const { return (data & 0x0001); }
     bool KeyEb() const { return (data & 0x0002); }
@@ -152,7 +160,7 @@ struct InputResult {
 
 class InputDeviceBase : public DeviceBase {
 public:
-  InputDeviceBase() = default;
-  virtual ~InputDeviceBase() = default;
-  virtual InputResult Update(const Parameters& parameters) = 0;
+    InputDeviceBase() = default;
+    virtual ~InputDeviceBase() = default;
+    virtual InputResult Update(const Parameters& parameters) = 0;
 };

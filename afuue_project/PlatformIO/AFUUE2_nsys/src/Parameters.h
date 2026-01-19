@@ -1,5 +1,7 @@
 #pragma once
 
+#define CORE0 (0)
+#define CORE1 (1)
 #define CLOCK_DIVIDER (55)
 #define TIMER_ALARM (33)
 // (80*1000*1000 / (CLOCK_DIVIDER * TIMER_ALARM)) // 80MHz / (80*50) = 20kHz
@@ -13,7 +15,7 @@
 #define SOUND_TWOPWM
 #define PWMPIN_LOW (GPIO_NUM_5) // AFUUE2R Gen2
 #define PWMPIN_HIGH (GPIO_NUM_6)
-//#define HAS_DISPLAY
+#define HAS_DISPLAY
 #ifndef HAS_DISPLAY
 #define NEOPIXEL_PIN (GPIO_NUM_35)
 #endif
@@ -38,7 +40,7 @@
 struct Parameters {
     float fineTune = 440.0f;
     float samplingRate = 44077.135f;
-    const float* pWaveTable = nullptr;
+    int waveTableIndex = 0;
 };
 
 struct Message {
