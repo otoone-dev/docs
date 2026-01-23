@@ -1,4 +1,5 @@
 #pragma once
+#include <string>
 
 #define CORE0 (0)
 #define CORE1 (1)
@@ -17,11 +18,13 @@
 #define PWMPIN_HIGH (GPIO_NUM_6)
 #define HAS_DISPLAY
 #ifndef HAS_DISPLAY
+#define HAS_LED
 #define NEOPIXEL_PIN (GPIO_NUM_35)
 #endif
 #define MIDI_IN_PIN (GPIO_NUM_9)  // not use
 #define MIDI_OUT_PIN (GPIO_NUM_7)
 #define BUTTON_PIN (GPIO_NUM_41)
+#define LED_PIN (GPIO_NUM_8)
 #define I2CPIN_SDA (GPIO_NUM_38)
 #define I2CPIN_SCL (GPIO_NUM_39)
 #else
@@ -30,6 +33,7 @@
 #define PWMPIN_HIGH (GPIO_NUM_40)
 #define ADCPIN_BREATH (GPIO_NUM_11)
 #define ADCPIN_BEND (GPIO_NUM_12)
+#define HAS_LED
 #define NEOPIXEL_PIN   (GPIO_NUM_21)
 #define MIDI_IN_PIN (GPIO_NUM_42)  // not use
 #define MIDI_OUT_PIN (GPIO_NUM_41)
@@ -38,9 +42,15 @@
 #endif // HW_AFUUE2R
 
 struct Parameters {
+    uint64_t beepTime = 0;
+    float beepNote = 48.0f;
     float fineTune = 440.0f;
     float samplingRate = 44077.135f;
+    float baseNote = 48.0f;
     int waveTableIndex = 0;
+#ifdef DEBUG
+    std::string debugMessage = "";
+#endif
 };
 
 struct Message {

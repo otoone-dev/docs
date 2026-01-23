@@ -4,7 +4,7 @@
 class WaveGenerator : public SoundProcessorBase {
 public:
     //--------------
-    WaveGenerator(std::vector<const float*>& waveTable) 
+    WaveGenerator(const std::vector<const float*>& waveTable) 
         : m_phase(0.0f)
         , m_waveTableIndex(0)
         , m_waveTable(waveTable)

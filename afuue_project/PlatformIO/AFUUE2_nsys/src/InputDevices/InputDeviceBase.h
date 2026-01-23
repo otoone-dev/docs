@@ -4,29 +4,34 @@
 #include <functional>
 
 struct Keys {
-    uint16_t data;
-    uint16_t lastData;
+private:
+    bool GetFlag(bool getClicked, uint16_t bit) const {
+        return (getClicked ? (clicked & bit) : (pressed & bit));
+    }
+public:
+    uint16_t pressed;
     uint16_t clicked;
-    Keys(uint16_t d)
-        : data(d)
-        , lastData(d) {
+    Keys(uint16_t d = 0)
+        : pressed(d)
+        , clicked(d) {
     }
     void Update(uint16_t d) {
-        data = d;
-        // ここに実装
+        clicked = (d ^ pressed) & d;
+        pressed = d;
     }
-    bool KeyLowC() const { return (data & 0x0001); }
-    bool KeyEb() const { return (data & 0x0002); }
-    bool KeyD() const { return (data & 0x0004); }
-    bool KeyE() const { return (data & 0x0008); }
-    bool KeyF() const { return (data & 0x0010); }
-    bool KeyLowCs() const { return (data & 0x0020); }
-    bool KeyGs() const { return (data & 0x0040); }
-    bool KeyG() const { return (data & 0x0080); }
-    bool KeyA() const { return (data & 0x0100); }
-    bool KeyB() const { return (data & 0x0200); }
-    bool KeyUp() const { return (data & 0x0400); }
-    bool KeyDown() const { return (data & 0x0800); }
+
+    bool KeyLowC(bool getClicked=false) const { return GetFlag(getClicked, 0x0001); }
+    bool KeyEb(bool getClicked=false) const { return GetFlag(getClicked, 0x0002); }
+    bool KeyD(bool getClicked=false) const { return GetFlag(getClicked, 0x0004); }
+    bool KeyE(bool getClicked=false) const { return GetFlag(getClicked, 0x0008); }
+    bool KeyF(bool getClicked=false) const { return GetFlag(getClicked, 0x0010); }
+    bool KeyLowCs(bool getClicked=false) const { return GetFlag(getClicked, 0x0020); }
+    bool KeyGs(bool getClicked=false) const { return GetFlag(getClicked, 0x0040); }
+    bool KeyG(bool getClicked=false) const { return GetFlag(getClicked, 0x0080); }
+    bool KeyA(bool getClicked=false) const { return GetFlag(getClicked, 0x0100); }
+    bool KeyB(bool getClicked=false) const { return GetFlag(getClicked, 0x0200); }
+    bool KeyUp(bool getClicked=false) const { return GetFlag(getClicked, 0x0400); }
+    bool KeyDown(bool getClicked=false) const { return GetFlag(getClicked, 0x0800); }
     float GetNote(float baseNote) const {
         int b = 0;
         if (KeyLowC()) b |= (1 << 7);
@@ -133,9 +138,6 @@ struct InputResult {
     Message message;
 
     std::string errorMessage = "";
-#ifdef DEBUG
-    std::string debugMessage = "";
-#endif
     //--------------
     void SetVolume(float p) {
         hasVolume = true;
@@ -162,5 +164,5 @@ class InputDeviceBase : public DeviceBase {
 public:
     InputDeviceBase() = default;
     virtual ~InputDeviceBase() = default;
-    virtual InputResult Update(const Parameters& parameters) = 0;
+    virtual InputResult Update(Parameters& parameters) = 0;
 };

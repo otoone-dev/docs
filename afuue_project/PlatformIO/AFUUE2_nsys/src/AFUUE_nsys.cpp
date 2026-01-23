@@ -89,16 +89,17 @@ public:
         m_inputDevices.push_back(new KeyMCP23017(Wire));
         //m_inputDevices.push_back(new KeyDigitalAFUUE2R());        
 
-        m_soundProcessors.push_back(new WaveGenerator()); // サウンドプロセッサは登録順が重要
+        m_soundProcessors.push_back(new WaveGenerator(waveTable)); // サウンドプロセッサは登録順が重要
         m_soundProcessors.push_back(new LowPassFilter());
         m_soundProcessors.push_back(new Delay());
 
         m_outputDevices.push_back(new Speaker(PWMPIN_LOW, PWMPIN_HIGH, m_soundProcessors));
-        m_outputDevices.push_back(new LED());
-
+#ifdef LED_PIN
+        m_outputDevices.push_back(new LED(LED_PIN));
+#endif
         m_menus.push_back(new MenuForKey());
 
-        m_parameters.pWaveTable = waveAfuueCla;
+        m_parameters.waveTableIndex = 0;
 
         std::string errorMessage = "";
         // Input Devices
@@ -139,11 +140,11 @@ public:
     }
     //--------------
 #if defined(NEOPIXEL_PIN)
-    void SetLED(int r, int g, int b) {
-        neopixelWrite(NEOPIXEL_PIN, r, g, b);
+    void SetLED(uint8_t r, uint8_t g, uint8_t b) {
+        neopixelWrite((uint8_t)NEOPIXEL_PIN, r, g, b);
     }
 #else
-    void SetLED(int r, int g, int b) {}
+    void SetLED(uint8_t r, uint8_t g, uint8_t b) {}
 #endif
 
 private:
@@ -196,22 +197,20 @@ private:
             if (result.hasBend) {
                 message.bend = result.message.bend;
             }
+            if (result.hasKey) {
+                message.keyData = result.message.keyData;
+            }
 #ifdef DEBUG
-            debugMessage += result.debugMessage;
+            if (!m_parameters.debugMessage.empty()) {
+                debugMessage += m_parameters.debugMessage + "\n";
+                m_parameters.debugMessage = "";
+            }
 #endif
         }
-#ifdef DEBUG
-        m_debugMessage = debugMessage;
-#endif
         if (m_btnPressed) {
             message.volume = 0.2f;
             if (!m_btnWasPressed) {
-                if (m_parameters.pWaveTable == waveAfuueCla) {
-                    m_parameters.pWaveTable = waveAfuueBrass;
-                }
-                else {
-                    m_parameters.pWaveTable = waveAfuueCla;
-                }
+                m_parameters.waveTableIndex++;
             }
         }
         m_btnWasPressed = m_btnPressed;
@@ -220,6 +219,16 @@ private:
             m_keys.Update(message.keyData);
             for (auto& menu : m_menus) {
                 menu->Update(m_parameters, m_keys);
+#ifdef DEBUG
+                if (!m_parameters.debugMessage.empty()) {
+                    debugMessage += m_parameters.debugMessage + "\n";
+                    m_parameters.debugMessage = "";
+                }
+#endif
+            }
+            if (m_parameters.beepTime > 0 && micros() < m_parameters.beepTime) {
+                message.volume = 0.2f;
+                message.note = m_parameters.beepNote;
             }
         }
 
@@ -229,8 +238,17 @@ private:
             if (result.hasCpuLoad) {
                 m_cpuLoad += (result.cpuLoad - m_cpuLoad) * 0.1f;
             }
+#ifdef DEBUG
+            if (!m_parameters.debugMessage.empty()) {
+                debugMessage += m_parameters.debugMessage + "\n";
+                m_parameters.debugMessage = "";
+            }
+#endif
         }
 
+#ifdef DEBUG
+        m_debugMessage = debugMessage;
+#endif
         SetLED(0, 0, (m_counter < 60 ? m_counter : 120 - m_counter));
         m_counter = (m_counter + 1) % 120;
     }
@@ -256,11 +274,11 @@ void setup() {
 //---------------------
 static int prev_note = 0;
 void noteOn(uint8_t note, uint8_t vol) {
-  int channelNo = 0;
+  uint8_t channelNo = 0;
   //midiEventPacket_t packet = {0x90 + channelNo, 0x90 + channelNo, note, vol};
   //MIDI.writePacket(&packet);
   MIDI.noteOn(note, vol);
-  midiEventPacket_t packet2 = {0xB0 + channelNo, 0xB0 + channelNo, 0x02, vol};
+  midiEventPacket_t packet2 = {(uint8_t)(0xB0 + channelNo), (uint8_t)(0xB0 + channelNo), (uint8_t)0x02, vol};
   MIDI.writePacket(&packet2);
   prev_note = note;
 }

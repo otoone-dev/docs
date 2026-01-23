@@ -23,7 +23,7 @@ protected:
         }
         if (t - m_lastChangeTime > 20*1000) { // ピロ音防止
             const Keys keys = Keys(m_lastKeyData);
-            m_targetNote = keys.GetNote(m_baseNote);
+            m_targetNote = keys.GetNote(parameter.baseNote);
         }
         m_currentNote += (m_targetNote - m_currentNote) * m_rate;
         return m_currentNote;
@@ -35,5 +35,4 @@ private:
     float m_targetNote = 0.0f;
     float m_currentNote = 0.0f;
     float m_rate = 0.9f;
-    int m_baseNote = 48; // C
 };

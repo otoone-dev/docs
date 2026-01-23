@@ -70,7 +70,7 @@ public:
     }
 
     //--------------
-    InputResult Update(const Parameters& parameters) override {
+    InputResult Update(Parameters& parameters) override {
         InputResult result;
         m_currentPressure += (GetPressure(PressureType::BREATH) - m_currentPressure) * 0.8f;
         float v = Clamp<float>((m_currentPressure - m_defaultPressure) / 400.0f, 0.0f, 1.0f);

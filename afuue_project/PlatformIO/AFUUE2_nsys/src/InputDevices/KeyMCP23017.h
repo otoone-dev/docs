@@ -55,9 +55,11 @@ public:
     }
 
     //--------------
-    InputResult Update(const Parameters& parameters) override {
+    InputResult Update(Parameters& parameters) override {
         InputResult result;
-        result.SetNote(GetNote(parameters, GetKeyData()));
+        uint16_t keyData = GetKeyData();
+        result.SetKeyData(keyData);
+        result.SetNote(GetNote(parameters, keyData));
         return result;
     }
 

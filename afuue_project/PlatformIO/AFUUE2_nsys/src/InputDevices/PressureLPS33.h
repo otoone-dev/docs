@@ -31,15 +31,18 @@ public:
     //--------------
     InitializeResult Initialize() override {
         InitializeResult result;
+        delay(100);
         result = StartDevice(m_address); // BREATH
         if (result.success && m_readType == ReadType::BREATH_AND_BEND) {
+            delay(10);
             result = StartDevice(m_address + 1); // BEND
         }
-        delay(20);
+        delay(100);
         if (result.success) {
             m_defaultPressure = GetPressure(m_address) + 50.0f;
             m_currentPressure = m_defaultPressure;
             if (m_readType == ReadType::BREATH_AND_BEND) {
+                delay(10);
                 m_defaultBendPressure = GetPressure(m_address + 1) + 50.0f;
                 m_currentBendPressure = m_defaultBendPressure;
             }
@@ -48,7 +51,7 @@ public:
     }
 
     //--------------
-    InputResult Update(const Parameters& parameters) override {
+    InputResult Update(Parameters& parameters) override {
         InputResult result;
         m_currentPressure += (GetPressure(m_address) - m_currentPressure) * 0.8f;
         float v = Clamp<float>((m_currentPressure - m_defaultPressure) / 400.0f, 0.0f, 1.0f);
@@ -69,9 +72,9 @@ public:
             result.SetBend(bendNoteShiftTarget);
         }
 #ifdef DEBUG
-        //char s[32];
-        //sprintf(s, "%1.1f\n%1.1f", m_currentPressure, m_currentBendPressure);
-        //result.debugMessage = s;
+        //char s[64];
+        //sprintf(s, "%1.1f\n%1.1f\n%1.1fB\n%1.1fB\n%1.1f", m_currentPressure, m_defaultPressure, m_currentBendPressure, m_defaultBendPressure, v);
+        //parameters.debugMessage = s;
 #endif
         return result;
     }

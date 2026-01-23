@@ -77,7 +77,7 @@ public:
     }
 
     //--------------
-    OutputResult Update(const Parameters& parameters, Message& msg) override {
+    OutputResult Update(Parameters& parameters, Message& msg) override {
         tickCount = CalcFrequency(parameters.fineTune, msg.note + msg.bend) / parameters.samplingRate;
         volume = msg.volume;
 
