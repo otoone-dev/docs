@@ -17,9 +17,12 @@
 
 #include "Menu/MenuForKey.h"
 
-#include <M5Unified.h>
 #include <Arduino.h>
 #include <WiFi.h>
+#include <M5Unified.h>
+#ifdef HAS_DISPLAY
+M5Canvas canvas(&M5.Display);
+#endif
 #include <vector>
 
 //-----------
@@ -40,7 +43,10 @@ public:
     std::string m_debugMessage;
 #endif
     //--------------
-    System() : m_keys(0) {
+    System()
+        : m_keys(0)
+        , m_parameters()
+    {
     }
 
     //--------------
@@ -52,9 +58,10 @@ public:
 #ifdef HAS_DISPLAY
         auto cfg = M5.config();
         M5.begin(cfg);
+        canvas.createSprite(M5.Display.width(), M5.Display.height());
 #endif
         ClearDisplay(2);
-        Display("\n\n AFUUE2R");
+        Display("AFUUE2R", TFT_WHITE, true);
         delay(500);
 
         SetLED(200, 0, 0);
@@ -84,14 +91,15 @@ public:
 #if defined(I2CPIN_SDA) && defined(I2CPIN_SCL)
         Wire.begin(I2CPIN_SDA, I2CPIN_SCL, I2C_FREQ);
 #endif
+        // 登録順が重要
         m_inputDevices.push_back(new PressureLPS33(Wire, PressureLPS33::ReadType::BREATH_AND_BEND));
         //m_inputDevices.push_back(new PressureADC(ADCPIN_BREATH, ADCPIN_BEND, PressureADC::ReadType::BREATH_AND_BEND));
         m_inputDevices.push_back(new KeyMCP23017(Wire));
-        //m_inputDevices.push_back(new KeyDigitalAFUUE2R());        
+        //m_inputDevices.push_back(new KeyDigitalAFUUE2R());
 
-        m_soundProcessors.push_back(new WaveGenerator(waveTable)); // サウンドプロセッサは登録順が重要
+        m_soundProcessors.push_back(new WaveGenerator());
         m_soundProcessors.push_back(new LowPassFilter());
-        m_soundProcessors.push_back(new Delay());
+        m_soundProcessors.push_back(new Delay(8000));
 
         m_outputDevices.push_back(new Speaker(PWMPIN_LOW, PWMPIN_HIGH, m_soundProcessors));
 #ifdef LED_PIN
@@ -99,7 +107,7 @@ public:
 #endif
         m_menus.push_back(new MenuForKey());
 
-        m_parameters.waveTableIndex = 0;
+        m_parameters.SetWaveTableIndex(0);
 
         std::string errorMessage = "";
         // Input Devices
@@ -124,6 +132,7 @@ public:
         }
         // Menus
         for (auto& menu : m_menus) {
+            Display(menu->GetName());
             menu->Initialize();
         }
 
@@ -147,6 +156,11 @@ public:
     void SetLED(uint8_t r, uint8_t g, uint8_t b) {}
 #endif
 
+    //--------------
+    const std::string& GetMenuMessage() const {
+        return m_parameters.menuMessage;
+    }
+
 private:
     std::vector<InputDeviceBase*> m_inputDevices;
     std::vector<OutputDeviceBase*> m_outputDevices;
@@ -167,10 +181,17 @@ private:
 #endif
     }
     //--------------
-    void Display(const char* message, int color = TFT_WHITE) {
+    void Display(const char* message, int color = TFT_WHITE, bool center = false) {
 #ifdef HAS_DISPLAY
         M5.Lcd.setTextColor(color);
-        M5.Lcd.printf("%s\n", message);
+        if (center) {
+            M5.Lcd.drawCenterString(message,
+                M5.Lcd.width() / 2, 
+                M5.Lcd.height() / 2 - (M5.Lcd.fontHeight(M5.Lcd.getFont()) * M5.Lcd.getTextSizeY()) / 2);
+        }
+        else {
+            M5.Lcd.printf("%s\n", message);
+        }
         delay(100);
 #endif
     }
@@ -181,24 +202,11 @@ private:
 #ifdef DEBUG
         std::string debugMessage = "";
 #endif
-        // 入力        
+        // 入力
         for (auto& device : m_inputDevices) {
-            InputResult result = device->Update(m_parameters);
-            if (!result.success) {
+            bool success = device->Update(m_parameters, message);
+            if (!success) {
                 continue;
-            }
-            if (result.hasVolume) {
-                message.volume = result.message.volume;
-                char s[32];
-            }
-            if (result.hasNote) {
-                message.note = result.message.note;
-            }
-            if (result.hasBend) {
-                message.bend = result.message.bend;
-            }
-            if (result.hasKey) {
-                message.keyData = result.message.keyData;
             }
 #ifdef DEBUG
             if (!m_parameters.debugMessage.empty()) {
@@ -210,7 +218,7 @@ private:
         if (m_btnPressed) {
             message.volume = 0.2f;
             if (!m_btnWasPressed) {
-                m_parameters.waveTableIndex++;
+                m_parameters.SetWaveTableIndex(m_parameters.GetWaveTableIndex()+1);
             }
         }
         m_btnWasPressed = m_btnPressed;
@@ -229,6 +237,9 @@ private:
             if (m_parameters.beepTime > 0 && micros() < m_parameters.beepTime) {
                 message.volume = 0.2f;
                 message.note = m_parameters.beepNote;
+            }
+            else {
+                m_parameters.menuMessage = "";
             }
         }
 
@@ -257,7 +268,7 @@ private:
     static void UpdateTask(void *parameter) {
         System *pSystem = static_cast<System *>(parameter);
         TickType_t xLastWakeTime;
-        const TickType_t xFrequency = 8 / portTICK_PERIOD_MS; // 8ms
+        const TickType_t xFrequency = 5 / portTICK_PERIOD_MS; // 5ms
         while (1) {
             pSystem->Update();
             xTaskDelayUntil( &xLastWakeTime, xFrequency );
@@ -299,20 +310,22 @@ void loop() {
   //  delay(500);
   //}
   static int loopCount = 0;
+  M5.update();
 #ifdef HAS_DISPLAY
-  M5.Lcd.clear(TFT_BLACK);
-  M5.Lcd.setCursor(0, 0);
-  M5.Lcd.setTextSize(2);
+  canvas.clear(TFT_BLACK);
+  canvas.setCursor(0, 0);
+  canvas.setTextSize(2);
 #ifdef DEBUG
-  M5.Lcd.printf("PLAYING\n%s", sys.m_debugMessage.c_str());
+  canvas.printf("PLAYING\n%s", sys.m_debugMessage.c_str());
   delay(100);
+  canvas.pushSprite(0, 0);
   return;
 #else
-  M5.Lcd.printf("PLAYING\n%3.2f%%", sys.m_cpuLoad * 100.0f);
+  canvas.printf("PLAYING\n%3.2f%%\n", sys.m_cpuLoad * 100.0f);
+  canvas.printf("%s\n", sys.GetMenuMessage().c_str());
+  canvas.pushSprite(0, 0);
 #endif
-
 #endif
-  //M5.update();
   //if (M5.BtnA.isPressed()) {
 #ifdef BUTTON_PIN
   if (digitalRead(BUTTON_PIN) == LOW) {
@@ -326,5 +339,5 @@ void loop() {
     sys.m_btnPressed = false;
   }
 #endif
-  delay(500);
+  delay(50);
 }

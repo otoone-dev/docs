@@ -51,13 +51,12 @@ public:
     }
 
     //--------------
-    InputResult Update(Parameters& parameters) override {
-        InputResult result;
-        m_currentPressure += (GetPressure(m_address) - m_currentPressure) * 0.8f;
+    bool Update(Parameters& params, Message& message) override {
+        m_currentPressure += (GetPressure(m_address) - m_currentPressure) * params.breathDelay;
         float v = Clamp<float>((m_currentPressure - m_defaultPressure) / 400.0f, 0.0f, 1.0f);
-        result.SetVolume(v * v);
+        message.volume = v * v;
         if (m_readType == ReadType::BREATH_AND_BEND) {
-            m_currentBendPressure += (GetPressure(m_address + 1) - m_currentBendPressure) * 0.8f;
+            m_currentBendPressure += (GetPressure(m_address + 1) - m_currentBendPressure) * params.bendDelay;
             float b = Clamp<float>((m_currentBendPressure - m_defaultBendPressure) / 400.0f, 0.0f, v);
             float bendNoteShiftTarget = 0.0f;
             if (v > 0.0001f) {
@@ -69,14 +68,14 @@ public:
             else {
                 bendNoteShiftTarget = 0.0f;
             }
-            result.SetBend(bendNoteShiftTarget);
+            message.bend = bendNoteShiftTarget;
         }
 #ifdef DEBUG
         //char s[64];
         //sprintf(s, "%1.1f\n%1.1f\n%1.1fB\n%1.1fB\n%1.1f", m_currentPressure, m_defaultPressure, m_currentBendPressure, m_defaultBendPressure, v);
-        //parameters.debugMessage = s;
+        //params.debugMessage = s;
 #endif
-        return result;
+        return true;
     }
 private:
     TwoWire &m_wire;

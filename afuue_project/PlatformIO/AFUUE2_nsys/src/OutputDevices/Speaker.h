@@ -77,9 +77,9 @@ public:
     }
 
     //--------------
-    OutputResult Update(Parameters& parameters, Message& msg) override {
-        tickCount = CalcFrequency(parameters.fineTune, msg.note + msg.bend) / parameters.samplingRate;
-        volume = msg.volume;
+    OutputResult Update(Parameters& parameters, Message& message) override {
+        tickCount = CalcFrequency(parameters.fineTune, message.note) / parameters.samplingRate;
+        volume = message.volume;
 
         for (auto& processor : m_soundProcessors) {
             processor->UpdateParameter(parameters, volume);

@@ -54,18 +54,7 @@ public:
         return result;
     }
 
-    //--------------
-    InputResult Update(Parameters& parameters) override {
-        InputResult result;
-        uint16_t keyData = GetKeyData();
-        result.SetKeyData(keyData);
-        result.SetNote(GetNote(parameters, keyData));
-        return result;
-    }
-
-private:
-    TwoWire &m_wire;
-
+protected:
     //--------------
     uint16_t GetKeyData() {
         m_wire.beginTransmission(MCP23017_ADDR);
@@ -83,4 +72,7 @@ private:
         uint16_t d = (gpiob << 8) | gpioa;
         return ~d; // push で LOW(0) なので反転
     }
+
+private:
+    TwoWire &m_wire;
 };

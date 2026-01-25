@@ -6,7 +6,11 @@
 class LowPassFilter : public SoundProcessorBase {
 public:
     //--------------
-    void Initialize(const Parameters& params) override {}
+    LowPassFilter()
+    {}
+    //--------------
+    void Initialize(const Parameters& params) override {
+    }
 
     //--------------
     // 波形更新（高速呼び出しされる）
@@ -19,10 +23,10 @@ public:
     //--------------
     // パラメータ更新（低速呼び出しされる)
     void UpdateParameter(const Parameters& params, float volume) override {
-        if (m_lp_valueQ > 0.0f) {
-            float idQ = 1.0f / (2.0f * (m_lp_valueQ));// + 1.0f * growlRate));
+        if (params.info.lowPassQ > 0.0f) {
+            float idQ = 1.0f / (2.0f * (params.info.lowPassQ));// + 1.0f * growlRate));
 
-            float a = (tanh(m_lp_valueR * (volume - m_lp_valueP)) + 1.0f) * 0.5f;
+            float a = (tanh(params.info.lowPassR * (volume - params.info.lowPassP)) + 1.0f) * 0.5f;
             float lp = 100.0f + 20000.0f * a;
             if (lp > 12000.0f) {
                 lp = 12000.0f;
@@ -43,9 +47,6 @@ public:
     }
 
 private:
-    float m_lp_valueP = 0.5f;
-    float m_lp_valueQ = 0.8f;
-    float m_lp_valueR = 5.0f;
     float m_lp_value = 0.0f;
 
     float m_lp_in1 = 0.0f;

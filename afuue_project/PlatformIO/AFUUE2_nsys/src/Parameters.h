@@ -1,4 +1,5 @@
 #pragma once
+#include "WaveTable.h"
 #include <string>
 
 #define CORE0 (0)
@@ -41,18 +42,45 @@
 #endif // HW_AFUUE2R_GEN2
 #endif // HW_AFUUE2R
 
-struct Parameters {
+//-------------
+class Parameters {
+public:
+    Parameters()
+        : info()
+    {}
+
+    const float samplingRate = 44077.135f;
     uint64_t beepTime = 0;
     float beepNote = 48.0f;
+    std::string menuMessage = "";
+
     float fineTune = 440.0f;
-    float samplingRate = 44077.135f;
     float baseNote = 48.0f;
-    int waveTableIndex = 0;
+    float delayAmount = 0.15f;
+    float delayTime = 0.3f;
+    float breathDelay = 0.8f;
+    float bendDelay = 0.5f;
+    uint64_t keyDelay = 20*1000; // microseconds
+    WaveInfo info;
 #ifdef DEBUG
     std::string debugMessage = "";
 #endif
+    int GetWaveTableIndex() const {
+        return waveTableIndex;
+    }
+    void SetWaveTableIndex(int index) {
+        waveTableIndex = index;
+        int i = index % waveInfos.size();
+        info = waveInfos[i];
+    }
+    int GetWaveTableCount() const {
+        return waveInfos.size();
+    }
+private:
+    int waveTableIndex = 0;
 };
 
+//-------------
 struct Message {
     float volume;
     float note;
@@ -60,6 +88,7 @@ struct Message {
     uint16_t keyData;
 };
 
+//-------------
 template<typename T>
 T Clamp(T v, T min, T max) {
     if (v < min) {
@@ -69,4 +98,27 @@ T Clamp(T v, T min, T max) {
         return max;
     }
     return v;
+}
+
+//-------------
+template<typename T>
+T Wrap(T v, T min, T max) {
+    if (max <= min) {
+        return min;
+    }
+    T c = v;
+    T range = max - min;
+    while (c < min) {
+        c += range;
+    }
+    while (c >= max) {
+        c -= range;
+    }
+    return c;
+}
+
+//-------------
+float Step(float f, float step) {
+    int32_t i = static_cast<int32_t>(f / step);
+    return i * step;
 }

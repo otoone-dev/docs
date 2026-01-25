@@ -128,6 +128,7 @@ public:
     }
 };
 
+/*
 struct InputResult {
     bool success = true;
     bool hasVolume = false;
@@ -159,10 +160,11 @@ struct InputResult {
         message.keyData = data;
     }
 };
+*/
 
 class InputDeviceBase : public DeviceBase {
 public:
     InputDeviceBase() = default;
     virtual ~InputDeviceBase() = default;
-    virtual InputResult Update(Parameters& parameters) = 0;
+    virtual bool Update(Parameters& parameters, Message& message) = 0;
 };

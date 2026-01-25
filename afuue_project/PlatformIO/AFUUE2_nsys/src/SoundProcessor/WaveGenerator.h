@@ -4,18 +4,15 @@
 class WaveGenerator : public SoundProcessorBase {
 public:
     //--------------
-    WaveGenerator(const std::vector<const float*>& waveTable) 
-        : m_phase(0.0f)
-        , m_waveTableIndex(0)
-        , m_waveTable(waveTable)
-        , m_pWaveTable(nullptr) {
-    }
+    WaveGenerator() 
+        : m_waveIndex(0)
+        , m_phase(0.0f) {}
 
     //--------------
     void Initialize(const Parameters& params) override {
         // Preferences からデータ復帰したり？
-        m_waveTableIndex = params.waveTableIndex;
-        m_pWaveTable = m_waveTable[m_waveTableIndex % m_waveTable.size()];
+        m_waveIndex = params.GetWaveTableIndex();
+        m_pWaveTable = params.info.pWave;
     }
 
     //--------------
@@ -30,14 +27,14 @@ public:
     //--------------
     // パラメータ更新（低速呼び出しされる)
     void UpdateParameter(const Parameters& params, float volume) override {
-        if (m_waveTableIndex != params.waveTableIndex) {
-            m_waveTableIndex = params.waveTableIndex;
-            m_pWaveTable = m_waveTable[m_waveTableIndex % m_waveTable.size()];
+        int i = params.GetWaveTableIndex() % params.GetWaveTableCount();
+        if (m_waveIndex != i) {
+            m_waveIndex = i;
+            m_pWaveTable = params.info.pWave;
         }
     }
 private:
+    int m_waveIndex;
     float m_phase;
-    int m_waveTableIndex;
-    const std::vector<const float*> m_waveTable;
     const float* m_pWaveTable;
 };

@@ -10,7 +10,7 @@ public:
 
     //--------------
     const char* GetName() const override {
-        return "DigitalKey";
+        return "KeySwitches";
     }
 
     //--------------
@@ -23,18 +23,9 @@ public:
         return result;
     }
 
+protected:
     //--------------
-    InputResult Update(Parameters& parameters) override {
-        InputResult result;
-        uint16_t keyData = GetKeyData();
-        result.SetKeyData(keyData);
-        result.SetNote(GetNote(parameters, keyData));
-        return result;
-    }
-
-private:
-    //--------------
-    uint16_t GetKeyData() {
+    uint16_t GetKeyData() override {
         bool keyLowC = digitalRead(1);
         bool keyEb = digitalRead(2);
         bool keyD = digitalRead(3);
