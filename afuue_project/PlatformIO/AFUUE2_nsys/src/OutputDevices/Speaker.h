@@ -3,8 +3,7 @@
 #include <driver/ledc.h>
 #include <soc/ledc_struct.h>
 #include <SoundProcessor/SoundProcessorBase.h>
-#include <OutputDevices/OutputDeviceBase.h>
-#include <Parameters.h>
+#include "OutputDeviceBase.h"
 
 //---------------------------------
 /*

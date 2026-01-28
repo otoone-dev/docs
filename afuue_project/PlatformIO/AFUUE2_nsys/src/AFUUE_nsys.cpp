@@ -14,6 +14,7 @@
 #include "OutputDevices/OutputDeviceBase.h"
 #include "OutputDevices/Speaker.h"
 #include "OutputDevices/LED.h"
+#include "OutputDevices/USB_MIDI.h"
 
 #include "Menu/MenuForKey.h"
 
@@ -30,9 +31,6 @@ M5Canvas canvas(&M5.Display);
 #define I2C_FREQ (400000)
 
 //-----------
-#include <USB.h>
-#include <USBMIDI.h>
-USBMIDI MIDI("AFUUE2R");
  
 //---------------------
 class System {
@@ -72,19 +70,6 @@ public:
         ClearDisplay(1);
 
         Serial.begin(115200);
-        MIDI.begin();
-        USB.begin();
-        delay(1000);
-        if (tud_mounted()) {
-            Display("USB MIDI");
-            SetLED(0, 100, 0);
-            delay(200);
-            SetLED(0, 0, 0);
-            delay(200);
-        }
-        else {
-            Display("PLAY MODE");
-        }
         btStop();
         WiFi.mode(WIFI_OFF); 
 
@@ -101,10 +86,12 @@ public:
         m_soundProcessors.push_back(new LowPassFilter());
         m_soundProcessors.push_back(new Delay(8000));
 
-        m_outputDevices.push_back(new Speaker(PWMPIN_LOW, PWMPIN_HIGH, m_soundProcessors));
 #ifdef LED_PIN
         m_outputDevices.push_back(new LED(LED_PIN));
 #endif
+        m_outputDevices.push_back(new USB_MIDI());
+        m_outputDevices.push_back(new Speaker(PWMPIN_LOW, PWMPIN_HIGH, m_soundProcessors));
+
         m_menus.push_back(new MenuForKey());
 
         m_parameters.SetWaveTableIndex(0);
@@ -117,6 +104,9 @@ public:
             if (!result.success) {
                 errorMessage += result.errorMessage + "\n";
             }
+            if (result.skipAfter) {
+                break;
+            }
         }
         //  Sound Processors
         for (auto& processor : m_soundProcessors) {
@@ -128,6 +118,9 @@ public:
             auto result = device->Initialize();
             if (!result.success) {
                 errorMessage += result.errorMessage + "\n";
+            }
+            if (result.skipAfter) {
+                break;
             }
         }
         // Menus
@@ -280,25 +273,6 @@ System sys;
 //---------------------
 void setup() {
   sys.initialize();
-}
-
-//---------------------
-static int prev_note = 0;
-void noteOn(uint8_t note, uint8_t vol) {
-  uint8_t channelNo = 0;
-  //midiEventPacket_t packet = {0x90 + channelNo, 0x90 + channelNo, note, vol};
-  //MIDI.writePacket(&packet);
-  MIDI.noteOn(note, vol);
-  midiEventPacket_t packet2 = {(uint8_t)(0xB0 + channelNo), (uint8_t)(0xB0 + channelNo), (uint8_t)0x02, vol};
-  MIDI.writePacket(&packet2);
-  prev_note = note;
-}
-
-void noteOff() {
-  int channelNo = 0;
-  //midiEventPacket_t packet = {0x80 + channelNo, 0x80 + channelNo, prev_note, 0};
-  //MIDI.writePacket(&packet);
-  MIDI.noteOff(prev_note, 0);
 }
 
 //---------------------

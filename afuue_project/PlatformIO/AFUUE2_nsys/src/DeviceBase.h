@@ -3,6 +3,7 @@
 
 struct InitializeResult {
     bool success = true;
+    bool skipAfter = false;
     std::string errorMessage = "";
 };
 

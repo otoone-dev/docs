@@ -10,12 +10,11 @@
 #define MCP23017_GPIOA (0x12)
 #define MCP23017_GPIOB (0x13)
 
-class KeyMCP23017 : public Key {
+class KeyMCP23017 : public KeyInputBase {
 public:
     //--------------
     KeyMCP23017(TwoWire &wire)
-     : Key()
-     , m_wire(wire) {}
+     : m_wire(wire) {}
 
     //--------------
     const char* GetName() const override {

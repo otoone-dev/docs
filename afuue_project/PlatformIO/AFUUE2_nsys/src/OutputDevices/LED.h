@@ -17,7 +17,7 @@ public:
     }
 
     OutputResult Update(Parameters& parameters, Message& msg) override {
-        ledcWrite(m_ledPin, (int)(1 + msg.volume * 250.0f));
+        ledcWrite(m_ledPin, (int)(1 + (msg.volume * msg.volume) * 250.0f));
         return OutputResult{ false, 0.0f };
     }
 private:

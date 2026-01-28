@@ -2,12 +2,8 @@
 #include <Wire.h>
 #include "Key.h"
 
-class KeyDigitalAFUUE2R : public Key {
+class KeyDigitalAFUUE2R : public KeyInputBase {
 public:
-    //--------------
-    KeyDigitalAFUUE2R()
-     : Key() {}
-
     //--------------
     const char* GetName() const override {
         return "KeySwitches";

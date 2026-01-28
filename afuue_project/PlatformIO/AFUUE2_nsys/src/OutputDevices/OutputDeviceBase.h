@@ -1,5 +1,6 @@
 #pragma once
 #include <DeviceBase.h>
+#include <Parameters.h>
 
 struct OutputResult {
     bool hasCpuLoad = false;
