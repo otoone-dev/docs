@@ -26,7 +26,7 @@ public:
 
     //--------------
     // パラメータ更新（低速呼び出しされる)
-    void UpdateParameter(const Parameters& params, float volume) override {
+    void UpdateParameter(const Parameters& params, Message& message) override {
         int i = params.GetWaveTableIndex() % params.GetWaveTableCount();
         if (m_waveIndex != i) {
             m_waveIndex = i;

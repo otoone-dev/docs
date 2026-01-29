@@ -44,11 +44,14 @@ void IRAM_ATTR OnTimer() {
 //---------------------------------
 class Speaker : public OutputDeviceBase {
 public:
+    float m_deltaTime;
+
     Speaker(gpio_num_t low, gpio_num_t high, std::vector<SoundProcessorBase*>& soundProcessors)
-    : m_lowPin(low)
+    : m_deltaTime(0.0f)
+    , m_soundProcessors(soundProcessors)
+    , m_lowPin(low)
     , m_highPin(high)
-    , m_soundProcessors(soundProcessors) {
-    }
+    {}
 
     //--------------
     const char* GetName() const override {
@@ -77,20 +80,17 @@ public:
 
     //--------------
     OutputResult Update(Parameters& parameters, Message& message) override {
-        tickCount = CalcFrequency(parameters.fineTune, message.note) / parameters.samplingRate;
         volume = message.volume;
+        m_deltaTime = 1.0f / parameters.samplingRate;
 
         for (auto& processor : m_soundProcessors) {
-            processor->UpdateParameter(parameters, volume);
+            processor->UpdateParameter(parameters, message);
         }
 
-        float load = cpuLoad / 1000000.0f;
-        return OutputResult{ true, load / (1.0f / parameters.samplingRate) };
-    }
+        tickCount = CalcFrequency(parameters.fineTune, message.note) / parameters.samplingRate;
 
-    //--------------
-    static float CalcFrequency(float fine, float note) {
-        return fine * pow(2, (note - (69.0f-12.0f))/12.0f);
+        float load = cpuLoad / 1000000.0f;
+        return OutputResult{ true, load / m_deltaTime };
     }
 
     //--------------
@@ -102,10 +102,11 @@ public:
 
         float fmid = 30000.0f;
         const int32_t umid = 32768;
-        SoundInfo info(60.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+        SoundInfo info(60.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
         while (1) {
             int createCount = 0;
-            uint64_t t0 = micros();
+            info.deltaTime = pSystem->m_deltaTime;
+            uint64_t t = micros();
             while (1) {
                 int d = (waveOutBufferWritePos > waveOutBufferReadPos)
                 ? waveOutBufferWritePos - waveOutBufferReadPos
@@ -113,7 +114,6 @@ public:
                 if (d > WAVEOUT_BUFFERING_SIZE) {
                     break;
                 }
-
                 info.tickCount = tickCount;
                 info.volume = volume;
                 for (auto& processor : pSystem->m_soundProcessors) {
@@ -126,8 +126,9 @@ public:
                 waveOutBufferWritePos = (waveOutBufferWritePos + 1) % WAVEOUT_BUFFERMAX;
                 createCount++;
             }
+            
             if (createCount > 0) {
-                cpuLoad = (micros() - t0) / createCount;
+                cpuLoad = (micros() - t) / createCount;
             }
             xTaskDelayUntil( &xLastWakeTime, xFrequency );
         }

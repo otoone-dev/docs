@@ -76,7 +76,7 @@ public:
                 params.SetWaveTableIndex(params.GetWaveTableIndex() + 1);
             }
             m_waveIndexNum1 = m_waveIndexNum10 = -1;
-            params.menuMessage = "Wave:\n  " + params.info.name;
+            params.menuMessage = params.info.name;
             SetBeep(params, params.baseNote, 500);
             keys.clicked = 0;   //後段のメニューにキーを渡さない
             return;

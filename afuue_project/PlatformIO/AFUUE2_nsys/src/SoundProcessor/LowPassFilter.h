@@ -22,11 +22,11 @@ public:
 
     //--------------
     // パラメータ更新（低速呼び出しされる)
-    void UpdateParameter(const Parameters& params, float volume) override {
+    void UpdateParameter(const Parameters& params, Message& message) override {
         if (params.info.lowPassQ > 0.0f) {
             float idQ = 1.0f / (2.0f * (params.info.lowPassQ));// + 1.0f * growlRate));
 
-            float a = (tanh(params.info.lowPassR * (volume - params.info.lowPassP)) + 1.0f) * 0.5f;
+            float a = (tanh(params.info.lowPassR * (message.volume - params.info.lowPassP)) + 1.0f) * 0.5f;
             float lp = 100.0f + 20000.0f * a;
             if (lp > 12000.0f) {
                 lp = 12000.0f;
@@ -34,8 +34,8 @@ public:
             m_lp_value += (lp - m_lp_value) * 0.8f;
 
             float omega = m_lp_value / params.samplingRate;
-            float alpha = InteropL(sinTable, 1024, omega) * idQ;
-            float cosv = InteropL(sinTable, 1024, omega + 0.25f);
+            float alpha = TableSine(omega) * idQ;
+            float cosv = TableSine(omega + 0.25f);
             float one_minus_cosv = 1.0f - cosv;
             m_lp_a0 =  1.0f + alpha;
             m_lp_a1 = -2.0f * cosv;

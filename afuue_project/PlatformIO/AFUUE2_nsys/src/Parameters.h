@@ -1,6 +1,7 @@
 #pragma once
 #include "WaveTable.h"
 #include <string>
+#include <cmath>
 
 #define CORE0 (0)
 #define CORE1 (1)
@@ -122,3 +123,9 @@ float Step(float f, float step) {
     int32_t i = static_cast<int32_t>(f / step);
     return i * step;
 }
+
+//--------------
+float CalcFrequency(float fine, float note) {
+    return fine * pow(2, (note - (69.0f-12.0f))/12.0f);
+}
+

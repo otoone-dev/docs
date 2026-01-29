@@ -8,6 +8,7 @@
 #include "InputDevices/Key.h"
 
 #include "SoundProcessor/WaveGenerator.h"
+#include "SoundProcessor/LFO.h"
 #include "SoundProcessor/LowPassFilter.h"
 #include "SoundProcessor/Delay.h"
 
@@ -82,6 +83,7 @@ public:
         m_inputDevices.push_back(new KeyMCP23017(Wire));
         //m_inputDevices.push_back(new KeyDigitalAFUUE2R());
 
+        m_soundProcessors.push_back(new LFO());
         m_soundProcessors.push_back(new WaveGenerator());
         m_soundProcessors.push_back(new LowPassFilter());
         m_soundProcessors.push_back(new Delay(8000));
@@ -138,7 +140,9 @@ public:
 
         xTaskCreatePinnedToCore(UpdateTask, "UpdateTask", 4096, this, 1, NULL, CORE1);
 
-        Display("READY");
+#ifdef HAS_DISPLAY
+        M5.Lcd.setBrightness(127);
+#endif
     }
     //--------------
 #if defined(NEOPIXEL_PIN)
@@ -296,7 +300,7 @@ void loop() {
   return;
 #else
   canvas.printf("PLAYING\n%3.2f%%\n", sys.m_cpuLoad * 100.0f);
-  canvas.printf("%s\n", sys.GetMenuMessage().c_str());
+  canvas.printf("\n%s", sys.GetMenuMessage().c_str());
   canvas.pushSprite(0, 0);
 #endif
 #endif

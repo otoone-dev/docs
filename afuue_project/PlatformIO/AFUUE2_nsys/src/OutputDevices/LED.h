@@ -11,7 +11,7 @@ public:
     InitializeResult Initialize() override {
         InitializeResult result;
         pinMode(m_ledPin, OUTPUT);
-        ledcAttach(m_ledPin, 156250, 8); // PWM 156,250Hz, 8Bit(256段階)
+        ledcAttachChannel(m_ledPin, 156250, 8, LEDC_CHANNEL_3); // PWM 156,250Hz, 8Bit(256段階)
         ledcWrite(m_ledPin, 0);
         return result;
     }
