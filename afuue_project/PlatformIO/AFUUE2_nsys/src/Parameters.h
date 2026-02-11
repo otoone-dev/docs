@@ -1,5 +1,6 @@
 #pragma once
 #include "WaveTable.h"
+#include <Arduino.h>
 #include <string>
 #include <cmath>
 
@@ -51,9 +52,10 @@ public:
     {}
 
     const float samplingRate = 44077.135f;
-    uint64_t beepTime = 0;
     float beepNote = 48.0f;
-    std::string menuMessage = "";
+    uint64_t beepTime = 0;
+    uint64_t dispTime = 0;
+    std::string dispMessage = "";
 
     float fineTune = 440.0f;
     float baseNote = 48.0f;
@@ -77,6 +79,14 @@ public:
     int GetWaveTableCount() const {
         return waveInfos.size();
     }
+    void SetBeep(float note, int32_t milliseconds) {
+        beepNote = note;
+        beepTime = micros() + milliseconds * 1000;
+    }
+    void SetDispMessage(const char* message, int32_t milliseconds) {
+        dispMessage = message;
+        dispTime = micros() + milliseconds * 1000;
+    }
 private:
     int waveTableIndex = 0;
 };
@@ -90,16 +100,7 @@ struct Message {
 };
 
 //-------------
-template<typename T>
-T Clamp(T v, T min, T max) {
-    if (v < min) {
-        return min;
-    }
-    else if (v > max) {
-        return max;
-    }
-    return v;
-}
+#define Clamp(v, min, max) ((v) <= (min) ? (min) : ((v) > (max) ? (max) : (v)))
 
 //-------------
 template<typename T>

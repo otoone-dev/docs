@@ -16,7 +16,8 @@ public:
     //--------------
     void Initialize(const Parameters& params) override {
         m_amount = params.delayAmount;
-        m_time = Clamp<int32_t>(static_cast<int32_t>(params.samplingRate * params.delayTime), 1, m_buffer.size());
+        int32_t t = static_cast<int32_t>(params.samplingRate * params.delayTime);
+        m_time = Clamp(t, 1, m_buffer.size());
     }
 
     //--------------

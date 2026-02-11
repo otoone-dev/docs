@@ -120,7 +120,8 @@ public:
                     processor->ProcessAudio(info);
                 }
 
-                int32_t i = Clamp<int32_t>(umid + static_cast<int32_t>(info.wave * fmid), 0, 65535);
+                int32_t mi = umid + static_cast<int32_t>(info.wave * fmid);
+                int32_t i = Clamp(mi, 0, 65535);
                 uint16_t w = static_cast<uint16_t>(i);
                 waveOutBuffer[waveOutBufferWritePos] = w;
                 waveOutBufferWritePos = (waveOutBufferWritePos + 1) % WAVEOUT_BUFFERMAX;

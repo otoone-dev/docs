@@ -70,7 +70,7 @@ public:
 
         ClearDisplay(1);
 
-        Serial.begin(115200);
+        //Serial.begin(115200);
         btStop();
         WiFi.mode(WIFI_OFF); 
 
@@ -137,7 +137,6 @@ public:
                 delay(1000);
             }
         }
-
         xTaskCreatePinnedToCore(UpdateTask, "UpdateTask", 4096, this, 1, NULL, CORE1);
 
 #ifdef HAS_DISPLAY
@@ -154,8 +153,8 @@ public:
 #endif
 
     //--------------
-    const std::string& GetMenuMessage() const {
-        return m_parameters.menuMessage;
+    const std::string& GetDispMessage() const {
+        return m_parameters.dispMessage;
     }
 
 private:
@@ -192,9 +191,10 @@ private:
         delay(100);
 #endif
     }
-
+public:
     //--------------
     void Update() {
+        uint64_t currentTime = micros();
         Message message;
 #ifdef DEBUG
         std::string debugMessage = "";
@@ -231,15 +231,17 @@ private:
                 }
 #endif
             }
-            if (m_parameters.beepTime > 0 && micros() < m_parameters.beepTime) {
+            if (m_parameters.beepTime > 0 && currentTime < m_parameters.beepTime) {
                 message.volume = 0.2f;
                 message.note = m_parameters.beepNote;
             }
+            if (m_parameters.dispTime > 0 && currentTime < m_parameters.dispTime) {
+                // 表示中
+            }
             else {
-                m_parameters.menuMessage = "";
+                m_parameters.dispMessage = "";
             }
         }
-
         // 出力
         for (auto& device : m_outputDevices) {
             OutputResult result = device->Update(m_parameters, message);
@@ -281,12 +283,6 @@ void setup() {
 
 //---------------------
 void loop() {
-  //midiEventPacket_t midi_packet_in = {0, 0, 0, 0};
-
-  //if (MIDI.readPacket(&midi_packet_in)) {
-  //  setLed(CRGB(0, 0, 100));
-  //  delay(500);
-  //}
   static int loopCount = 0;
   M5.update();
 #ifdef HAS_DISPLAY
@@ -300,18 +296,14 @@ void loop() {
   return;
 #else
   canvas.printf("PLAYING\n%3.2f%%\n", sys.m_cpuLoad * 100.0f);
-  canvas.printf("\n%s", sys.GetMenuMessage().c_str());
+  canvas.printf("\n%s", sys.GetDispMessage().c_str());
   canvas.pushSprite(0, 0);
 #endif
 #endif
-  //if (M5.BtnA.isPressed()) {
+
 #ifdef BUTTON_PIN
   if (digitalRead(BUTTON_PIN) == LOW) {
     sys.m_btnPressed = true;
-    //noteOn(60, 127);
-    //setLed(CRGB(0, 100, 0));
-    //delay(500);
-    //noteOff();
   }
   else {
     sys.m_btnPressed = false;

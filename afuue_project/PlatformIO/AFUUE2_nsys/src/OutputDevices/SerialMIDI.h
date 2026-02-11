@@ -16,7 +16,7 @@ public:
 
 protected:
     //--------
-    void NoteOn(int32_t note, float vol) override {
+    void NoteOn(int32_t note, int32_t velocity) override {
     }
     //--------
     void NoteOff(int32_t note) override {

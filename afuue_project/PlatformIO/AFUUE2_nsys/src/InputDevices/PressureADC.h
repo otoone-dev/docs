@@ -72,11 +72,13 @@ public:
     //--------------
     bool Update(Parameters& params, Message& message) override {
         m_currentPressure += (GetPressure(PressureType::BREATH) - m_currentPressure) * params.breathDelay;
-        float v = Clamp<float>((m_currentPressure - m_defaultPressure) / 400.0f, 0.0f, 1.0f);
+        float p = (m_currentPressure - m_defaultPressure) / 400.0f;
+        float v = Clamp(p, 0.0f, 1.0f);
         message.volume = v * v;
         if (m_readType == ReadType::BREATH_AND_BEND) {
             m_currentBendPressure += (GetPressure(PressureType::BEND) - m_currentBendPressure) * params.bendDelay;
-            float b = Clamp<float>((m_currentBendPressure - m_defaultBendPressure) / 400.0f, 0.0f, v);
+            float pb = (m_currentBendPressure - m_defaultBendPressure) / 400.0f;
+            float b = Clamp(pb, 0.0f, v);
             float bendNoteShiftTarget = 0.0f;
             if (v > 0.0001f) {
                 bendNoteShiftTarget = -1.0f + ((v - b) / v) * 1.2f;

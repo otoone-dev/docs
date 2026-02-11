@@ -27,7 +27,8 @@ public:
         m_freq = params.info.lfoFreq;
         if (m_power > 0.0f) {
             float t = static_cast<int32_t>(micros() / 1000) / 1000.0f;
-            float n = Clamp<float>(message.note + m_power * TableSine(m_freq * 6.283f * t), 1.0f, 127.0f);
+            float nn = message.note + m_power * TableSine(m_freq * 6.283f * t);
+            float n = Clamp(nn, 1.0f, 127.0f);
             message.note = n;
         }
     }
