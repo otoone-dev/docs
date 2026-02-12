@@ -16,6 +16,7 @@
 #include "OutputDevices/Speaker.h"
 #include "OutputDevices/LED.h"
 #include "OutputDevices/USB_MIDI.h"
+#include "OutputDevices/SerialMIDI.h"
 
 #include "Menu/MenuForKey.h"
 
@@ -92,6 +93,7 @@ public:
         m_outputDevices.push_back(new LED(LED_PIN));
 #endif
         m_outputDevices.push_back(new USB_MIDI());
+        m_outputDevices.push_back(new SerialMIDI(MIDI_OUT_PIN));
         m_outputDevices.push_back(new Speaker(PWMPIN_LOW, PWMPIN_HIGH, m_soundProcessors));
 
         m_menus.push_back(new MenuForKey());

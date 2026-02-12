@@ -1,62 +1,32 @@
 #pragma once
-#include <Arduino.h>
 #include "MIDIBase.h"
 
 class SerialMIDI : public MIDIBase {
 public:
-    SerialMIDI(gpio_num_t outPin) : m_outPin(outPin) {}
+    SerialMIDI(gpio_num_t outPin, gpio_num_t inPin = (gpio_num_t)-1)
+     : m_outPin(outPin)
+     , m_inPin(inPin)
+    {}
 
     const char* GetName() const override { return "MIDIout"; }
 
     InitializeResult Initialize() override {
         InitializeResult result;
-        pinMode(m_outPin, OUTPUT);
+        Serial2.begin(31250, SERIAL_8N1, m_outPin, m_inPin);
         return result;
     }
 
-protected:
-    //--------
-    void NoteOn(int32_t note, int32_t velocity) override {
+    OutputResult Update(Parameters& params, Message& msg) override {
+        MidiUpdate(params, msg);
+        return OutputResult{ false, 0.0f };
     }
-    //--------
-    void NoteOff(int32_t note) override {
-    }
-    //--------
-    void PicthBendControl(float bend) override {
-        //uint16_t value = static_cast<uint16_t>(static_cast<int32_t>(bend * 0x7FFF) + 0x8000) >> 2; // 14bit
-        //uint8_t d0 = static_cast<uint8_t>(value & 0x7F);
-        //uint8_t d1 = static_cast<uint8_t>((value >> 7) & 0x7F);
-        //SendMessage3(0xE0, d0, d1);
-    }
-    //--------
-    void BreathControl(float vol) override {
-        //SendMessage3(0xB0, 0x02, vol); // 0x02 : Breath Control
-        /*
-        midiPacket[1] = 0xD0 + channelNo; // AFTER TOUCH
-        midiPacket[2] = vol;
 
-        midiPacket[1] = 0x0B; // expression
-            if (midiMode == MIDIMODE::BREATHCONTROL) {
-                midiPacket[1] = 0x02; // breath control
-            }
-            else if (midiMode == MIDIMODE::MAINVOLUME) {
-                midiPacket[1] = 0x07; // main volume
-            }
-            else if (midiMode == MIDIMODE::CUTOFF) {
-                midiPacket[1] = 43; // CUTOFF (for KORG NTS-1)
-            }
-        */
-    }
-    //--------
-    void ProgramChange(int32_t pgNum) override {
-    }
-    //--------
-    void ChangeBreathControlMode() override {
-    }
-    //--------
-    void ActiveNotify() override {
+protected:
+    void SendData(const uint8_t* buff, size_t size) override {
+        Serial2.write(buff, size);
     }
 
 private:
     gpio_num_t m_outPin;
+    gpio_num_t m_inPin;
 };
