@@ -10,7 +10,7 @@ public:
     }
 
     //--------------
-    InitializeResult Initialize() override {
+    InitializeResult Initialize(Parameters& params) override {
         InitializeResult result;
         const int keyPortList[14] = { 0, 1, 2, 3, 4, 5, 6, 7, 8 ,9, 10, 44, 46 };
         for (int i = 0; i < 14; i++) {

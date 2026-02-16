@@ -8,7 +8,7 @@ public:
 
     const char* GetName() const override { return "LED"; }
 
-    InitializeResult Initialize() override {
+    InitializeResult Initialize(Parameters& params) override {
         InitializeResult result;
         pinMode(m_ledPin, OUTPUT);
         ledcAttachChannel(m_ledPin, 156250, 8, LEDC_CHANNEL_3); // PWM 156,250Hz, 8Bit(256段階)

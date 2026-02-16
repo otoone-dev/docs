@@ -1,7 +1,6 @@
 #pragma once
 
 #include "MenuBase.h"
-#include "Parameters.h"
 
 class MenuForKey : public MenuBase {
 public:
@@ -14,7 +13,7 @@ public:
     }
 
     //--------------
-    InitializeResult Initialize() override {
+    InitializeResult Initialize(Parameters& params) override {
         return InitializeResult();
     }
     

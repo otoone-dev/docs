@@ -12,7 +12,7 @@ public:
 
     const char* GetName() const override { return "USB-MIDI"; }
 
-    InitializeResult Initialize() override {
+    InitializeResult Initialize(Parameters& params) override {
         InitializeResult result;
         USB.begin();
         MIDI.begin();
@@ -20,6 +20,7 @@ public:
         m_mounted = tud_mounted();
         if (m_mounted) {
             m_initialized = true;
+            params.playMode = PlayMode::USBMIDI_Normal;
             result.skipAfter = true; // 後続の SerialMIDI と Speaker を起動しない
         }
         return result;
@@ -41,7 +42,7 @@ public:
             }
 
             MidiUpdate(params, msg);
-            
+
             msg.volume = 0.0f; // 後続のスピーカーに渡さない
         }
         else {

@@ -51,10 +51,10 @@ public:
 
     //--------------
     void initialize() {
-        SetLED(100, 0, 0);
-        delay(200);
-        SetLED(1, 0, 0);
-        delay(200);
+        SetLED(0, 0, 100);
+        delay(100);
+        SetLED(0, 0, 1);
+        delay(100);
 #ifdef HAS_DISPLAY
         auto cfg = M5.config();
         M5.begin(cfg);
@@ -64,9 +64,9 @@ public:
         Display("AFUUE2R", TFT_WHITE, true);
         delay(500);
 
-        SetLED(200, 0, 0);
-        delay(200);
-        SetLED(1, 0, 0);
+        SetLED(0, 0, 100);
+        delay(100);
+        SetLED(0, 0, 1);
         delay(500);
 
         ClearDisplay(1);
@@ -93,7 +93,7 @@ public:
         m_outputDevices.push_back(new LED(LED_PIN));
 #endif
         m_outputDevices.push_back(new USB_MIDI());
-        m_outputDevices.push_back(new SerialMIDI(MIDI_OUT_PIN));
+        m_outputDevices.push_back(new SerialMIDI(MIDI_OUT_PIN, MIDI_IN_PIN));
         m_outputDevices.push_back(new Speaker(PWMPIN_LOW, PWMPIN_HIGH, m_soundProcessors));
 
         m_menus.push_back(new MenuForKey());
@@ -104,7 +104,7 @@ public:
         // Input Devices
         for (auto& device : m_inputDevices) {
             Display(device->GetName());
-            auto result = device->Initialize();
+            auto result = device->Initialize(m_parameters);
             if (!result.success) {
                 errorMessage += result.errorMessage + "\n";
             }
@@ -119,7 +119,7 @@ public:
         // Output Devices
         for (auto& device : m_outputDevices) {
             Display(device->GetName());
-            auto result = device->Initialize();
+            auto result = device->Initialize(m_parameters);
             if (!result.success) {
                 errorMessage += result.errorMessage + "\n";
             }
@@ -130,7 +130,7 @@ public:
         // Menus
         for (auto& menu : m_menus) {
             Display(menu->GetName());
-            menu->Initialize();
+            menu->Initialize(m_parameters);
         }
 
         if (errorMessage != "") {
@@ -148,7 +148,7 @@ public:
     //--------------
 #if defined(NEOPIXEL_PIN)
     void SetLED(uint8_t r, uint8_t g, uint8_t b) {
-        neopixelWrite((uint8_t)NEOPIXEL_PIN, r, g, b);
+        rgbLedWrite((uint8_t)NEOPIXEL_PIN, r, g, b);
     }
 #else
     void SetLED(uint8_t r, uint8_t g, uint8_t b) {}
@@ -166,7 +166,6 @@ private:
     std::vector<MenuBase*> m_menus;
     Parameters m_parameters;
     Keys m_keys;
-    int m_counter = 0;
     bool m_btnWasPressed = false;
 
     //--------------
@@ -214,10 +213,11 @@ public:
             }
 #endif
         }
+
         if (m_btnPressed) {
-            message.volume = 0.2f;
             if (!m_btnWasPressed) {
-                m_parameters.SetWaveTableIndex(m_parameters.GetWaveTableIndex()+1);
+                m_parameters.SetBeep(53.0f, 200);
+                m_parameters.NextPlayMode();
             }
         }
         m_btnWasPressed = m_btnPressed;
@@ -261,8 +261,15 @@ public:
 #ifdef DEBUG
         m_debugMessage = debugMessage;
 #endif
-        SetLED(0, 0, (m_counter < 60 ? m_counter : 120 - m_counter));
-        m_counter = (m_counter + 1) % 120;
+        if (m_parameters.IsBendEnabled()) {
+            // Bend mode
+            int32_t b = static_cast<int32_t>(message.bend * 20.0f);
+            SetLED(Clamp(20+b, 0, 255), 0, Clamp(-b, 0, 255));
+        }
+        else {
+            // Normal mode
+            SetLED(0, 20, 0);
+        }
     }
 
     //--------------

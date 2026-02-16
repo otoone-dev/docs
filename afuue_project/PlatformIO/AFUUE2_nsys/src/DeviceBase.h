@@ -1,4 +1,5 @@
 #pragma once
+#include <Parameters.h>
 #include <string>
 
 struct InitializeResult {
@@ -10,5 +11,5 @@ struct InitializeResult {
 class DeviceBase {
 public:
     virtual const char* GetName() const = 0;
-    virtual InitializeResult Initialize() = 0;
+    virtual InitializeResult Initialize(Parameters& params) = 0;
 };

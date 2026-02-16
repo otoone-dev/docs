@@ -29,7 +29,7 @@ public:
     }
 
     //--------------
-    InitializeResult Initialize() override {
+    InitializeResult Initialize(Parameters& params) override {
         InitializeResult result;
         delay(100);
         result = StartDevice(m_address); // BREATH
@@ -53,16 +53,16 @@ public:
     //--------------
     bool Update(Parameters& params, Message& message) override {
         m_currentPressure += (GetPressure(m_address) - m_currentPressure) * params.breathDelay;
-        float p = (m_currentPressure - m_defaultPressure) / 400.0f;
+        float p = (m_currentPressure - m_defaultPressure) * 0.003f;
         float v = Clamp(p, 0.0f, 1.0f);
         message.volume = v * v;
-        if (m_readType == ReadType::BREATH_AND_BEND) {
-            m_currentBendPressure += (GetPressure(m_address + 1) - m_currentBendPressure) * params.bendDelay;
-            float pb = (m_currentBendPressure - m_defaultBendPressure) / 400.0f;
-            float b = Clamp(pb, 0.0f, v);
+        if (m_readType == ReadType::BREATH_AND_BEND && params.IsBendEnabled()) {
+            m_currentBendPressure += (GetPressure(m_address + 1) - m_currentBendPressure) * params.breathDelay; //ブレスと同じでないとズレる
             float bendNoteShiftTarget = 0.0f;
-            if (v > 0.0001f) {
-                bendNoteShiftTarget = -1.0f + ((v - b) / v) * 1.2f;
+            if (v > 0.00001f) {
+                float pb = (m_currentBendPressure - m_defaultBendPressure)  * 0.003f;
+                float vb = Clamp(pb, 0.0f, 1.0f);            
+                bendNoteShiftTarget = -1.0f + ((v - vb) / v) * 1.2f;
                 if (bendNoteShiftTarget > 0.0f) {
                     bendNoteShiftTarget = 0.0f;
                 }
@@ -71,6 +71,9 @@ public:
                 bendNoteShiftTarget = 0.0f;
             }
             message.bend = bendNoteShiftTarget;
+        }
+        else {
+            message.bend = 0.0f;
         }
 #ifdef DEBUG
         //char s[64];

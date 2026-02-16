@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <string>
 
 const float waveAfuueCla[256] = {
     -0.08316f,-0.14099f,-0.19882f,-0.25040f,-0.28775f,-0.32510f,-0.34079f,-0.34265f,-0.34451f,-0.31738f,-0.28760f,-0.25647f,-0.22083f,-0.18515f,-0.15909f,-0.14169f,

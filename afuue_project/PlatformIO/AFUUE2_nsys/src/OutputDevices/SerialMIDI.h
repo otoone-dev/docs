@@ -3,21 +3,24 @@
 
 class SerialMIDI : public MIDIBase {
 public:
-    SerialMIDI(gpio_num_t outPin, gpio_num_t inPin = (gpio_num_t)-1)
+    SerialMIDI(gpio_num_t outPin, gpio_num_t inPin)
      : m_outPin(outPin)
      , m_inPin(inPin)
     {}
 
     const char* GetName() const override { return "MIDIout"; }
 
-    InitializeResult Initialize() override {
+    InitializeResult Initialize(Parameters& params) override {
         InitializeResult result;
-        Serial2.begin(31250, SERIAL_8N1, m_outPin, m_inPin);
+        Serial2.begin(31250, SERIAL_8N1, m_inPin, m_outPin);
         return result;
     }
 
     OutputResult Update(Parameters& params, Message& msg) override {
-        MidiUpdate(params, msg);
+        if (params.IsMidiEnabled()) {
+            MidiUpdate(params, msg);
+            msg.volume = 0.0f; // 後続のスピーカーに渡さない
+        }
         return OutputResult{ false, 0.0f };
     }
 

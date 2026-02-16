@@ -59,7 +59,7 @@ public:
     }
 
     //--------------
-    InitializeResult Initialize() override {
+    InitializeResult Initialize(Parameters& params) override {
         InitializeResult result;
         pinMode(m_lowPin, OUTPUT);
         pinMode(m_highPin, OUTPUT);
@@ -87,7 +87,7 @@ public:
             processor->UpdateParameter(parameters, message);
         }
 
-        tickCount = CalcFrequency(parameters.fineTune, message.note) / parameters.samplingRate;
+        tickCount = CalcFrequency(parameters.fineTune, message.note + message.bend) / parameters.samplingRate;
 
         float load = cpuLoad / 1000000.0f;
         return OutputResult{ true, load / m_deltaTime };

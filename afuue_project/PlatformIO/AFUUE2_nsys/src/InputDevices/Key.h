@@ -151,7 +151,7 @@ public:
         }
         if (t - m_lastChangeTime > params.keyDelay) { // ピロ音防止
             const Keys keys = Keys(m_lastKeyData);
-            m_targetNote = keys.GetNote(params.baseNote) + message.bend;
+            m_targetNote = keys.GetNote(params.baseNote);
             if (params.info.dropPos > 0.0f && message.volume < params.info.dropPos) { // 音量によるピッチダウン
                 m_targetNote -= (1.0f-(message.volume / params.info.dropPos)) * params.info.dropAmount;
             }

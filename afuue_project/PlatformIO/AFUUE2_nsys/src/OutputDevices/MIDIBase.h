@@ -43,31 +43,42 @@ protected:
                 m_prevNote = note;
                 NoteOn(note, 120);
                 BreathControl(msg.volume);
+                float b = 8192.0f + 8000.0f * msg.bend;
+                uint16_t bend = static_cast<uint16_t>(b);
+                PicthBendControl(bend);
             }
         }
         else {
             if (msg.volume < 0.01f) {
-                NoteOff(m_prevNote);
+                NoteOff(m_prevNote, 0);
             }
             else {
                 int32_t note = static_cast<int32_t>(msg.note);
                 if (note != m_prevNote) {
-                    NoteOff(m_prevNote);
-                    m_prevNote = note;
-                    NoteOn(note, 120);
+                    NoteOff(m_prevNote, 120);
+                    //int32_t i = m_sendCount % 2;
+                    //SendData(m_sendData[i].data(), m_sendData[i].size());
+                    //m_sendCount++;
+                    //m_sendData[m_sendCount%2].clear();
+
+                    //m_prevNote = note;
+                    //NoteOn(note, 120);
                 }
                 uint16_t breath = static_cast<uint16_t>(Clamp(msg.volume, 0.0f, 1.0f) * 16383.0f);
                 BreathControl(breath);
-                uint16_t bend = static_cast<uint16_t>(8192.0f + Clamp(msg.bend, -1.0f, 1.0f) * 8191.0f);
+                float b = 8192.0f + 8000.0f * msg.bend;
+                uint16_t bend = static_cast<uint16_t>(b);
                 PicthBendControl(bend);
             }
         }
-        int32_t i = m_sendCount % 2;
+        {
+            int32_t i = m_sendCount % 2;
 
-        if (m_sendData[i].size() > 0) {
-            SendData(m_sendData[i].data(), m_sendData[i].size());
-            m_sendCount++;
-            m_sendData[m_sendCount%2].clear();
+            if (m_sendData[i].size() > 0) {
+                SendData(m_sendData[i].data(), m_sendData[i].size());
+                m_sendCount++;
+                m_sendData[m_sendCount%2].clear();
+            }
         }
     }
 
@@ -96,9 +107,9 @@ protected:
         PushData(0x90 + m_channelNo, note, velocity);
     }
     //--------
-    void NoteOff(uint8_t note) {
+    void NoteOff(uint8_t note, uint8_t velocity) {
         m_playing = false;
-        PushData(0x80 + m_channelNo, note, 0);
+        PushData(0x80 + m_channelNo, note, velocity);
     }
     //--------
     void PicthBendControl(uint16_t bend) {
@@ -109,6 +120,7 @@ protected:
     //--------
     void BreathControl(uint16_t vol) {
         PushData(0xB0 + m_channelNo, 0x02, static_cast<uint8_t>((vol >> 7) & 0x7F));
+        PushData(0xB0 + m_channelNo, 0x22, static_cast<uint8_t>(vol & 0x7F));
     }
     //--------
     void ProgramChange(uint8_t pgNum) {

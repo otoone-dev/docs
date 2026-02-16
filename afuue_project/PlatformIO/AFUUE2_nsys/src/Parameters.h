@@ -19,7 +19,7 @@
 #define SOUND_TWOPWM
 #define PWMPIN_LOW (GPIO_NUM_5) // AFUUE2R Gen2
 #define PWMPIN_HIGH (GPIO_NUM_6)
-#define HAS_DISPLAY
+//#define HAS_DISPLAY
 #ifndef HAS_DISPLAY
 #define HAS_LED
 #define NEOPIXEL_PIN (GPIO_NUM_35)
@@ -45,6 +45,16 @@
 #endif // HW_AFUUE2R
 
 //-------------
+enum class PlayMode : uint8_t {
+    Normal,
+    Bend,
+    MIDI_Normal,
+    MIDI_Bend,
+    USBMIDI_Normal,
+    USBMIDI_Bend,
+};
+
+//-------------
 class Parameters {
 public:
     Parameters()
@@ -62,9 +72,9 @@ public:
     float delayAmount = 0.15f;
     float delayTime = 0.3f;
     float breathDelay = 0.8f;
-    float bendDelay = 0.5f;
     uint64_t keyDelay = 20*1000; // microseconds
     WaveInfo info;
+    PlayMode playMode = PlayMode::Normal;
 #ifdef DEBUG
     std::string debugMessage = "";
 #endif
@@ -87,6 +97,28 @@ public:
         dispMessage = message;
         dispTime = micros() + milliseconds * 1000;
     }
+    bool IsBendEnabled() const {
+        return playMode == PlayMode::Bend || playMode == PlayMode::MIDI_Bend || playMode == PlayMode::USBMIDI_Bend;
+    }
+    bool IsMidiEnabled() const {
+        return playMode == PlayMode::MIDI_Normal
+        || playMode == PlayMode::MIDI_Bend
+        || playMode == PlayMode::USBMIDI_Normal
+        || playMode == PlayMode::USBMIDI_Bend;
+    }
+    void NextPlayMode() {
+        if (static_cast<uint8_t>(playMode) <= static_cast<uint8_t>(PlayMode::MIDI_Bend)) {
+            playMode = static_cast<PlayMode>((static_cast<uint8_t>(playMode) + 1) % 4);
+        }
+        else {
+            if (playMode == PlayMode::USBMIDI_Bend) {
+                playMode = PlayMode::Normal;
+            }
+            else {
+                playMode = PlayMode::USBMIDI_Bend;
+            }
+        }
+    }
 private:
     int waveTableIndex = 0;
 };
@@ -100,7 +132,7 @@ struct Message {
 };
 
 //-------------
-#define Clamp(v, min, max) ((v) <= (min) ? (min) : ((v) > (max) ? (max) : (v)))
+#define Clamp(v, min, max) ((v) < (min) ? (min) : ((v) > (max) ? (max) : (v)))
 
 //-------------
 template<typename T>

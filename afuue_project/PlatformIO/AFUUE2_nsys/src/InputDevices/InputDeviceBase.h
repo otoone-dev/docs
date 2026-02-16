@@ -1,6 +1,5 @@
 #pragma once
 #include <DeviceBase.h>
-#include <Parameters.h>
 #include <functional>
 
 //-------------

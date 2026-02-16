@@ -22,7 +22,7 @@ public:
     }
 
     //--------------
-    InitializeResult Initialize() override {
+    InitializeResult Initialize(Parameters& params) override {
         InitializeResult result;
         m_wire.beginTransmission(MCP23017_ADDR);
         if (m_wire.endTransmission() != 0) {

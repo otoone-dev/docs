@@ -30,7 +30,7 @@ public:
     }
 
     //--------------
-    InitializeResult Initialize() override {
+    InitializeResult Initialize(Parameters& params) override {
         InitializeResult result;
 
         adc_oneshot_unit_init_cfg_t init_cfg = {
