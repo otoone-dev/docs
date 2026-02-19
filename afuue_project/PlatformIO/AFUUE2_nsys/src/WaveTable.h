@@ -205,7 +205,7 @@ struct WaveInfo {
 
 std::vector<WaveInfo> waveInfos = {
   { "SynthA",     waveSynthA2,     0.1f, 0.85f, 0.0f, 0.0f, 0.5f, 5.0f, 0.5f, 0.0f, 0.0f },
-  { "SynthB",     waveSynthB2,     0.3f, 0.85f, 0.0f, 0.0f, 0.6f, 5.0f, 0.8f, 0.2f, 0.7f },
+  { "SynthB",     waveSynthB2,     0.3f, 0.85f, 0.0f, 0.0f, 0.6f, 5.0f, 0.8f, 0.05f, 5.0f },
 //   name         waveTable       attack porta  dropP dropV  LP_P  LP_R  LP_Q  LFO LFOfreq
   { "A_Clarinet", waveAfuueCla,    0.2f, 0.85f, 0.0f, 0.0f, 0.5f, 5.0f, 0.6f, 0.0f, 0.0f },
   { "A_Recorder", waveAfuueCla,    0.2f, 0.8f, 0.8f, 0.6f, 0.5f, 5.0f, 0.8f, 0.0f, 0.0f },
@@ -213,7 +213,7 @@ std::vector<WaveInfo> waveInfos = {
   { "A_Flute",    waveAfuueFlute,  0.7f, 0.8f, 0.8f, 0.1f, 0.5f, 5.0f, 0.5f, 0.0f, 0.0f },
   { "A_Violin",   waveAfuueViolin, 0.5f, 0.7f, 0.0f, 0.0f, 0.5f, 5.0f, 0.3f, 0.0f, 0.0f },
 //   name         waveTable       attack porta  dropP dropV  LP_P  LP_R  LP_Q  LFO LFOfreq
-  { "P_Square",   wavePureSquare,  0.2f, 0.8f, 0.0f, 0.0f, 0.5f, 8.0f, 0.7f, 0.5f, 200.0f },
-  { "P_Saw",      wavePureSaw,     0.1f, 0.8f, 0.0f, 0.0f, 0.5f, 4.0f, 0.1f, 0.0f, 0.0f },
+  { "P_Square",   wavePureSquare,  0.2f, 0.8f, 0.0f, 0.0f, 0.5f, 8.0f, 0.7f, 0.0f, 0.0f },
+  { "P_Saw",      wavePureSaw,     0.1f, 0.8f, 0.0f, 0.0f, 0.5f, 4.0f, 0.1f, 0.2f, 50.0f },
   { "P_Triangle", wavePureTriangle, 0.5f, 0.1f, 0.0f, 0.0f, 0.5f, 6.0f, 2.0f, 0.0f, 0.0f },
 };

@@ -19,7 +19,7 @@
 #define SOUND_TWOPWM
 #define PWMPIN_LOW (GPIO_NUM_5) // AFUUE2R Gen2
 #define PWMPIN_HIGH (GPIO_NUM_6)
-//#define HAS_DISPLAY
+#define HAS_DISPLAY
 #ifndef HAS_DISPLAY
 #define HAS_LED
 #define NEOPIXEL_PIN (GPIO_NUM_35)
@@ -104,6 +104,10 @@ public:
         return playMode == PlayMode::MIDI_Normal
         || playMode == PlayMode::MIDI_Bend
         || playMode == PlayMode::USBMIDI_Normal
+        || playMode == PlayMode::USBMIDI_Bend;
+    }
+    bool IsUSBMIDIEnabled() const {
+        return playMode == PlayMode::USBMIDI_Normal
         || playMode == PlayMode::USBMIDI_Bend;
     }
     void NextPlayMode() {

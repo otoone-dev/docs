@@ -20,6 +20,8 @@
 
 #include "Menu/MenuForKey.h"
 
+#include "logo.h"
+
 #include <Arduino.h>
 #include <WiFi.h>
 #include <M5Unified.h>
@@ -27,6 +29,7 @@
 M5Canvas canvas(&M5.Display);
 #endif
 #include <vector>
+#include <string>
 
 //-----------
 #include <Wire.h>
@@ -142,7 +145,7 @@ public:
         xTaskCreatePinnedToCore(UpdateTask, "UpdateTask", 4096, this, 1, NULL, CORE1);
 
 #ifdef HAS_DISPLAY
-        M5.Lcd.setBrightness(127);
+        M5.Lcd.setBrightness(10);
 #endif
     }
     //--------------
@@ -158,6 +161,16 @@ public:
     const std::string& GetDispMessage() const {
         return m_parameters.dispMessage;
     }
+    //--------------
+    const std::string& GetWaveName() {
+        if (m_parameters.IsUSBMIDIEnabled()) {
+            char s[32];
+            sprintf(s, "No.%03d", m_parameters.GetWaveTableIndex()+1);
+            m_waveNoStr = s;
+            return m_waveNoStr;
+        }
+        return m_parameters.info.name;
+    }
 
 private:
     std::vector<InputDeviceBase*> m_inputDevices;
@@ -165,6 +178,7 @@ private:
     std::vector<SoundProcessorBase*> m_soundProcessors;
     std::vector<MenuBase*> m_menus;
     Parameters m_parameters;
+    std::string m_waveNoStr;
     Keys m_keys;
     bool m_btnWasPressed = false;
 
@@ -294,20 +308,38 @@ void setup() {
 void loop() {
   static int loopCount = 0;
   M5.update();
-#ifdef HAS_DISPLAY
+#if 0 //def HAS_DISPLAY
   canvas.clear(TFT_BLACK);
   canvas.setCursor(0, 0);
   canvas.setTextSize(2);
+#endif
 #ifdef DEBUG
   canvas.printf("PLAYING\n%s", sys.m_debugMessage.c_str());
   delay(100);
   canvas.pushSprite(0, 0);
   return;
 #else
-  canvas.printf("PLAYING\n%3.2f%%\n", sys.m_cpuLoad * 100.0f);
-  canvas.printf("\n%s", sys.GetDispMessage().c_str());
-  canvas.pushSprite(0, 0);
-#endif
+  static std::string name = "";
+  const std::string& currentName = sys.GetWaveName();
+  const std::string& dispMessage = sys.GetDispMessage();
+  if (name != currentName || !dispMessage.empty()) {
+    canvas.clear(TFT_BLACK);
+    canvas.setTextSize(2);
+    canvas.pushImage(-5, -10, 120, 105, bitmap_logo);
+    canvas.setCursor(0, 120 - 30);
+    if (!dispMessage.empty()) {
+        canvas.printf("\n%s", dispMessage.c_str());
+    }
+    else {
+        if (name != currentName) {
+            name = currentName;
+            canvas.printf("\n%s", name.c_str());
+        }
+    }
+    canvas.pushSprite(0, 0);
+  }
+  //canvas.printf("PLAYING\n%3.2f%%\n", sys.m_cpuLoad * 100.0f);
+  //canvas.printf("\n%s", sys.GetDispMessage().c_str());
 #endif
 
 #ifdef BUTTON_PIN
