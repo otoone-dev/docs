@@ -29,12 +29,8 @@ volatile uint32_t waveHigh = 0;
 volatile uint32_t waveLow = 0;
 //---------------------------------
 void IRAM_ATTR OnTimer() {
-#ifdef SOUND_TWOPWM
     ledcWriteChannel(LEDC_CHANNEL_1, waveLow);
     ledcWriteChannel(LEDC_CHANNEL_2, waveHigh);
-#else
-    //dacWrite(DACPIN, h);
-#endif
     uint32_t w = waveOutBuffer[waveOutBufferReadPos];
     waveLow = (w & 0xFF);// << 4;
     waveHigh = ((w >> 8) & 0xFF);// << 4;

@@ -20,12 +20,16 @@
 
 #include "Menu/MenuForKey.h"
 
-#include "logo.h"
+#ifdef HW_TONEGENERATOR
+#include "MidiDebug.h"
+#endif
 
 #include <Arduino.h>
 #include <WiFi.h>
 #include <M5Unified.h>
+
 #ifdef HAS_DISPLAY
+#include "logo.h"
 M5Canvas canvas(&M5.Display);
 #endif
 #include <vector>
@@ -73,8 +77,9 @@ public:
         delay(500);
 
         ClearDisplay(1);
-
-        //Serial.begin(115200);
+#ifdef HW_TONEGENERATOR
+        //DebugMIDIMessage(); // MIDI受信テスト
+#endif
         btStop();
         WiFi.mode(WIFI_OFF); 
 
@@ -82,9 +87,13 @@ public:
         Wire.begin(I2CPIN_SDA, I2CPIN_SCL, I2C_FREQ);
 #endif
         // 登録順が重要
+#ifdef HAS_LPS33
         m_inputDevices.push_back(new PressureLPS33(Wire, PressureLPS33::ReadType::BREATH_AND_BEND));
-        //m_inputDevices.push_back(new PressureADC(ADCPIN_BREATH, ADCPIN_BEND, PressureADC::ReadType::BREATH_AND_BEND));
+#endif
+#ifdef HAS_MCP23017
         m_inputDevices.push_back(new KeyMCP23017(Wire));
+#endif
+        //m_inputDevices.push_back(new PressureADC(ADCPIN_BREATH, ADCPIN_BEND, PressureADC::ReadType::BREATH_AND_BEND));
         //m_inputDevices.push_back(new KeyDigitalAFUUE2R());
 
         m_soundProcessors.push_back(new LFO());
@@ -95,9 +104,15 @@ public:
 #ifdef LED_PIN
         m_outputDevices.push_back(new LED(LED_PIN));
 #endif
+#ifdef USE_USBMIDI
         m_outputDevices.push_back(new USB_MIDI());
+#endif
+#if defined(MIDI_OUT_PIN) && defined(MIDI_IN_PIN)
         m_outputDevices.push_back(new SerialMIDI(MIDI_OUT_PIN, MIDI_IN_PIN));
+#endif
+#if defined(PWMPIN_LOW) && defined(PWMPIN_HIGH)
         m_outputDevices.push_back(new Speaker(PWMPIN_LOW, PWMPIN_HIGH, m_soundProcessors));
+#endif
 
         m_menus.push_back(new MenuForKey());
 

@@ -40,9 +40,11 @@ protected:
         if (!m_playing) {
             if (msg.volume > 0.01f) {
                 uint8_t note = static_cast<uint8_t>(Clamp(static_cast<int32_t>(msg.note), 0, 127));
+                uint16_t breath = static_cast<uint16_t>(Clamp(msg.volume, 0.0f, 1.0f) * 16383.0f);
                 m_prevNote = note;
-                NoteOn(note, 120);
-                BreathControl(msg.volume);
+                //NoteOn(note, (breath >> 7) & 0x7F, false);
+                NoteOn(note, 120, false);
+                BreathControl(breath);
                 float b = 8192.0f + 8000.0f * msg.bend;
                 uint16_t bend = static_cast<uint16_t>(b);
                 PicthBendControl(bend);
@@ -54,12 +56,12 @@ protected:
             }
             else {
                 int32_t note = static_cast<int32_t>(msg.note);
+                uint16_t breath = static_cast<uint16_t>(Clamp(msg.volume, 0.0f, 1.0f) * 16383.0f);
                 if (note != m_prevNote) {
-                    NoteOn(note, 120);
-                    NoteOff(m_prevNote, 120);
+                    //NoteOn(note, (breath >> 7) & 0x7F, true);
+                    NoteOn(note, 120, true);
                     m_prevNote = note;
                 }
-                uint16_t breath = static_cast<uint16_t>(Clamp(msg.volume, 0.0f, 1.0f) * 16383.0f);
                 BreathControl(breath);
                 float b = 8192.0f + 8000.0f * msg.bend;
                 uint16_t bend = static_cast<uint16_t>(b);
@@ -97,29 +99,37 @@ protected:
     }
 
     //--------
-    void NoteOn(uint8_t note, uint8_t velocity) {
+    void NoteOn(uint8_t note, uint8_t velocity, bool changeNote) {
         m_playing = true;
-        PushData(0x90 + m_channelNo, note, velocity);
+        PushStatus(0x90 + m_channelNo);
+        PushData(note, velocity);
+        if (changeNote) {
+            PushData(m_prevNote, 0);
+        }
     }
     //--------
     void NoteOff(uint8_t note, uint8_t velocity) {
         m_playing = false;
-        PushData(0x80 + m_channelNo, note, velocity);
+        PushStatus(0x80 + m_channelNo);
+        PushData(note, velocity);
     }
     //--------
     void PicthBendControl(uint16_t bend) {
         uint8_t d0 = bend & 0x7F;
         uint8_t d1 = (bend >> 7) & 0x7F;
-        PushData(0xE0 + m_channelNo, d0, d1);
+        PushStatus(0xE0 + m_channelNo);
+        PushData(d0, d1);
     }
     //--------
     void BreathControl(uint16_t vol) {
-        PushData(0xB0 + m_channelNo, 0x02, static_cast<uint8_t>((vol >> 7) & 0x7F));
-        PushData(0xB0 + m_channelNo, 0x22, static_cast<uint8_t>(vol & 0x7F));
+        PushStatus(0xB0 + m_channelNo);
+        PushData(0x02, static_cast<uint8_t>((vol >> 7) & 0x7F));
+        PushData(0x22, static_cast<uint8_t>(vol & 0x7F));
     }
     //--------
     void ProgramChange(uint8_t pgNum) {
-        PushData(0xC0 + m_channelNo, pgNum);
+        PushStatus(0xC0 + m_channelNo);
+        PushData(pgNum);
     }
     //--------
     void ActiveNotify() {
@@ -127,8 +137,16 @@ protected:
     }
 
     //--------
-    void PushData(int32_t status, int32_t data1 = -1, int32_t data2 = -1, int32_t data3 = -1) {
-        m_sendData[m_sendCount%2].push_back(static_cast<uint8_t>(status));
+    void PushStatus(int32_t status) {
+        if (status != m_status) {
+            m_sendData[m_sendCount%2].push_back(static_cast<uint8_t>(status));
+            m_status = status;
+        }
+    }
+
+    //--------
+    void PushData(int32_t data0, int32_t data1 = -1, int32_t data2 = -1, int32_t data3 = -1) {
+        m_sendData[m_sendCount%2].push_back(static_cast<uint8_t>(data0));
         if (data1 >= 0) {
             m_sendData[m_sendCount%2].push_back(static_cast<uint8_t>(data1));
         }
@@ -156,4 +174,5 @@ private:
     std::vector<uint8_t> m_sendData[2];
     std::queue<uint8_t> m_recvData;
     int32_t m_sendCount = 0;
+    int32_t m_status = 0;
 };

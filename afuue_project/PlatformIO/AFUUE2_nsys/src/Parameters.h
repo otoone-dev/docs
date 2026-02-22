@@ -16,12 +16,9 @@
 
 #ifdef HW_AFUUE2R
 #ifdef HW_AFUUE2R_GEN2
-#define SOUND_TWOPWM
 #define PWMPIN_LOW (GPIO_NUM_5) // AFUUE2R Gen2
 #define PWMPIN_HIGH (GPIO_NUM_6)
-//#define HAS_DISPLAY
 #ifndef HAS_DISPLAY
-#define HAS_LED
 #define NEOPIXEL_PIN (GPIO_NUM_35)
 #endif
 #define MIDI_IN_PIN (GPIO_NUM_9)  // not use
@@ -31,17 +28,19 @@
 #define I2CPIN_SDA (GPIO_NUM_38)
 #define I2CPIN_SCL (GPIO_NUM_39)
 #else
-#define SOUND_TWOPWM
 #define PWMPIN_LOW (GPIO_NUM_39) // AFUUE2R 初代
 #define PWMPIN_HIGH (GPIO_NUM_40)
 #define ADCPIN_BREATH (GPIO_NUM_11)
 #define ADCPIN_BEND (GPIO_NUM_12)
-#define HAS_LED
 #define NEOPIXEL_PIN   (GPIO_NUM_21)
 #define MIDI_IN_PIN (GPIO_NUM_42)  // not use
 #define MIDI_OUT_PIN (GPIO_NUM_41)
 #define BUTTON_PIN (GPIO_NUM_0)
 #endif // HW_AFUUE2R_GEN2
+#elif defined(HW_TONEGENERATOR) // HW_AFFUE2R
+#define NEOPIXEL_PIN   (GPIO_NUM_21)
+#define MIDI_IN_PIN (GPIO_NUM_42)
+#define MIDI_OUT_PIN (GPIO_NUM_41)
 #endif // HW_AFUUE2R
 
 //-------------
