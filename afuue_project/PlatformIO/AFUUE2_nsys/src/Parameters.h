@@ -90,11 +90,11 @@ public:
     }
     void SetBeep(float note, int32_t milliseconds) {
         beepNote = note;
-        beepTime = micros() + milliseconds * 1000;
+        beepTime = millis() + milliseconds;
     }
     void SetDispMessage(const char* message, int32_t milliseconds) {
         dispMessage = message;
-        dispTime = micros() + milliseconds * 1000;
+        dispTime = millis() + milliseconds;
     }
     bool IsBendEnabled() const {
         return playMode == PlayMode::Bend || playMode == PlayMode::MIDI_Bend || playMode == PlayMode::USBMIDI_Bend;

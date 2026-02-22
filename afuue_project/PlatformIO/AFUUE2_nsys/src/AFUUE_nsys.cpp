@@ -224,7 +224,7 @@ private:
 public:
     //--------------
     void Update() {
-        uint64_t currentTime = micros();
+        uint64_t currentTime = millis();
         Message message;
 #ifdef DEBUG
         std::string debugMessage = "";
@@ -262,12 +262,22 @@ public:
                 }
 #endif
             }
-            if (m_parameters.beepTime > 0 && currentTime < m_parameters.beepTime) {
-                message.volume = 0.2f;
-                message.note = m_parameters.beepNote;
+            if (m_parameters.beepTime > 0) {
+                if (currentTime < m_parameters.beepTime) {
+                    message.volume = 0.2f;
+                    message.note = m_parameters.beepNote;
+                }
+                else {
+                    m_parameters.beepTime = 0;
+                }
             }
-            if (m_parameters.dispTime > 0 && currentTime < m_parameters.dispTime) {
-                // 表示中
+            if (m_parameters.dispTime > 0) {
+                if (currentTime < m_parameters.dispTime) {
+                    // 表示中
+                }
+                else {
+                    m_parameters.dispTime = 0;
+                }
             }
             else {
                 m_parameters.dispMessage = "";
