@@ -55,14 +55,9 @@ protected:
             else {
                 int32_t note = static_cast<int32_t>(msg.note);
                 if (note != m_prevNote) {
+                    NoteOn(note, 120);
                     NoteOff(m_prevNote, 120);
-                    //int32_t i = m_sendCount % 2;
-                    //SendData(m_sendData[i].data(), m_sendData[i].size());
-                    //m_sendCount++;
-                    //m_sendData[m_sendCount%2].clear();
-
-                    //m_prevNote = note;
-                    //NoteOn(note, 120);
+                    m_prevNote = note;
                 }
                 uint16_t breath = static_cast<uint16_t>(Clamp(msg.volume, 0.0f, 1.0f) * 16383.0f);
                 BreathControl(breath);

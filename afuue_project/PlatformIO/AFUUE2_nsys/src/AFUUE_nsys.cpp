@@ -308,11 +308,10 @@ void setup() {
 void loop() {
   static int loopCount = 0;
   M5.update();
-#if 0 //def HAS_DISPLAY
+#ifdef HAS_DISPLAY
   canvas.clear(TFT_BLACK);
   canvas.setCursor(0, 0);
   canvas.setTextSize(2);
-#endif
 #ifdef DEBUG
   canvas.printf("PLAYING\n%s", sys.m_debugMessage.c_str());
   delay(100);
@@ -341,6 +340,7 @@ void loop() {
   //canvas.printf("PLAYING\n%3.2f%%\n", sys.m_cpuLoad * 100.0f);
   //canvas.printf("\n%s", sys.GetDispMessage().c_str());
 #endif
+#endif //HAS_DISPLAY
 
 #ifdef BUTTON_PIN
   if (digitalRead(BUTTON_PIN) == LOW) {
