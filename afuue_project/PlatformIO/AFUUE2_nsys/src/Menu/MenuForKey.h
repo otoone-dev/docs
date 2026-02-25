@@ -59,6 +59,7 @@ public:
                 float n = params.baseNote + (keys.KeyE(true) ? 1.0f : -1.0f);
                 params.baseNote = Clamp(n, 24.0f, 72.0f);
             }
+            params.SavePreferences();
             int32_t n = static_cast<int32_t>(params.baseNote) % 12;
             std::string s = "Transpose:\n  " + TransposeToStr(static_cast<int32_t>(params.baseNote - 48.0f));
             params.SetDispMessage(s.c_str(), 500);
@@ -76,6 +77,7 @@ public:
             else {
                 params.SetWaveTableIndex(params.GetWaveTableIndex() + 1);
             }
+            params.SavePreferences();
             m_waveIndexNum1 = m_waveIndexNum10 = -1;
             params.SetDispMessage(params.info.name.c_str(), 500);
             params.SetBeep(params.baseNote, 500);
@@ -92,10 +94,16 @@ public:
         }
         if (keys.KeyA(true)) {
             // ブレス感度変更
-            params.breathDelay = Wrap<float>(Step(params.breathDelay, 0.1f) + 0.1f, 0.5f, 1.0f);
+            int32_t bd = static_cast<int32_t>(1.0f / params.breathDelay);
+            bd -= 50;
+            if (bd < 100) {
+                bd = 350;
+            }
+            params.breathDelay = 1.0f / bd;
             std::string s = Format("BreathSense:\n  ", params.breathDelay * 100.0f, 0) + "%";
             params.SetDispMessage(s.c_str(), 500);
-            params.SetBeep(71.0f, (params.breathDelay == 0.8f ? 500 : 200));
+            params.SetBeep(71.0f, (bd == 200 ? 500 : 200));
+            params.SavePreferences();
             keys.clicked = 0;   //後段のメニューにキーを渡さない
             return;
         }

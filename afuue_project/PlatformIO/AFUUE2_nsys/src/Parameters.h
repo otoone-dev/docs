@@ -1,6 +1,7 @@
 #pragma once
 #include "WaveTable.h"
 #include <Arduino.h>
+#include <Preferences.h>
 #include <string>
 #include <cmath>
 
@@ -58,8 +59,8 @@ class Parameters {
 public:
     Parameters()
         : info()
-    {}
-
+    {
+    }
     const float samplingRate = 44077.135f;
     float beepNote = 48.0f;
     uint64_t beepTime = 0;
@@ -67,7 +68,7 @@ public:
     std::string dispMessage = "";
 
     float fineTune = 440.0f;
-    float baseNote = 48.0f;
+    float baseNote;
     float delayAmount = 0.15f;
     float delayTime = 0.3f;
     float breathDelay = 0.8f;
@@ -77,6 +78,12 @@ public:
 #ifdef DEBUG
     std::string debugMessage = "";
 #endif
+    void Initialize() {
+        LoadPreferences();
+        int i = waveTableIndex % waveInfos.size();
+        info = waveInfos[i];
+    }
+
     int GetWaveTableIndex() const {
         return waveTableIndex;
     }
@@ -122,8 +129,51 @@ public:
             }
         }
     }
+    //-------------------------------------
+    // Flash書き込み開始
+    void BeginPreferences(bool writable) {
+        usePreferencesDepth++;
+        if (usePreferencesDepth > 1) return;
+        //if (timer) timerAlarmDisable(timer);
+        pref.begin("Afuue/Settings", !writable);
+    }
+
+    //--------------------------
+    // Flash書き込み終了
+    void EndPreferences() {
+        usePreferencesDepth--;
+        if (usePreferencesDepth == 0) {
+            pref.end();  
+            delay(10);
+            //if (timer) timerAlarmEnable(timer);
+        }
+        if (usePreferencesDepth < 0) usePreferencesDepth = 0;
+    }
+    // Clear
+    void ClearPreferences() {
+        pref.clear();
+    }
+    // Save
+    void SavePreferences() {
+        BeginPreferences(true); {
+            pref.putInt("WaveIndex", waveTableIndex);
+            pref.putFloat("BreathSense", breathDelay);
+            pref.putFloat("BaseNote", baseNote);
+        } EndPreferences();
+    }
+    // Load
+    void LoadPreferences() {
+        BeginPreferences(false); {
+            waveTableIndex = pref.getInt("WaveIndex", 0);
+            breathDelay = pref.getFloat("BreathSense", 0.8f);
+            baseNote = pref.getFloat("BaseNote", 48.0f);
+        } EndPreferences();
+    }
+
 private:
     int waveTableIndex = 0;
+    int usePreferencesDepth = 0;
+    Preferences pref;
 };
 
 //-------------

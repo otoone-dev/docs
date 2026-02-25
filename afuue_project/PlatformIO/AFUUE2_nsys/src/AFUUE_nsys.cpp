@@ -40,6 +40,7 @@ M5Canvas canvas(&M5.Display);
 #define I2C_FREQ (400000)
 
 //-----------
+const int32_t updateInterval = 5; // ms
  
 //---------------------
 class System {
@@ -58,6 +59,8 @@ public:
 
     //--------------
     void initialize() {
+        m_parameters.Initialize();
+        
         SetLED(0, 0, 100);
         delay(100);
         SetLED(0, 0, 1);
@@ -115,8 +118,6 @@ public:
 #endif
 
         m_menus.push_back(new MenuForKey());
-
-        m_parameters.SetWaveTableIndex(0);
 
         std::string errorMessage = "";
         // Input Devices
@@ -195,6 +196,7 @@ private:
     Parameters m_parameters;
     std::string m_waveNoStr;
     Keys m_keys;
+    float m_btnPressedTime = 0.0f;
     bool m_btnWasPressed = false;
 
     //--------------
@@ -250,6 +252,16 @@ public:
             }
         }
         m_btnWasPressed = m_btnPressed;
+        if (m_btnPressed) {
+            m_btnPressedTime += updateInterval / portTICK_PERIOD_MS;
+            if (m_btnPressedTime > 10*1000) {
+                m_parameters.ClearPreferences();
+                ESP.restart();
+            }
+        }
+        else {
+            m_btnPressedTime = 0.0f;
+        }
         {
             // メニュー
             m_keys.Update(message.keyData);
@@ -315,7 +327,7 @@ public:
     static void UpdateTask(void *parameter) {
         System *pSystem = static_cast<System *>(parameter);
         TickType_t xLastWakeTime;
-        const TickType_t xFrequency = 5 / portTICK_PERIOD_MS; // 5ms
+        const TickType_t xFrequency = updateInterval / portTICK_PERIOD_MS; // 5ms
         while (1) {
             pSystem->Update();
             xTaskDelayUntil( &xLastWakeTime, xFrequency );
