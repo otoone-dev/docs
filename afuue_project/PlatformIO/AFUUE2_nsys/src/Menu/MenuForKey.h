@@ -61,7 +61,7 @@ public:
             }
             params.SavePreferences();
             int32_t n = static_cast<int32_t>(params.baseNote) % 12;
-            std::string s = "Transpose:\n  " + TransposeToStr(static_cast<int32_t>(params.baseNote - 48.0f));
+            std::string s = "Trans:" + TransposeToStr(static_cast<int32_t>(params.baseNote - 48.0f));
             params.SetDispMessage(s.c_str(), 500);
             params.SetBeep(params.baseNote, (n == 0 ? 500 : 100));
             keys.clicked = 0;
@@ -87,22 +87,22 @@ public:
         if (keys.KeyG(true)) {
             // ローパスフィルタＱ値変更
             params.info.lowPassQ = Wrap<float>(Step(params.info.lowPassQ, 0.5f) + 0.5f, 0.5f, 3.0f);
-            params.SetDispMessage(Format("LowPassQ:\n  ", params.info.lowPassQ, 1).c_str(), 500);
+            params.SetDispMessage(Format("LP_Q:", params.info.lowPassQ, 1).c_str(), 500);
             params.SetBeep(67.0f, (params.info.lowPassQ == 0.5f ? 500 : 100));
             keys.clicked = 0;   //後段のメニューにキーを渡さない
             return;
         }
         if (keys.KeyA(true)) {
             // ブレス感度変更
-            int32_t bd = static_cast<int32_t>(1.0f / params.breathDelay);
+            int32_t bd = static_cast<int32_t>(1.0f / params.breathSense);
             bd -= 50;
             if (bd < 100) {
                 bd = 350;
             }
-            params.breathDelay = 1.0f / bd;
-            std::string s = Format("BreathSense:\n  ", params.breathDelay * 100.0f, 0) + "%";
+            params.breathSense = 1.0f / bd;
+            std::string s = Format("BrthS:", bd);
             params.SetDispMessage(s.c_str(), 500);
-            params.SetBeep(71.0f, (bd == 200 ? 500 : 200));
+            params.SetBeep(71.0f, (abs(bd-200) < 5 ? 500 : 200));
             params.SavePreferences();
             keys.clicked = 0;   //後段のメニューにキーを渡さない
             return;
@@ -110,7 +110,7 @@ public:
         if (keys.KeyB(true)) {
             // MIDI ブレス信号変更
             params.breathMode = static_cast<MIDIBreathMode>((static_cast<int32_t>(params.breathMode) + 1) % static_cast<int32_t>(MIDIBreathMode::MIDIBreathMode_Max));
-            std::string s = "BreathMode:\n  " + MIDIBreathModeToStr(params.breathMode);
+            std::string s = "BrthM:" + MIDIBreathModeToStr(params.breathMode);
             params.SetDispMessage(s.c_str(), 500);
             params.SetBeep(78.0f, (params.breathMode == MIDIBreathMode::BreathControl ? 500 : 200));
             params.SavePreferences();
@@ -120,7 +120,7 @@ public:
         if (keys.KeyDown(true)) {
             // 基準音変更
             params.fineTune = Wrap<float>(Step(params.fineTune, 2.0f) + 2.0f, 438.0f, 444.0f);
-            std::string s = Format("Fine:\n  ", params.fineTune, 0) + "Hz";
+            std::string s = Format("Fine:", params.fineTune, 0) + "Hz";
             params.SetDispMessage(s.c_str(), 500);
             params.SetBeep(69.0f, (params.fineTune == 440.0f ? 500 : 200));
             params.SavePreferences();
@@ -130,7 +130,7 @@ public:
         if (keys.KeyUp(true)) {
             // ディレイ変更
             params.delayAmount = Wrap<float>(Step(params.delayAmount, 0.15f) + 0.15f, 0.0f, 0.45f);
-            std::string s = Format("Delay:\n  ", params.delayAmount * 100.0f, 0) + "%";
+            std::string s = Format("Delay:", params.delayAmount * 100.0f, 0) + "%";
             params.SetDispMessage(s.c_str(), 500);
             params.SetBeep(62.0f, (params.delayAmount == 0.15f ? 500 : 100));
             keys.clicked = 0;   //後段のメニューにキーを渡さない

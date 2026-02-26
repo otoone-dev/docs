@@ -98,7 +98,7 @@ public:
     float baseNote;
     float delayAmount = 0.15f;
     float delayTime = 0.3f;
-    float breathDelay = 0.8f;
+    float breathSense = 0.8f;
     uint64_t keyDelay = 20*1000; // microseconds
     WaveInfo info;
     PlayMode playMode = PlayMode::Normal;
@@ -190,9 +190,10 @@ public:
     void SavePreferences() {
         BeginPreferences(true); {
             pref.putInt("WaveIndex", waveTableIndex);
-            pref.putFloat("BreathSense", breathDelay);
+            pref.putFloat("BreathSense", breathSense);
             pref.putFloat("BaseNote", baseNote);
             pref.putFloat("FineTune", fineTune);
+            pref.putFloat("DelayAmount", delayAmount);
             pref.putInt("MIDIBreathMode", static_cast<int32_t>(breathMode));
         } EndPreferences();
     }
@@ -200,7 +201,7 @@ public:
     void LoadPreferences() {
         BeginPreferences(false); {
             waveTableIndex = pref.getInt("WaveIndex", 0);
-            breathDelay = pref.getFloat("BreathSense", 0.8f);
+            breathSense = pref.getFloat("BreathSense", 0.8f);
             baseNote = pref.getFloat("BaseNote", 48.0f);
             fineTune = pref.getFloat("FineTune", 440.0f);
             breathMode = static_cast<MIDIBreathMode>(pref.getInt("MIDIBreathMode", 0));
