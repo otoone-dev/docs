@@ -44,7 +44,7 @@ protected:
                 m_prevNote = note;
                 //NoteOn(note, (breath >> 7) & 0x7F, false);
                 NoteOn(note, 120, false);
-                BreathControl(breath);
+                BreathControl(breath, params.breathMode);
                 float b = 8192.0f + 8000.0f * msg.bend;
                 uint16_t bend = static_cast<uint16_t>(b);
                 PicthBendControl(bend);
@@ -62,7 +62,7 @@ protected:
                     NoteOn(note, 120, true);
                     m_prevNote = note;
                 }
-                BreathControl(breath);
+                BreathControl(breath, params.breathMode);
                 float b = 8192.0f + 8000.0f * msg.bend;
                 uint16_t bend = static_cast<uint16_t>(b);
                 PicthBendControl(bend);
@@ -121,10 +121,32 @@ protected:
         PushData(d0, d1);
     }
     //--------
-    void BreathControl(uint16_t vol) {
-        PushStatus(0xB0 + m_channelNo);
-        PushData(0x02, static_cast<uint8_t>((vol >> 7) & 0x7F));
-        PushData(0x22, static_cast<uint8_t>(vol & 0x7F));
+    void BreathControl(uint16_t vol, MIDIBreathMode mode) {
+        switch (mode) {
+            case MIDIBreathMode::BreathControl:
+                PushStatus(0xB0 + m_channelNo);
+                PushData(0x02, static_cast<uint8_t>((vol >> 7) & 0x7F));
+                PushData(0x22, static_cast<uint8_t>(vol & 0x7F));
+                return;
+            case MIDIBreathMode::Expression:
+                PushStatus(0xB0 + m_channelNo);
+                PushData(0x0B, static_cast<uint8_t>((vol >> 7) & 0x7F));
+                PushData(0x2B, static_cast<uint8_t>(vol & 0x7F));
+                return;
+            case MIDIBreathMode::AfterTouch: // Channel Pressure
+                PushStatus(0xD0 + m_channelNo);
+                PushData(static_cast<uint8_t>((vol >> 7) & 0x7F));
+                return;
+            case MIDIBreathMode::MainVolume: // Channel Volume
+                PushStatus(0xB0 + m_channelNo);
+                PushData(0x07, static_cast<uint8_t>((vol >> 7) & 0x7F));
+                PushData(0x27, static_cast<uint8_t>(vol & 0x7F));
+                return;
+            case MIDIBreathMode::CutOff: // Brightness
+                PushStatus(0xB0 + m_channelNo);
+                PushData(0x4A, static_cast<uint8_t>((vol >> 7) & 0x7F));
+                return;
+        }
     }
     //--------
     void ProgramChange(uint8_t pgNum) {
