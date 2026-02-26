@@ -109,6 +109,13 @@ public:
         }
         if (keys.KeyB(true)) {
             // MIDI ブレス信号変更
+            params.breathMode = static_cast<MIDIBreathMode>((static_cast<int32_t>(params.breathMode) + 1) % static_cast<int32_t>(MIDIBreathMode::MIDIBreathMode_Max));
+            std::string s = "BreathMode:\n  " + MIDIBreathModeToStr(params.breathMode);
+            params.SetDispMessage(s.c_str(), 500);
+            params.SetBeep(78.0f, (params.breathMode == MIDIBreathMode::BreathControl ? 500 : 200));
+            params.SavePreferences();
+            keys.clicked = 0;   //後段のメニューにキーを渡さない
+            return;
         }
         if (keys.KeyDown(true)) {
             // 基準音変更
@@ -116,6 +123,7 @@ public:
             std::string s = Format("Fine:\n  ", params.fineTune, 0) + "Hz";
             params.SetDispMessage(s.c_str(), 500);
             params.SetBeep(69.0f, (params.fineTune == 440.0f ? 500 : 200));
+            params.SavePreferences();
             keys.clicked = 0;   //後段のメニューにキーを渡さない
             return;
         }

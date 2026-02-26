@@ -5,6 +5,8 @@
 #include <string>
 #include <cmath>
 
+#define AFUUE_VER (2000)
+
 #define CORE0 (0)
 #define CORE1 (1)
 #define CLOCK_DIVIDER (55)
@@ -55,6 +57,31 @@ enum class PlayMode : uint8_t {
 };
 
 //-------------
+enum class MIDIBreathMode : uint8_t {
+    BreathControl,
+    Expression,
+    AfterTouch,
+    MainVolume,
+    CutOff,
+    MIDIBreathMode_Max,
+};
+std::string MIDIBreathModeToStr(MIDIBreathMode mode) {
+    switch (mode) {
+        case MIDIBreathMode::BreathControl:
+        return "BrCt";
+        case MIDIBreathMode::Expression:
+        return "Expr";
+        case MIDIBreathMode::AfterTouch:
+        return "Aftr";
+        case MIDIBreathMode::MainVolume:
+        return "MVol";
+        case MIDIBreathMode::CutOff:
+        return "COff";
+    }
+    return "??";
+}
+
+//-------------
 class Parameters {
 public:
     Parameters()
@@ -75,10 +102,16 @@ public:
     uint64_t keyDelay = 20*1000; // microseconds
     WaveInfo info;
     PlayMode playMode = PlayMode::Normal;
+    MIDIBreathMode breathMode = MIDIBreathMode::BreathControl;
 #ifdef DEBUG
     std::string debugMessage = "";
 #endif
     void Initialize() {
+        int ver = pref.getInt("AfuueVer", -1);
+        if (ver != AFUUE_VER) {
+            pref.clear(); // CLEAR ALL FLASH MEMORY
+            pref.putInt("AfuueVer", AFUUE_VER);
+        }
         LoadPreferences();
         int i = waveTableIndex % waveInfos.size();
         info = waveInfos[i];
@@ -159,6 +192,8 @@ public:
             pref.putInt("WaveIndex", waveTableIndex);
             pref.putFloat("BreathSense", breathDelay);
             pref.putFloat("BaseNote", baseNote);
+            pref.putFloat("FineTune", fineTune);
+            pref.putInt("MIDIBreathMode", static_cast<int32_t>(breathMode));
         } EndPreferences();
     }
     // Load
@@ -167,6 +202,8 @@ public:
             waveTableIndex = pref.getInt("WaveIndex", 0);
             breathDelay = pref.getFloat("BreathSense", 0.8f);
             baseNote = pref.getFloat("BaseNote", 48.0f);
+            fineTune = pref.getFloat("FineTune", 440.0f);
+            breathMode = static_cast<MIDIBreathMode>(pref.getInt("MIDIBreathMode", 0));
         } EndPreferences();
     }
 
