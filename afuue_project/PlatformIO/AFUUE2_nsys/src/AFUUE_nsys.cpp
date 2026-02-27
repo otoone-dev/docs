@@ -10,6 +10,7 @@
 #include "SoundProcessor/WaveGenerator.h"
 #include "SoundProcessor/LFO.h"
 #include "SoundProcessor/LowPassFilter.h"
+#include "SoundProcessor/Noise.h"
 #include "SoundProcessor/Delay.h"
 
 #include "OutputDevices/OutputDeviceBase.h"
@@ -41,6 +42,7 @@ M5Canvas canvas(&M5.Display);
 
 //-----------
 const int32_t updateInterval = 5; // ms
+const float deltaTime = (updateInterval / portTICK_PERIOD_MS) / 1000.0f; // 前回との差分とってもいいが、処理落ちしなければよいので
  
 //---------------------
 class System {
@@ -102,6 +104,7 @@ public:
         m_soundProcessors.push_back(new LFO());
         m_soundProcessors.push_back(new WaveGenerator());
         m_soundProcessors.push_back(new LowPassFilter());
+        m_soundProcessors.push_back(new Noise());
         m_soundProcessors.push_back(new Delay(8000));
 
 #ifdef LED_PIN
@@ -196,6 +199,8 @@ private:
     Parameters m_parameters;
     std::string m_waveNoStr;
     Keys m_keys;
+    float m_playTime = 0.0f;
+    float m_keepNoteTime = 0.0;
     float m_btnPressedTime = 0.0f;
     bool m_btnWasPressed = false;
 
@@ -228,6 +233,8 @@ public:
     void Update() {
         uint64_t currentTime = millis();
         Message message;
+        message.playTime = m_playTime;
+        message.keepNoteTime = m_keepNoteTime;
 #ifdef DEBUG
         std::string debugMessage = "";
 #endif
@@ -244,7 +251,18 @@ public:
             }
 #endif
         }
-
+        if (message.volume < 0.005f) {
+            message.playTime = 0.0f;
+        }
+        else if (message.playTime < 60*60) {
+            message.playTime += deltaTime;
+        }
+        char t[64];
+        sprintf(t, "%1.3f", message.playTime);
+        m_parameters.SetDispMessage(t, 10);
+        if (message.keepNoteTime < 60*60) {
+            message.keepNoteTime += deltaTime;
+        }
         if (m_btnPressed) {
             if (!m_btnWasPressed) {
                 m_parameters.SetBeep(53.0f, 200);
@@ -253,8 +271,8 @@ public:
         }
         m_btnWasPressed = m_btnPressed;
         if (m_btnPressed) {
-            m_btnPressedTime += updateInterval / portTICK_PERIOD_MS;
-            if (m_btnPressedTime > 10*1000) {
+            m_btnPressedTime += deltaTime;
+            if (m_btnPressedTime > 10) {
                 m_parameters.ClearPreferences();
                 ESP.restart();
             }
@@ -308,7 +326,8 @@ public:
             }
 #endif
         }
-
+        m_playTime = message.playTime;
+        m_keepNoteTime = message.keepNoteTime;
 #ifdef DEBUG
         m_debugMessage = debugMessage;
 #endif

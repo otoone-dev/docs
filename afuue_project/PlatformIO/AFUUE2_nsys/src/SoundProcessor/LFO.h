@@ -26,10 +26,13 @@ public:
         m_power = params.info.lfoPower * message.volume;
         m_freq = params.info.lfoFreq;
         if (m_power > 0.0f) {
-            float t = static_cast<int32_t>(millis()) / 1000.0f;
-            float nn = message.note + m_power * TableSine(m_freq * t);
-            float n = Clamp(nn, 1.0f, 127.0f);
-            message.note = n;
+            if (message.playTime > params.info.lfoDelay) {
+                float i = Clamp((message.playTime - params.info.lfoDelay) / 0.5f, 0.0f, 1.0f);
+                float t = static_cast<int32_t>(millis()) / 1000.0f;
+                float nn = message.note + i * m_power * TableSine(m_freq * t);
+                float n = Clamp(nn, 1.0f, 127.0f);
+                message.note = n;
+            }
         }
     }
 

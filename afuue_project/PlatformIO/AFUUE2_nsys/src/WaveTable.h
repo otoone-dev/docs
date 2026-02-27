@@ -185,11 +185,15 @@ struct WaveInfo {
     float lowPassQ;
     float lfoPower;
     float lfoFreq;
+    float lfoDelay;
+    float noiseInitial;
+    float noiseDecay;
+    float noiseSustain;
     WaveInfo()
     {
-        WaveInfo("", nullptr, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+        WaveInfo("", nullptr, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
     }
-    WaveInfo(const char* n, const float* w, float a, float m, float d, float v, float p, float r, float q, float o, float f)
+    WaveInfo(const char* n, const float* w, float a, float m, float d, float v, float p, float r, float q, float o, float f, float l, float ni, float nd, float ns)
     : name(n)
     , pWave(w)
     , attackSoftness(a)
@@ -200,20 +204,24 @@ struct WaveInfo {
     , lowPassR(r)
     , lowPassQ(q)
     , lfoPower(o)
-    , lfoFreq(f) {}
+    , lfoFreq(f)
+    , lfoDelay(l)
+    , noiseInitial(ni)
+    , noiseDecay(nd)
+    , noiseSustain(ns) {}
 };
 
 std::vector<WaveInfo> waveInfos = {
-  { "SynthA",     waveSynthA2,     0.1f, 0.85f, 0.0f, 0.0f, 0.5f, 5.0f, 0.5f, 0.0f, 0.0f },
-  { "SynthB",     waveSynthB2,     0.3f, 0.85f, 0.0f, 0.0f, 0.6f, 5.0f, 0.8f, 0.05f, 5.0f },
-//   name         waveTable       attack porta  dropP dropV  LP_P  LP_R  LP_Q  LFO LFOfreq
-  { "A_Clarinet", waveAfuueCla,    0.2f, 0.85f, 0.0f, 0.0f, 0.5f, 5.0f, 0.6f, 0.0f, 0.0f },
-  { "A_Recorder", waveAfuueCla,    0.2f, 0.8f, 0.8f, 0.6f, 0.5f, 5.0f, 0.8f, 0.0f, 0.0f },
-  { "A_Brass",    waveAfuueBrass, 0.05f, 0.85f, 0.0f, 0.0f, 0.5f, 5.0f, 0.7f, 0.0f, 0.0f },
-  { "A_Flute",    waveAfuueFlute,  0.7f, 0.8f, 0.8f, 0.1f, 0.5f, 5.0f, 0.5f, 0.0f, 0.0f },
-  { "A_Violin",   waveAfuueViolin, 0.5f, 0.7f, 0.0f, 0.0f, 0.5f, 5.0f, 0.3f, 0.0f, 0.0f },
-//   name         waveTable       attack porta  dropP dropV  LP_P  LP_R  LP_Q  LFO LFOfreq
-  { "P_Square",   wavePureSquare,  0.2f, 0.8f, 0.0f, 0.0f, 0.5f, 8.0f, 0.7f, 0.0f, 0.0f },
-  { "P_Saw",      wavePureSaw,     0.1f, 0.8f, 0.0f, 0.0f, 0.5f, 4.0f, 0.1f, 0.2f, 50.0f },
-  { "P_Triangle", wavePureTriangle, 0.5f, 0.1f, 0.0f, 0.0f, 0.5f, 6.0f, 2.0f, 0.0f, 0.0f },
+  { "SynthA",     waveSynthA2,     0.8f, 0.85f, 0.0f, 0.0f, 0.5f, 5.0f, 0.5f, 0.0f, 0.0f, 0.0f,  0.0f, 0.0f, 0.0f },
+  { "SynthB",     waveSynthB2,     0.7f, 0.85f, 0.0f, 0.0f, 0.6f, 5.0f, 0.8f, 0.05f, 4.0f, 0.7f,  0.0f, 0.0f, 0.0f },
+//   name         waveTable       attack porta  dropP dropV  LP_P  LP_R  LP_Q  LFO freq delay    NIni  NDy  Nsus
+  { "A_Clarinet", waveAfuueCla,    0.7f, 0.85f, 0.0f, 0.0f, 0.5f, 5.0f, 0.6f, 0.0f, 0.0f, 0.0f,  0.0f, 0.0f, 0.0f },
+  { "A_Recorder", waveAfuueCla,    0.7f, 0.8f, 0.8f, 0.6f, 0.5f, 5.0f, 0.8f, 0.0f, 0.0f, 0.0f,  0.0f, 0.0f, 0.0f },
+  { "A_Brass",    waveAfuueBrass,  0.9f, 0.85f, 0.8f, 0.1f, 0.5f, 5.0f, 0.7f, 0.0f, 0.0f, 0.0f,  0.08f, 0.0f, 0.08f },
+  { "A_Flute",    waveAfuueFlute,  0.3f, 0.8f, 0.8f, 0.1f, 0.5f, 5.0f, 0.5f, 0.0f, 0.0f, 0.0f,  0.2f, 0.15f, 0.1f },
+  { "A_Violin",   waveAfuueViolin, 0.4f, 0.7f, 0.0f, 0.0f, 0.5f, 5.0f, 0.3f, 0.0f, 0.0f, 0.0f,  0.0f, 0.0f, 0.0f },
+//   name         waveTable       attack porta  dropP dropV  LP_P  LP_R  LP_Q  LFO freq delay    NIni  NDy  Nsus
+  { "P_Square",   wavePureSquare,  0.8f, 0.8f, 0.0f, 0.0f, 0.5f, 8.0f, 0.7f, 0.0f, 0.0f, 0.0f,  0.0f, 0.0f, 0.0f },
+  { "P_Saw",      wavePureSaw,     0.8f, 0.8f, 0.0f, 0.0f, 0.5f, 4.0f, 0.8f, 0.0f, 0.0f, 0.0f,  0.0f, 0.0f, 0.0f },
+  { "P_Triangle", wavePureTriangle, 0.5f, 0.1f, 0.0f, 0.0f, 0.5f, 6.0f, 2.0f, 0.0f, 0.0f, 0.0f,  0.0f, 0.0f, 0.0f },
 };

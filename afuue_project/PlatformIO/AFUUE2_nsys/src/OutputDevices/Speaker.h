@@ -47,6 +47,7 @@ public:
     , m_soundProcessors(soundProcessors)
     , m_lowPin(low)
     , m_highPin(high)
+    , m_attack(0.0f)
     {}
 
     //--------------
@@ -78,6 +79,7 @@ public:
     OutputResult Update(Parameters& parameters, Message& message) override {
         volume = message.volume;
         m_deltaTime = 1.0f / parameters.samplingRate;
+        m_attack = parameters.info.attackSoftness;
 
         for (auto& processor : m_soundProcessors) {
             processor->UpdateParameter(parameters, message);
@@ -111,7 +113,7 @@ public:
                     break;
                 }
                 info.tickCount = tickCount;
-                info.volume = volume;
+                info.volume += (volume - info.volume) * pSystem->m_attack;
                 for (auto& processor : pSystem->m_soundProcessors) {
                     processor->ProcessAudio(info);
                 }
@@ -135,4 +137,5 @@ private:
     std::vector<SoundProcessorBase*>& m_soundProcessors;
     gpio_num_t m_lowPin;
     gpio_num_t m_highPin;
+    float m_attack;
 };

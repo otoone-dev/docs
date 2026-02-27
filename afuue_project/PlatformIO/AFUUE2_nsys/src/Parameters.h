@@ -216,10 +216,12 @@ private:
 
 //-------------
 struct Message {
-    float volume;
-    float note;
-    float bend;
-    uint16_t keyData;
+    float volume = 0.0f;
+    float note = 48.0f;
+    float bend = 0.0f;
+    float playTime = 0.0f;
+    float keepNoteTime = 0.0f;
+    uint16_t keyData = 0;
 };
 
 //-------------

@@ -148,6 +148,7 @@ public:
         if (message.keyData != m_lastKeyData) {
             m_lastKeyData = message.keyData;
             m_lastChangeTime = t;
+            message.keepNoteTime = 0.0f;
         }
         if (t - m_lastChangeTime > params.keyDelay) { // ピロ音防止
             const Keys keys = Keys(m_lastKeyData);
