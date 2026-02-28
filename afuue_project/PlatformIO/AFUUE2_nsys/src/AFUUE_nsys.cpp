@@ -257,9 +257,6 @@ public:
         else if (message.playTime < 60*60) {
             message.playTime += deltaTime;
         }
-        char t[64];
-        sprintf(t, "%1.3f", message.playTime);
-        m_parameters.SetDispMessage(t, 10);
         if (message.keepNoteTime < 60*60) {
             message.keepNoteTime += deltaTime;
         }

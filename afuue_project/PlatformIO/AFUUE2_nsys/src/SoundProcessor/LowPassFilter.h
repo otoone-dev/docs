@@ -25,8 +25,10 @@ public:
     void UpdateParameter(const Parameters& params, Message& message) override {
         if (params.info.lowPassQ > 0.0f) {
             float idQ = 1.0f / (2.0f * (params.info.lowPassQ));// + 1.0f * growlRate));
-
-            float a = (tanh(params.info.lowPassR * (message.volume - params.info.lowPassP)) + 1.0f) * 0.5f;
+            float t = (message.keepNoteTime < 0.2f
+                ? Clamp(1.0f - 0.1 + 0.1f*TableSine(message.keepNoteTime / 0.2f * 0.25f), 0.0f, 1.0f)
+                : 1.0f);
+            float a = (tanh(params.info.lowPassR * ((message.volume * t) - params.info.lowPassP)) + 1.0f) * 0.5f;
             float lp = 100.0f + 20000.0f * a;
             if (lp > 12000.0f) {
                 lp = 12000.0f;
