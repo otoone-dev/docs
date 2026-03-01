@@ -99,7 +99,7 @@ public:
     float delayAmount = 0.15f;
     float delayTime = 0.3f;
     float breathSense = 0.8f;
-    uint64_t keyDelay = 20*1000; // microseconds
+    uint64_t keyDelay = 40*1000; // microseconds
     WaveInfo info;
     PlayMode playMode = PlayMode::Normal;
     MIDIBreathMode breathMode = MIDIBreathMode::BreathControl;

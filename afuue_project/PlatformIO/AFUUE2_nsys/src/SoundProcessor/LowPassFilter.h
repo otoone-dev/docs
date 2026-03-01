@@ -20,20 +20,21 @@ public:
         }
     }
 
+    #define NOTECHANGE_FILTER_TIME (0.1f)
     //--------------
     // パラメータ更新（低速呼び出しされる)
     void UpdateParameter(const Parameters& params, Message& message) override {
         if (params.info.lowPassQ > 0.0f) {
             float idQ = 1.0f / (2.0f * (params.info.lowPassQ));// + 1.0f * growlRate));
-            float t = (message.keepNoteTime < 0.2f
-                ? Clamp(1.0f - 0.1 + 0.1f*TableSine(message.keepNoteTime / 0.2f * 0.25f), 0.0f, 1.0f)
-                : 1.0f);
-            float a = (tanh(params.info.lowPassR * ((message.volume * t) - params.info.lowPassP)) + 1.0f) * 0.5f;
+            float t = (message.keepNoteTime < 0.1f
+                ? -params.info.lowPassN + params.info.lowPassN * TableSine(Clamp(message.keepNoteTime, 0.0f, NOTECHANGE_FILTER_TIME) / NOTECHANGE_FILTER_TIME * 0.25f) // sin の 1/4 だけ使うので x0.25
+                : 0.0f);
+            float a = (tanh(params.info.lowPassR * (message.volume - params.info.lowPassP + t*message.volume)) + 1.0f) * 0.5f;
             float lp = 100.0f + 20000.0f * a;
             if (lp > 12000.0f) {
                 lp = 12000.0f;
             }
-            m_lp_value += (lp - m_lp_value) * 0.8f;
+            m_lp_value += (lp - m_lp_value) * 0.5f;
 
             float omega = m_lp_value / params.samplingRate;
             float alpha = TableSine(omega) * idQ;
