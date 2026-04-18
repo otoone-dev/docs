@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Tiny Browser Setting Page</title>
+  </head>
+  <body>
+    <h1>Tiny Browser Setting Page</h1>
+    <p>Input start page URL</p>
+    <input type="text" name="seturl" size="40" maxlength="255" id="seturl_select"><br>
+    <button id="save_button">Set</button><br>
+<br> 
+    <p>default page
+    <br>https://otoone-dev.github.io/docs/pebble.html
+    <br>
+    </p>
+   </body>
+</html>
+
+<script>
+  //Setup to allow easy adding more options later
+  function saveOptions() {
+    seturlSelect = document.getElementById("seturl_select");
+    var options = {
+      "seturltext": seturlSelect.value
+    }
+     
+    return options;
+  };
+ 
+  var submitButton = document.getElementById("save_button");
+  submitButton.addEventListener("click", 
+    function() {
+      console.log("Submit");
+ 
+      var options = saveOptions();
+      var location = "pebblejs://close#" + encodeURIComponent(JSON.stringify(options));
+       
+      document.location = location;
+    }, 
+  false);
+</script>

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>AFUUE Software Updates</title>
+  </head>
+  <body>
+    <br>
+    <h2>AFUUE (ウインドシンセサイザー) 内蔵ソフト更新向けページ</h2><br>
+    ※ ソフトウェアを書きこんだ事による不具合発生や使用不能についての責任は負いかねます。<br>
+    サポートはしますが自己責任でよろしくお願いします。<br>
+    今まで AFUUE で変更した値などは全て初期化されます。ご了承ください。<br>
+    <br>
+    <br>
+    <h3>更新内容</h3>
+    2025/2/27 : ソフトウェア更新<br>
+    ・AFUUE2R のトランスポーズなどの各種変更機能が使えない不具合を修正<br>
+    ・AFUUE2R の音色の番号指定変更を MIDI モード以外でも使えるように変更<br>
+    ・AFUUE2 のメニューに AccDrum を試験的に追加（左右に振る事でドラム音が鳴らせます）<br>
+    <br>
+    2025/2/6 : ソフトウェア更新<br>
+    ・音色の追加（AFUUE2R からは４つ、AFUUE2 からは６つ追加）<br>
+    　　"SynthA"<br>
+    　　"SynthB"<br>
+    　　"A_Clarinet"<br>
+    　　"A_Recorder"<br>
+    　　"A_Brass"<br>
+    　　"A_Flute"<br>
+    　　"A_Violin"<br>
+    　　"P_Square"<br>
+    　　"P_Saw"<br>
+    　　"P_Triangle"<br>
+    ・ローパスフィルターの動的制御<br>
+    　　特に P_ で始まる音色で強めにかけているのですが、音量によってフィルターを動かし音に変化を加えました。<br>
+    ・音量によるピッチの制御<br>
+    　　A_Recorder と A_Flute にデフォルトでピッチ制御を入れています。音量を弱くするとピッチが下がります。<br>
+    ・リセット機能の追加<br>
+    　　下にあるマニュアルを参照ください。音色単位のリセット(AFUUE2のみ)と、全体の出荷時設定に戻すリセットがあります。<br>
+    <br>
+    <br>
+    <h3>ダウンロード</h3>
+    AFUUE2 ソフトウェア <a href="afuue_project/Arduino/AFUUE2.zip">ダウンロード</a> (2023/9 以降にお買い上げの方向け/白い表面に製造番号が入っている)<br>
+    AFUUE2 (2022/12～2023/5 にお買い上げの方向け/白い表面に穴が２つ空いている,製造番号はない) はお問い合わせください。<br>
+    <br>
+    AFUUE2R ソフトウェア <a href="afuue_project/Arduino/AFUUE2R.zip">ダウンロード</a><br>
+    <br>
+    <br>
+    <h3>マニュアル</h3>
+    お買い上げ時と少し変わっている（メニュー追加やリセット操作も増えてます）ので、一読ください。<br>
+    <a href="afuue_project/Manual/v9/Manual.pdf">AFUUE2 マニュアル</a><br>
+    <a href="afuue_project/Manual/v10/Manual.pdf">AFUUE2R マニュアル</a><br>
+    <br>
+    <br>
+    <h3>AFUUE2 更新方法</h3>
+    （うまく行かない場合は問合せください。手探りで対応するので解決しない可能性もあります…）<br>
+    ダウンロードした zip ファイルを展開します。場所はどこでも大丈夫ですが、フォルダ名は AFUUE2 のままにしてください（中の .ino ファイルと同名の必要があります）<br>
+    <br>
+    Arduino IDE 2.3.4 を使用します。<br>
+    <br>
+    Arduino IDE のボードマネージャーで M5Stack をインストールします。<br>
+    <br>
+    Arduino IDE のライブラリマネージャーから下記のライブラリをインストールします。<br>
+    - M5Stack library 0.4.6<br>
+    - M5Unified library 0.2.0<br>
+    - Adafruit_MCP23017 library 2.3.2<br>
+    - Adafruit_PCF8574 library 1.1.1<br>
+    - Adafruit TinyUSB Library 3.1.3<br>
+    <br>
+    Arduino IDE の Tools から boards を M5StickC Plus に変更します。<br>
+    <br>
+    AFUUE2 を PC に接続します。<br>
+    Arduino IDE の Tools の PORT から接続された M5StickC Plus と思われるものを選択します（他に何もつないでなければ通常は１つだけ選択可能なはずです）<br>
+    <br>
+    Arduino IDE の (→) ボタンでソフトウェアを書き込みます。<br>
+    <br>
+    Output の所に書き込み状況が表示され、100% まで進んだのちに AFUUE2 が再起動したら完了です。<br>
+    <br>
+    <br>
+    <h3>AFUUE2R 更新方法</h3>
+    （うまく行かない場合は問合せください。手探りで対応するので解決しない可能性もあります…）<br>
+    ダウンロードした zip ファイルを展開します。場所はどこでも大丈夫ですが、フォルダ名は AFUUE2R のままにしてください（中の .ino ファイルと同名の必要があります）<br>
+    <br>
+    Arduino IDE 2.3.4 を使用します。<br>
+    <br>
+    Arduino IDE のボードマネージャーで M5Stack をインストールします。<br>
+    <br>
+    Arduino IDE のライブラリマネージャーから下記のライブラリをインストールします。<br>
+    - M5Stack library 0.4.6<br>
+    - M5Unified library 0.2.0<br>
+    - Adafruit_MCP23017 library 2.3.2<br>
+    - Adafruit_PCF8574 library 1.1.1<br>
+    - Adafruit TinyUSB Library 3.1.3<br>
+    <br>
+    Arduino IDE の Tools から boards を M5StampS3 に変更します。<br>
+    Arduino IDE の Tools の以下の項目を設定します。<br>
+    - USB CDC On Boot  : "Enabled"<br>
+    - USB DFU On Boot  : "Disabled"<br>
+    - JTAG Adapter     : "Disabled"<br>
+    - USB Firmware MSC On Boot: "Disabled"<br>
+    - Upload Mode      : "UART0/Hardware CDC"<br>
+    - USB Mode         : "USB-OTG (TinyUSB)"<br>
+
+    <br>
+    AFUUE2R を「ファンクションボタンを押しながら」 PC に接続します。<br>
+    Arduino IDE の Tools の PORT から接続された M5StampS3 と思われるものを選択します（他に何もつないでなければ通常は１つだけ選択可能なはずです）<br>
+    <br>
+    Arduino IDE の (→) ボタンでソフトウェアを書き込みます。<br>
+    <br>
+    Output の所に書き込み状況が表示され、100% まで進んだのちに AFUUE2R が再起動したら完了です。<br>
+    PC に USB-MIDI 接続したいときは一度 USB ケーブルを抜いてから接続しなおしてください。<br>
+    <br>
+    <br>
+    <br>
+  </body>
+</html>

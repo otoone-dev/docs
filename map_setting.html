@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>SimpleMap for pebble</title>
+  </head>
+  <body>
+    <h1>SimpleMap for pebble</h1>
+    <p>Input marker location</p>
+ 
+    <p>ex) Tokyo station
+    <br>ex) 40.714728,-73.998672
+    <br>
+    <input type="text" name="location" size="40" maxlength="512" id="location_select">
+    </p>
+ 
+    <p>
+    <button id="save_button">Set</button>
+    </p>
+  </body>
+</html>
+
+<script>
+  //Setup to allow easy adding more options later
+  function saveOptions() {
+    //var invertSelect = document.getElementById("invert_select");
+    locationSelect = document.getElementById("location_select");
+    var options = {
+      //"invert": invertSelect.options[invertSelect.selectedIndex].value
+      "locationtext": locationSelect.value
+    }
+     
+    return options;
+  };
+ 
+  var submitButton = document.getElementById("save_button");
+  submitButton.addEventListener("click", 
+    function() {
+      console.log("Submit");
+ 
+      var options = saveOptions();
+      var location = "pebblejs://close#" + encodeURIComponent(JSON.stringify(options));
+       
+      document.location = location;
+    }, 
+  false);
+</script>

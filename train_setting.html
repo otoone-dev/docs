@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+  <head>
+	<meta charset="UTF-8">
+    <title>TrainTime Setting Page</title>
+  </head>
+  <body>
+    <h1>TrainTime Setting Page</h1>
+    
+---------<br>
+<a href="train_setting_sample.html">Sample is here</a><br>
+---------<br>
+<p>
+<br>
+    <input type="radio" name="radio-group" id="radio1" value="0" checked="checked" onclick="radio1Click()">Station1
+    <input type="radio" name="radio-group" id="radio2" value="1" onclick="radio2Click()">Station2
+<br>
+IconType
+<select name="type-select" id="type">
+<option value="0">Train</option>
+<option value="2">Train15</option>
+<option value="3">Bus</option>
+<option value="4">Ship</option>
+<option value="5">Plane</option>
+</select><br>
+Color
+<select name="color-select" id="color">
+<option value="00FF00">Green</option>
+<option value="FF0000">Red</option>
+<option value="FFAA55">Rajah</option>
+<option value="00FFFF">Cyan</option>
+<option value="FFFF00">Yellow</option>
+<option value="FF00FF">Magenta</option>
+<option value="AAAAAA">LightGray</option>
+</select><br>
+    <textarea id="timetable" cols="30" rows="10" maxlength="6144" wrap="off" placeholder="Input time table data"></textarea>
+<br>
+    <button id="save_button">Save</button><br>
+</p>
+   </body>
+</html>
+
+
+<script>
+  //Setup to allow easy adding more options later
+  var timeTable = document.getElementById("timetable");
+  var color = document.getElementById("color");
+  var type = document.getElementById("type");
+
+  window.onload = function() {
+    if (localStorage.watchTimeTable1 != null) {
+      timeTable.value = localStorage.watchTimeTable1;
+      color.value = localStorage.watchTimeColor1;
+      type.value = localStorage.watchTimeType1;
+    }
+  }
+  var viewingBank = 1;
+
+  function storeCurrentTable() {
+    if (viewingBank == 1) {
+      localStorage.watchTimeTable1 = timeTable.value;
+      localStorage.watchTimeColor1 = color.value;
+      localStorage.watchTimeType1 = type.value;
+    } else {
+      localStorage.watchTimeTable2 = timeTable.value;
+      localStorage.watchTimeColor2 = color.value;
+      localStorage.watchTimeType2 = type.value;
+    }
+  }
+
+  function radio1Click() {
+    storeCurrentTable();
+    if (localStorage.watchTimeTable1 != null) {
+      timeTable.value = localStorage.watchTimeTable1;
+      color.value = localStorage.watchTimeColor1;
+      type.value = localStorage.watchTimeType1;
+    }
+    viewingBank = 1;
+  }
+  function radio2Click() {
+    storeCurrentTable();
+    if (localStorage.watchTimeTable2 != null) {
+      timeTable.value = localStorage.watchTimeTable2;
+      color.value = localStorage.watchTimeColor2;
+      type.value = localStorage.watchTimeType2;
+    }
+    viewingBank = 2;
+  }
+
+  function saveOptions() {
+    storeCurrentTable();
+    bank = document.getElementById("radio2");
+    var options = {
+      "time_table": timeTable.value,
+      "bank": bank.checked,
+      "color": color.value,
+      "type": type.value
+    }
+    return options;
+  };
+ 
+  var submitButton = document.getElementById("save_button");
+  submitButton.addEventListener("click", 
+    function() {
+      console.log("Submit");
+ 
+      var options = saveOptions();
+      var location = "pebblejs://close#" + encodeURIComponent(JSON.stringify(options));
+       
+      document.location = location;
+    }, 
+  false);
+</script>
