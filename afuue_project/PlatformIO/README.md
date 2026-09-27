@@ -14,6 +14,8 @@ zip ファイルを展開すると、中に README.md がありますので、�
 1. 上記リンクから AFUUE2_gen2.bin をダウンロードしてください。
 2. AFUUE2R gen2 の StampS3 lite (裏面の白い四角いマイコン) を Windows PC に USB で接続し、横にある小さなボタンを長押します。ボタンの根本に緑のランプが点灯することで書き込みモードに入ったことが確認できます。AFUUE2R gen2 本体につないだまま作業できます。
 
+![AFUUE2R_program_mode](afuue2r_program_mode.png)
+
 3. Windows PC の Chrome (Edgeでもいけるかもしれません) で下記ページを開きます。<br>
 [WebSerial_ESPTool](https://jason2866.github.io/WebSerial_ESPTool/)
 
