@@ -2,8 +2,8 @@
 
 ## ファイル構成
 このフォルダには以下のファイルがあります。
-- AFUUE2R_gen2.bin
-- AFUUE2R_gen2.zip
+- [AFUUE2R_gen2.bin](AFUUE2R_gen2.bin)
+- [AFUUE2R_gen2.zip](AFUUE2R_gen2.zip)
 
 bin ファイルはソフトウェア書き込み用になり、zip ファイルはソフトウェアを開発したい方向けです。
 
