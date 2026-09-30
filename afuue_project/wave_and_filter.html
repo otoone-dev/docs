@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>波形エディタ + ローパスフィルター</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#e9edf1;--panel:#fff;--ink:#131c25;--mut:#5d6b78;--line:#cfd6dd;--grid:#e3e8ec;--wave:#0b63c8;--fill:rgba(11,99,200,.12);--acc:#0b63c8;--onacc:#fff}
+html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b1015;--panel:#131a21;--ink:#e6ecf1;--mut:#8b99a6;--line:#27313b;--grid:#1c252d;--wave:#ffb454;--fill:rgba(255,180,84,.13);--acc:#ffb454;--onacc:#1a1206}}
+:root[data-theme="dark"]{--bg:#0b1015;--panel:#131a21;--ink:#e6ecf1;--mut:#8b99a6;--line:#27313b;--grid:#1c252d;--wave:#ffb454;--fill:rgba(255,180,84,.13);--acc:#ffb454;--onacc:#1a1206}
+*{box-sizing:border-box}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic UI","Noto Sans JP",system-ui,sans-serif}
+main{max-width:760px;margin:0 auto;padding:16px 14px 32px}
+h1{font-size:20px;margin:4px 0 2px;letter-spacing:.01em}
+.sub{color:var(--mut);margin:0 0 14px;font-size:13px}
+section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
+h2{font-size:14px;margin:0 0 8px;display:flex;justify-content:space-between;align-items:baseline}
+h2 small{color:var(--mut);font-weight:400;font-size:12px}
+canvas{display:block;width:100%;border-radius:6px;background:var(--panel);border:1px solid var(--line)}
+#wave{height:200px;touch-action:none;cursor:crosshair}
+#resp{height:130px}
+#top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:6px 0 8px;margin-bottom:6px}
+#scope{height:56px}
+.row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+button{font:inherit;font-size:13px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:6px;padding:6px 11px;cursor:pointer}
+button:hover{border-color:var(--acc)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#play{width:100%;padding:12px;font-size:16px;font-weight:600;background:var(--acc);color:var(--onacc);border-color:var(--acc);border-radius:8px;margin-bottom:8px}
+#play.on{background:transparent;color:var(--acc)}
+.ctl{display:grid;grid-template-columns:96px 1fr 84px;align-items:center;gap:8px;margin:8px 0}
+.ctl output{text-align:right;font-variant-numeric:tabular-nums;font-size:13px}
+input[type=range]{width:100%;accent-color:var(--acc)}
+.note{color:var(--mut);font-size:12px;margin:6px 0 0}
+</style>
+</head>
+<body>
+<main>
+<h1>波形エディタ + ローパスフィルター</h1>
+<p class="sub">波形を直接なぞって描くと、再生中の音がリアルタイムに変わります。</p>
+
+<div id="top"><button id="play">▶ 再生</button><canvas id="scope"></canvas></div>
+
+<section>
+<h2>ベース波形 <small>1周期・ドラッグで描画</small></h2>
+<canvas id="wave"></canvas>
+<div class="row" id="presets">
+<button data-p="sine">サイン</button><button data-p="tri">三角</button><button data-p="saw">ノコギリ</button><button data-p="sq">矩形</button><button data-p="pulse">パルス25%</button><button data-p="rnd">ランダム</button>
+<button id="smooth">なめらかに</button><button id="inv">反転</button>
+</div>
+</section>
+
+<section>
+<h2>ローパスフィルター <small>周波数特性</small></h2>
+<canvas id="resp"></canvas>
+<div class="ctl"><label for="cut">カットオフ</label><input id="cut" type="range" min="0" max="1000" value="700"><output id="cutv"></output></div>
+<div class="ctl"><label for="q">Q値</label><input id="q" type="range" min="0" max="1000" value="250"><output id="qv"></output></div>
+<p class="note">Q=0.71 でフラット、大きいほどカットオフ付近が強調されます。音量に注意。</p>
+</section>
+
+<section>
+<h2>出力</h2>
+<div class="ctl"><label for="pitch">ピッチ</label><input id="pitch" type="range" min="0" max="1000" value="500"><output id="pitchv"></output></div>
+<div class="ctl"><label for="vol">音量</label><input id="vol" type="range" min="0" max="100" value="40"><output id="volv"></output></div>
+</section>
+</main>
+
+<script>
+const N=256, K=N/2-1;
+const $=id=>document.getElementById(id);
+const wave=new Float32Array(N);
+const AC=window.AudioContext||window.webkitAudioContext;
+const ac=new AC();
+const env=ac.createGain(); env.gain.value=0;
+const lp=ac.createBiquadFilter(); lp.type='lowpass';
+const master=ac.createGain();
+env.connect(lp); lp.connect(master); master.connect(ac.destination);
+const probe=ac.createBiquadFilter(); probe.type='lowpass';
+const an=ac.createAnalyser();an.fftSize=2048;lp.connect(an);
+const buf=new Float32Array(2048);
+let osc=null;
+
+// ---- parameter mapping
+const cutHz=()=>20*Math.pow(1000,$('cut').value/1000);            // 20 - 20000 Hz
+const qVal=()=>0.5*Math.pow(60,$('q').value/1000);                 // 0.5 - 30
+const pitchHz=()=>55*Math.pow(16,$('pitch').value/1000);           // 55 - 880 Hz
+const volGain=()=>Math.pow($('vol').value/100,2)*0.8;
+
+function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+function fit(c){const d=window.devicePixelRatio||1,w=c.clientWidth,h=c.clientHeight;
+  if(c.width!==Math.round(w*d)||c.height!==Math.round(h*d)){c.width=Math.round(w*d);c.height=Math.round(h*d)}
+  const g=c.getContext('2d');g.setTransform(d,0,0,d,0,0);return[g,w,h]}
+
+// ---- waveform drawing
+function drawWave(){
+  const[g,w,h]=fit($('wave'));
+  g.clearRect(0,0,w,h);
+  g.strokeStyle=css('--grid');g.lineWidth=1;g.beginPath();
+  for(let i=1;i<4;i++){const y=h*i/4;g.moveTo(0,y);g.lineTo(w,y)}
+  for(let i=1;i<4;i++){const x=w*i/4;g.moveTo(x,0);g.lineTo(x,h)}
+  g.stroke();
+  g.beginPath();
+  for(let i=0;i<N;i++){const x=i/(N-1)*w,y=(1-wave[i])/2*h;i?g.lineTo(x,y):g.moveTo(x,y)}
+  g.strokeStyle=css('--wave');g.lineWidth=2;g.stroke();
+  g.lineTo(w,h/2);g.lineTo(0,h/2);g.fillStyle=css('--fill');g.fill();
+}
+function buildWave(){
+  const re=new Float32Array(K+1),im=new Float32Array(K+1);
+  for(let k=1;k<=K;k++){let a=0,b=0;const t=2*Math.PI*k/N;
+    for(let n=0;n<N;n++){a+=wave[n]*Math.cos(t*n);b+=wave[n]*Math.sin(t*n)}
+    re[k]=2*a/N;im[k]=2*b/N}
+  return ac.createPeriodicWave(re,im);
+}
+function changed(){drawWave();if(osc)osc.setPeriodicWave(buildWave())}
+
+// ---- pointer editing
+const cv=$('wave');let last=null;
+function pos(e){const r=cv.getBoundingClientRect();
+  return[Math.max(0,Math.min(N-1,Math.round((e.clientX-r.left)/r.width*(N-1)))),
+         Math.max(-1,Math.min(1,1-2*(e.clientY-r.top)/r.height))]}
+function paint(p){
+  if(!last){wave[p[0]]=p[1];return}
+  const a=last,b=p,n=Math.abs(b[0]-a[0]);
+  for(let i=0;i<=n;i++){const t=n?i/n:0;wave[Math.round(a[0]+(b[0]-a[0])*t)]=a[1]+(b[1]-a[1])*t}
+}
+cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);last=null;const p=pos(e);paint(p);last=p;changed()});
+cv.addEventListener('pointermove',e=>{if(!last)return;const p=pos(e);paint(p);last=p;changed()});
+['pointerup','pointercancel'].forEach(t=>cv.addEventListener(t,()=>{last=null}));
+
+// ---- presets
+function preset(k){
+  for(let i=0;i<N;i++){const p=i/N;
+    wave[i]=k==='sine'?Math.sin(2*Math.PI*p)
+      :k==='tri'?(p<.25?4*p:p<.75?2-4*p:4*p-4)
+      :k==='saw'?1-2*p
+      :k==='sq'?(p<.5?1:-1)
+      :k==='pulse'?(p<.25?1:-1)
+      :Math.random()*2-1}
+  if(k==='rnd')for(let s=0;s<6;s++)smooth();
+  if(k==='rnd'){let m=0;for(const v of wave)m=Math.max(m,Math.abs(v));for(let i=0;i<N;i++)wave[i]/=m||1}
+  changed();
+}
+function smooth(){const c=Float32Array.from(wave);for(let i=0;i<N;i++)wave[i]=(c[(i+N-1)%N]+c[i]+c[(i+1)%N])/3}
+document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>preset(b.dataset.p));
+$('smooth').onclick=()=>{smooth();changed()};
+$('inv').onclick=()=>{for(let i=0;i<N;i++)wave[i]=-wave[i];changed()};
+
+// ---- filter response plot
+const fr=new Float32Array(240),mag=new Float32Array(240),ph=new Float32Array(240);
+for(let i=0;i<fr.length;i++)fr[i]=20*Math.pow(1000,i/(fr.length-1));
+function drawResp(){
+  const[g,w,h]=fit($('resp'));
+  probe.frequency.value=cutHz();probe.Q.value=20*Math.log10(qVal());
+  probe.getFrequencyResponse(fr,mag,ph);
+  const lo=-48,hi=30,X=f=>Math.log(f/20)/Math.log(1000)*w,Y=d=>h-(Math.max(lo,Math.min(hi,d))-lo)/(hi-lo)*h;
+  g.clearRect(0,0,w,h);
+  g.strokeStyle=css('--grid');g.lineWidth=1;g.fillStyle=css('--mut');g.font='11px sans-serif';g.beginPath();
+  [100,1000,10000].forEach(f=>{g.moveTo(X(f),0);g.lineTo(X(f),h);g.fillText(f>=1000?f/1000+'k':f,X(f)+3,h-4)});
+  [-24,0,24].forEach(d=>{g.moveTo(0,Y(d));g.lineTo(w,Y(d));g.fillText(d+'dB',3,Y(d)-3)});
+  g.stroke();
+  g.beginPath();
+  for(let i=0;i<fr.length;i++){const x=X(fr[i]),y=Y(20*Math.log10(mag[i]||1e-6));i?g.lineTo(x,y):g.moveTo(x,y)}
+  g.strokeStyle=css('--wave');g.lineWidth=2;g.stroke();
+  g.setLineDash([4,4]);g.strokeStyle=css('--mut');g.beginPath();g.moveTo(X(cutHz()),0);g.lineTo(X(cutHz()),h);g.stroke();g.setLineDash([]);
+}
+
+// ---- output scope (post-filter)
+function drawScope(){
+  const[g,w,h]=fit($('scope'));
+  g.clearRect(0,0,w,h);
+  g.strokeStyle=css('--grid');g.lineWidth=1;g.beginPath();g.moveTo(0,h/2);g.lineTo(w,h/2);g.stroke();
+  g.fillStyle=css('--mut');g.font='11px sans-serif';g.fillText('出力波形',4,12);
+  if(!osc)return;
+  an.getFloatTimeDomainData(buf);
+  const len=Math.min(Math.round(ac.sampleRate/pitchHz()*2),1024);
+  let s=0;for(let i=1;i<1024;i++){if(buf[i-1]<=0&&buf[i]>0){s=i;break}}
+  let pk=1;for(let i=0;i<len;i++)pk=Math.max(pk,Math.abs(buf[s+i]));
+  g.beginPath();
+  for(let i=0;i<len;i++){const x=i/(len-1)*w,y=h/2-buf[s+i]/pk*h/2*0.9;i?g.lineTo(x,y):g.moveTo(x,y)}
+  g.strokeStyle=css('--wave');g.lineWidth=1.5;g.stroke();
+}
+function tick(){drawScope();if(osc)requestAnimationFrame(tick)}
+
+// ---- controls
+function fmtHz(f){return f>=1000?(f/1000).toFixed(2)+' kHz':f.toFixed(0)+' Hz'}
+function applyAll(){
+  const t=ac.currentTime;
+  lp.frequency.setTargetAtTime(cutHz(),t,0.01);
+  lp.Q.setTargetAtTime(20*Math.log10(qVal()),t,0.01); // Web Audio の lowpass Q は dB 単位
+  master.gain.setTargetAtTime(volGain(),t,0.01);
+  if(osc)osc.frequency.setTargetAtTime(pitchHz(),t,0.01);
+  $('cutv').textContent=fmtHz(cutHz());
+  $('qv').textContent=qVal().toFixed(2);
+  $('pitchv').textContent=pitchHz().toFixed(1)+' Hz';
+  $('volv').textContent=$('vol').value+'%';
+  drawResp();
+}
+['cut','q','pitch','vol'].forEach(id=>$(id).addEventListener('input',applyAll));
+
+$('play').onclick=async()=>{
+  const b=$('play');
+  if(osc){
+    const o=osc;osc=null;const t=ac.currentTime;
+    env.gain.setTargetAtTime(0,t,0.02);o.stop(t+0.15);
+    b.textContent='▶ 再生';b.classList.remove('on');setTimeout(drawScope,250);
+  }else{
+    await ac.resume();
+    osc=ac.createOscillator();osc.setPeriodicWave(buildWave());
+    osc.frequency.value=pitchHz();osc.connect(env);osc.start();
+    env.gain.setTargetAtTime(1,ac.currentTime,0.02);
+    b.textContent='■ 停止';b.classList.add('on');tick();
+  }
+};
+
+function redraw(){drawWave();drawResp();drawScope()}
+addEventListener('resize',redraw);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',redraw);
+preset('saw');applyAll();drawScope();
+</script>
+</body>
+</html>
