@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>波形エディタ + MIDI</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#e9edf1;--panel:#fff;--ink:#131c25;--mut:#5d6b78;--line:#cfd6dd;--grid:#e3e8ec;--wave:#0b63c8;--fill:rgba(11,99,200,.12);--acc:#0b63c8;--onacc:#fff}
+html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b1015;--panel:#131a21;--ink:#e6ecf1;--mut:#8b99a6;--line:#27313b;--grid:#1c252d;--wave:#ffb454;--fill:rgba(255,180,84,.13);--acc:#ffb454;--onacc:#1a1206}}
+:root[data-theme="dark"]{--bg:#0b1015;--panel:#131a21;--ink:#e6ecf1;--mut:#8b99a6;--line:#27313b;--grid:#1c252d;--wave:#ffb454;--fill:rgba(255,180,84,.13);--acc:#ffb454;--onacc:#1a1206}
+*{box-sizing:border-box}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic UI","Noto Sans JP",system-ui,sans-serif}
+main{max-width:760px;margin:0 auto;padding:16px 14px 32px}
+h1{font-size:20px;margin:4px 0 2px;letter-spacing:.01em}
+.sub{color:var(--mut);margin:0 0 14px;font-size:13px}
+section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
+h2{font-size:14px;margin:0 0 8px;display:flex;justify-content:space-between;align-items:baseline}
+h2 small{color:var(--mut);font-weight:400;font-size:12px}
+canvas{display:block;width:100%;border-radius:6px;background:var(--panel);border:1px solid var(--line)}
+#wave{height:200px;touch-action:none;cursor:crosshair}
+#resp{height:130px}
+#top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:6px 0 8px;margin-bottom:6px}
+#scope{height:56px}
+.row{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+button{font:inherit;font-size:13px;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:6px;padding:6px 11px;cursor:pointer}
+button:hover{border-color:var(--acc)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#play{width:100%;padding:12px;font-size:16px;font-weight:600;background:var(--acc);color:var(--onacc);border-color:var(--acc);border-radius:8px;margin-bottom:8px}
+#play.on{background:transparent;color:var(--acc)}
+#midiBtn{width:100%;padding:10px;font-weight:600}
+.ctl{display:grid;grid-template-columns:96px 1fr 84px;align-items:center;gap:8px;margin:8px 0}
+.ctl.two{grid-template-columns:96px 1fr}
+.ctl output{text-align:right;font-variant-numeric:tabular-nums;font-size:13px}
+input[type=range]{width:100%;accent-color:var(--acc)}
+select{font:inherit;font-size:13px;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 8px;width:100%}
+.sel{background:var(--acc);color:var(--onacc);border-color:var(--acc)}
+[hidden]{display:none!important}
+.note{color:var(--mut);font-size:12px;margin:6px 0 0}
+#midiMon{font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<main>
+<h1>波形エディタ + MIDI</h1>
+<p class="sub">波形を直接なぞって描くと、再生中の音がリアルタイムに変わります。MIDI入力でノート・ブレス・ピッチベンドも使えます。</p>
+
+<div id="top"><button id="play">▶ 再生</button><canvas id="scope"></canvas></div>
+
+<section>
+<h2>MIDI入力 <small id="midiState">未接続</small></h2>
+<button id="midiBtn">MIDIを有効にする</button>
+<div class="ctl two"><label for="midiIn">入力デバイス</label><select id="midiIn" disabled><option value="">すべて</option></select></div>
+<div class="ctl two"><label for="bendRange">ベンド幅</label><select id="bendRange">
+<option value="1">±1 半音</option><option value="2" selected>±2 半音</option><option value="3">±3 半音</option><option value="5">±5 半音</option><option value="12">±12 半音</option></select></div>
+<div class="ctl two"><label for="breathSrc">ブレス</label><select id="breathSrc">
+<option value="both" selected>CC#2 + CC#11</option><option value="cc2">CC#2 のみ</option><option value="cc11">CC#11 のみ</option><option value="at">チャンネルアフタータッチ</option><option value="off">無効（常に最大）</option></select></div>
+<p class="note" id="midiMon">ノート: - ／ ブレス: 100% ／ ベンド: 0 cent</p>
+<p class="note" id="midiNote">モノフォニック（最後に押した音を優先）。ブレスのCCを受信するまでは音量最大で鳴ります。ブラウザ側のMIDI許可と、タップによる音声の有効化が必要です。</p>
+</section>
+
+<section>
+<h2>ベース波形 <small>1周期・ドラッグで描画</small></h2>
+<canvas id="wave"></canvas>
+<div class="row" id="presets">
+<button data-p="sine">サイン</button><button data-p="tri">三角</button><button data-p="saw">ノコギリ</button><button data-p="sq">矩形</button><button data-p="pulse">パルス25%</button><button data-p="rnd">ランダム</button>
+<button id="smooth">なめらかに</button><button id="inv">反転</button>
+</div>
+</section>
+
+<section>
+<h2>モード <small id="modeHint">スライダーで手動調整</small></h2>
+<div class="row" id="modes"><button data-m="manual" class="sel">手動</button><button data-m="auto">自動</button></div>
+<div class="row" id="insts" hidden><button data-i="trumpet">トランペット</button><button data-i="sax">サックス</button><button data-i="clarinet">クラリネット</button><button data-i="flute">フルート</button><button data-i="oboe">オーボエ</button></div>
+</section>
+
+<section>
+<h2>ローパスフィルター <small>周波数特性</small></h2>
+<canvas id="resp"></canvas>
+<div class="ctl"><label for="cut">カットオフ</label><input id="cut" type="range" min="0" max="1000" value="700"><output id="cutv"></output></div>
+<div class="ctl"><label for="q">Q値</label><input id="q" type="range" min="0" max="1000" value="250"><output id="qv"></output></div>
+<p class="note">Q=0.71 でフラット、大きいほどカットオフ付近が強調されます。音量に注意。</p>
+</section>
+
+<section>
+<h2>フォルマント（ピーク）フィルター <small>ローパスの後段・固定周波数</small></h2>
+<div class="ctl"><label for="fmf">中心周波数</label><input id="fmf" type="range" min="0" max="1000" value="537"><output id="fmfv"></output></div>
+<div class="ctl"><label for="fmg">ゲイン</label><input id="fmg" type="range" min="-120" max="180" value="0"><output id="fmgv"></output></div>
+<div class="ctl"><label for="fmq">Q値</label><input id="fmq" type="range" min="0" max="1000" value="354"><output id="fmqv"></output></div>
+<p class="note">ゲイン0dBでオフ。自動モードでは楽器ごとの値が入り、再生中も動かせます。</p>
+</section>
+
+<section>
+<h2>出力</h2>
+<div class="ctl"><label for="pitch">ピッチ</label><input id="pitch" type="range" min="0" max="1000" value="500"><output id="pitchv"></output></div>
+<div class="ctl"><label for="vol">音量</label><input id="vol" type="range" min="0" max="100" value="40"><output id="volv"></output></div>
+<p class="note">MIDIノート演奏中は、ピッチがノートに追従します（スライダーは55〜880Hzの範囲で表示）。</p>
+</section>
+</main>
+
+<script>
+const N=256, K=N/2-1;
+const $=id=>document.getElementById(id);
+const wave=new Float32Array(N);
+const AC=window.AudioContext||window.webkitAudioContext;
+const ac=new AC();
+const env=ac.createGain(); env.gain.value=0;
+const breathG=ac.createGain(); breathG.gain.value=1;               // ブレス(MIDI)による音量
+const lp=ac.createBiquadFilter(); lp.type='lowpass';
+const master=ac.createGain();
+const fm=ac.createBiquadFilter();fm.type='peaking';fm.gain.value=0;
+env.connect(breathG); breathG.connect(lp); lp.connect(fm); fm.connect(master); master.connect(ac.destination);
+const bs=ac.createConstantSource();bs.offset.value=0;bs.start();   // ピッチベンド(cent)。発音ごとに osc.detune へ接続
+const probe=ac.createBiquadFilter(); probe.type='lowpass';
+const probe2=ac.createBiquadFilter(); probe2.type='peaking';
+const an=ac.createAnalyser();an.fftSize=2048;fm.connect(an);
+const buf=new Float32Array(2048);
+let osc=null;
+let noteHz=null;                 // MIDIノート演奏中の周波数（null=スライダー）
+const held=[];                   // 押されているノート（最後が優先）
+
+// ---- parameter mapping
+const cutHz=()=>20*Math.pow(1000,$('cut').value/1000);            // 20 - 20000 Hz
+const qVal=()=>0.5*Math.pow(60,$('q').value/1000);                 // 0.5 - 30
+const pitchHz=()=>noteHz||55*Math.pow(16,$('pitch').value/1000);   // スライダー 55 - 880 Hz / MIDI時はノート周波数
+const volGain=()=>Math.pow($('vol').value/100,2)*0.8;
+
+function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+function fit(c){const d=window.devicePixelRatio||1,w=c.clientWidth,h=c.clientHeight;
+  if(c.width!==Math.round(w*d)||c.height!==Math.round(h*d)){c.width=Math.round(w*d);c.height=Math.round(h*d)}
+  const g=c.getContext('2d');g.setTransform(d,0,0,d,0,0);return[g,w,h]}
+
+// ---- waveform drawing
+function drawWave(){
+  const[g,w,h]=fit($('wave'));
+  g.clearRect(0,0,w,h);
+  g.strokeStyle=css('--grid');g.lineWidth=1;g.beginPath();
+  for(let i=1;i<4;i++){const y=h*i/4;g.moveTo(0,y);g.lineTo(w,y)}
+  for(let i=1;i<4;i++){const x=w*i/4;g.moveTo(x,0);g.lineTo(x,h)}
+  g.stroke();
+  g.beginPath();
+  for(let i=0;i<N;i++){const x=i/(N-1)*w,y=(1-wave[i])/2*h;i?g.lineTo(x,y):g.moveTo(x,y)}
+  g.strokeStyle=css('--wave');g.lineWidth=2;g.stroke();
+  g.lineTo(w,h/2);g.lineTo(0,h/2);g.fillStyle=css('--fill');g.fill();
+}
+function buildWave(){
+  const re=new Float32Array(K+1),im=new Float32Array(K+1);
+  for(let k=1;k<=K;k++){let a=0,b=0;const t=2*Math.PI*k/N;
+    for(let n=0;n<N;n++){a+=wave[n]*Math.cos(t*n);b+=wave[n]*Math.sin(t*n)}
+    re[k]=2*a/N;im[k]=2*b/N}
+  return ac.createPeriodicWave(re,im);
+}
+function changed(){drawWave();if(osc)osc.setPeriodicWave(buildWave())}
+
+// ---- pointer editing
+const cv=$('wave');let last=null;
+function pos(e){const r=cv.getBoundingClientRect();
+  return[Math.max(0,Math.min(N-1,Math.round((e.clientX-r.left)/r.width*(N-1)))),
+         Math.max(-1,Math.min(1,1-2*(e.clientY-r.top)/r.height))]}
+function paint(p){
+  if(!last){wave[p[0]]=p[1];return}
+  const a=last,b=p,n=Math.abs(b[0]-a[0]);
+  for(let i=0;i<=n;i++){const t=n?i/n:0;wave[Math.round(a[0]+(b[0]-a[0])*t)]=a[1]+(b[1]-a[1])*t}
+}
+cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);last=null;const p=pos(e);paint(p);last=p;changed()});
+cv.addEventListener('pointermove',e=>{if(!last)return;const p=pos(e);paint(p);last=p;changed()});
+['pointerup','pointercancel'].forEach(t=>cv.addEventListener(t,()=>{last=null}));
+
+// ---- presets
+function preset(k){
+  for(let i=0;i<N;i++){const p=i/N;
+    wave[i]=k==='sine'?Math.sin(2*Math.PI*p)
+      :k==='tri'?(p<.25?4*p:p<.75?2-4*p:4*p-4)
+      :k==='saw'?1-2*p
+      :k==='sq'?(p<.5?1:-1)
+      :k==='pulse'?(p<.25?1:-1)
+      :Math.random()*2-1}
+  if(k==='rnd')for(let s=0;s<6;s++)smooth();
+  if(k==='rnd'){let m=0;for(const v of wave)m=Math.max(m,Math.abs(v));for(let i=0;i<N;i++)wave[i]/=m||1}
+  changed();
+}
+function smooth(){const c=Float32Array.from(wave);for(let i=0;i<N;i++)wave[i]=(c[(i+N-1)%N]+c[i]+c[(i+1)%N])/3}
+document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>preset(b.dataset.p));
+$('smooth').onclick=()=>{smooth();changed()};
+$('inv').onclick=()=>{for(let i=0;i<N;i++)wave[i]=-wave[i];changed()};
+
+// ---- filter response plot
+const fr=new Float32Array(240),mag=new Float32Array(240),ph=new Float32Array(240),mag2=new Float32Array(240);
+for(let i=0;i<fr.length;i++)fr[i]=20*Math.pow(1000,i/(fr.length-1));
+function drawResp(){
+  const[g,w,h]=fit($('resp'));
+  probe.frequency.value=cutHz();probe.Q.value=20*Math.log10(qVal());
+  probe.getFrequencyResponse(fr,mag,ph);
+  {const[hz,db,q]=FM();probe2.frequency.value=hz;probe2.gain.value=db;probe2.Q.value=q;
+    probe2.getFrequencyResponse(fr,mag2,ph);for(let i=0;i<fr.length;i++)mag[i]*=mag2[i]}
+  const lo=-48,hi=30,X=f=>Math.log(f/20)/Math.log(1000)*w,Y=d=>h-(Math.max(lo,Math.min(hi,d))-lo)/(hi-lo)*h;
+  g.clearRect(0,0,w,h);
+  g.strokeStyle=css('--grid');g.lineWidth=1;g.fillStyle=css('--mut');g.font='11px sans-serif';g.beginPath();
+  [100,1000,10000].forEach(f=>{g.moveTo(X(f),0);g.lineTo(X(f),h);g.fillText(f>=1000?f/1000+'k':f,X(f)+3,h-4)});
+  [-24,0,24].forEach(d=>{g.moveTo(0,Y(d));g.lineTo(w,Y(d));g.fillText(d+'dB',3,Y(d)-3)});
+  g.stroke();
+  g.beginPath();
+  for(let i=0;i<fr.length;i++){const x=X(fr[i]),y=Y(20*Math.log10(mag[i]||1e-6));i?g.lineTo(x,y):g.moveTo(x,y)}
+  g.strokeStyle=css('--wave');g.lineWidth=2;g.stroke();
+  g.setLineDash([4,4]);g.strokeStyle=css('--mut');g.beginPath();g.moveTo(X(cutHz()),0);g.lineTo(X(cutHz()),h);g.stroke();g.setLineDash([]);
+}
+
+// ---- output scope (post-filter)
+function drawScope(){
+  const[g,w,h]=fit($('scope'));
+  g.clearRect(0,0,w,h);
+  g.strokeStyle=css('--grid');g.lineWidth=1;g.beginPath();g.moveTo(0,h/2);g.lineTo(w,h/2);g.stroke();
+  g.fillStyle=css('--mut');g.font='11px sans-serif';g.fillText('出力波形',4,12);
+  if(!osc)return;
+  an.getFloatTimeDomainData(buf);
+  const len=Math.min(Math.round(ac.sampleRate/pitchHz()*2),1024);
+  let s=0;for(let i=1;i<1024;i++){if(buf[i-1]<=0&&buf[i]>0){s=i;break}}
+  let pk=1;for(let i=0;i<len;i++)pk=Math.max(pk,Math.abs(buf[s+i]));
+  g.beginPath();
+  for(let i=0;i<len;i++){const x=i/(len-1)*w,y=h/2-buf[s+i]/pk*h/2*0.9;i?g.lineTo(x,y):g.moveTo(x,y)}
+  g.strokeStyle=css('--wave');g.lineWidth=1.5;g.stroke();
+}
+function tick(){
+  drawScope();
+  if(mode==='auto'&&osc){ // 自動モード中はスライダーを実際の値に追従させる
+    const f=lp.frequency.value,q=Math.pow(10,lp.Q.value/20);
+    $('cut').value=1000*Math.log(f/20)/Math.log(1000);$('q').value=1000*Math.log(q/.5)/Math.log(60);
+    $('cutv').textContent=fmtHz(f);$('qv').textContent=q.toFixed(2);drawResp();
+  }
+  if(osc)requestAnimationFrame(tick);
+}
+
+// ---- auto mode (instrument presets)
+// h: 倍音振幅 / amp: [A,D,S,R秒] / cut: [開始,ピーク,持続]=ピッチ倍率, [到達秒,減衰秒] / q: [開始,持続] / vib: [Hz,cent,遅延秒] / br: 息ノイズ量
+const INST={
+ trumpet:{h:k=>Math.pow(k,-.6),n:24,amp:[.04,.08,.85,.12],cut:[2,12,7,.06,.12],q:[.8,1.2],vib:[5.5,10,.5],br:0},
+ sax:{h:k=>Math.pow(k,-.8)*(k==1?.8:k<4?1.15:1),n:24,amp:[.04,.08,.85,.15],cut:[4,7,6,.05,.15],q:[.8,1],vib:[5,0,.4],br:.16,nbf:1500,fm:[900,5,1]},
+ clarinet:{h:k=>k%2?1/k:.04/k,n:15,amp:[.06,.06,.9,.12],cut:[2,10,6,.06,.15],q:[.7,1],vib:[4.5,3,.8],br:.008},
+ flute:{h:k=>[0,1,.35,.12,.05,.02][k],n:5,amp:[.1,.08,.85,.2],cut:[2,6,3.5,.1,.2],q:[.7,.7],vib:[5,9,.4],br:.05},
+ oboe:{h:k=>Math.pow(k,-.5)*(k==1?.35:1),n:24,amp:[.05,.05,.9,.1],cut:[6,9,8,.03,.08],q:[.9,1.1],vib:[5.8,0,.5],br:.02,nbf:2500,fm:[1300,9,1.8]}
+};
+let mode='manual',inst='trumpet',extras=[];
+const I=()=>INST[inst];
+const fmHz=()=>200*Math.pow(20,$('fmf').value/1000);   // 200 - 4000 Hz
+const fmDb=()=>$('fmg').value/10;                      // -12 - +18 dB
+const fmQ=()=>.3*Math.pow(30,$('fmq').value/1000);     // 0.3 - 9
+const FM=()=>[fmHz(),fmDb(),fmQ()];
+function setFM(hz,db,q){$('fmf').value=1000*Math.log(hz/200)/Math.log(20);$('fmg').value=db*10;$('fmq').value=1000*Math.log(q/.3)/Math.log(30)}
+const nb=ac.createBuffer(1,ac.sampleRate,ac.sampleRate),nd=nb.getChannelData(0);
+for(let i=0;i<nd.length;i++)nd[i]=Math.random()*2-1;
+function instWave(){const d=I();let m=0;
+  for(let i=0;i<N;i++){let v=0;for(let k=1;k<=d.n;k++)v+=d.h(k)*Math.sin(2*Math.PI*k*i/N);wave[i]=v;m=Math.max(m,Math.abs(v))}
+  for(let i=0;i<N;i++)wave[i]/=m||1}
+function pickInst(n){inst=n;
+  document.querySelectorAll('[data-i]').forEach(b=>b.classList.toggle('sel',b.dataset.i===n));
+  instWave();setFM(...(I().fm||[1000,0,1]));applyAll();changed()}
+function setMode(m){stopPlay();mode=m;
+  document.querySelectorAll('[data-m]').forEach(b=>b.classList.toggle('sel',b.dataset.m===m));
+  $('insts').hidden=m!=='auto';
+  $('cut').disabled=$('q').disabled=m==='auto';
+  $('modeHint').textContent=m==='auto'?'発音に合わせてカットオフ/Qが動きます':'スライダーで手動調整';
+  if(m==='auto')pickInst(inst);
+  else{$('fmg').value=0;lp.frequency.cancelScheduledValues(0);lp.Q.cancelScheduledValues(0);applyAll()}}
+document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+document.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>pickInst(b.dataset.i));
+
+async function startPlay(){
+  await ac.resume();
+  const t=ac.currentTime,f0=pitchHz();
+  osc=ac.createOscillator();osc.setPeriodicWave(buildWave());osc.frequency.value=f0;osc.connect(env);
+  bs.connect(osc.detune);                       // ピッチベンド
+  osc.start();
+  extras=[];env.gain.cancelScheduledValues(t);
+  if(mode==='auto'){
+    const d=I(),[fh,fg,fq]=FM(),[a,dc,su]=d.amp,[r0,rp,rs,ta,td]=d.cut,[q0,q1]=d.q;
+    const F=r=>Math.min(20000,Math.max(20,f0*r)),qd=q=>20*Math.log10(q);
+    fm.frequency.value=fh;fm.gain.value=fg;fm.Q.value=fq;
+    env.gain.setValueAtTime(0,t);env.gain.linearRampToValueAtTime(1,t+a);env.gain.linearRampToValueAtTime(su,t+a+dc);
+    lp.frequency.cancelScheduledValues(t);lp.frequency.setValueAtTime(F(r0),t);
+    lp.frequency.exponentialRampToValueAtTime(F(rp),t+ta);lp.frequency.exponentialRampToValueAtTime(F(rs),t+ta+td);
+    lp.Q.cancelScheduledValues(t);lp.Q.setValueAtTime(qd(q0),t);lp.Q.linearRampToValueAtTime(qd(q1),t+ta+td);
+    const lfo=ac.createOscillator(),lg=ac.createGain();
+    lfo.frequency.value=d.vib[0];lg.gain.setValueAtTime(0,t);lg.gain.setValueAtTime(0,t+d.vib[2]);
+    lg.gain.linearRampToValueAtTime(d.vib[1],t+d.vib[2]+.4);
+    lfo.connect(lg);lg.connect(osc.detune);lfo.start();extras.push(lfo);
+    if(d.br){const ns=ac.createBufferSource(),ng=ac.createGain();ns.buffer=nb;ns.loop=true;ng.gain.value=d.br;
+      let src=ns;
+      if(d.nbf){const nf=ac.createBiquadFilter();nf.type='bandpass';nf.frequency.value=d.nbf;nf.Q.value=.6;ns.connect(nf);src=nf}
+      src.connect(ng);ng.connect(env);ns.start();extras.push(ns)}
+  }else env.gain.setTargetAtTime(1,t,.02);
+  $('play').textContent='■ 停止';$('play').classList.add('on');tick();
+}
+function stopPlay(){
+  held.length=0;noteHz=null;
+  if(!osc)return;
+  const o=osc,ex=extras,t=ac.currentTime,rel=mode==='auto'?I().amp[3]:.06;osc=null;extras=[];
+  env.gain.cancelScheduledValues(t);env.gain.setValueAtTime(env.gain.value,t);env.gain.setTargetAtTime(0,t,rel/3);
+  if(mode==='auto'){const f=lp.frequency.value;lp.frequency.cancelScheduledValues(t);lp.frequency.setValueAtTime(f,t);
+    lp.frequency.exponentialRampToValueAtTime(Math.max(20,f*.6),t+rel)}
+  o.stop(t+rel+.15);ex.forEach(n=>n.stop(t+rel+.15));
+  setTimeout(()=>{try{bs.disconnect(o.detune)}catch(_){}},(rel+.4)*1000);
+  $('play').textContent='▶ 再生';$('play').classList.remove('on');setTimeout(drawScope,(rel+.3)*1000);
+}
+
+// ---- controls
+function fmtHz(f){return f>=1000?(f/1000).toFixed(2)+' kHz':f.toFixed(0)+' Hz'}
+const NN=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const noteName=n=>NN[n%12]+(Math.floor(n/12)-1);
+function applyAll(){
+  const t=ac.currentTime;
+  if(mode==='manual'){
+    lp.frequency.setTargetAtTime(cutHz(),t,0.01);
+    lp.Q.setTargetAtTime(20*Math.log10(qVal()),t,0.01); // Web Audio の lowpass Q は dB 単位
+  }else if(osc)lp.frequency.setTargetAtTime(Math.min(20000,pitchHz()*I().cut[2]),t,0.05);
+  master.gain.setTargetAtTime(volGain(),t,0.01);
+  if(osc)osc.frequency.setTargetAtTime(pitchHz(),t,0.005);
+  fm.frequency.setTargetAtTime(fmHz(),t,0.01);fm.gain.setTargetAtTime(fmDb(),t,0.01);fm.Q.setTargetAtTime(fmQ(),t,0.01);
+  $('fmfv').textContent=fmtHz(fmHz());$('fmgv').textContent=(fmDb()>0?'+':'')+fmDb().toFixed(1)+' dB';$('fmqv').textContent=fmQ().toFixed(2);
+  $('cutv').textContent=fmtHz(cutHz());
+  $('qv').textContent=qVal().toFixed(2);
+  $('pitchv').textContent=pitchHz().toFixed(1)+' Hz';
+  $('volv').textContent=$('vol').value+'%';
+  drawResp();
+}
+$('pitch').addEventListener('input',()=>{noteHz=null});   // 手動操作でMIDIノート追従を解除（applyAllより先に登録）
+['cut','q','fmf','fmg','fmq','pitch','vol'].forEach(id=>$(id).addEventListener('input',applyAll));
+
+$('play').onclick=()=>osc?stopPlay():startPlay();
+
+// ---- MIDI (Web MIDI API)
+let midiAccess=null,bendNorm=0,breathVal=1,starting=false;
+const bendRange=()=>+$('bendRange').value;
+function mon(){
+  const n=held.length?noteName(held[held.length-1]):'-';
+  $('midiMon').textContent='ノート: '+n+' ／ ブレス: '+Math.round(breathVal*100)+'% ／ ベンド: '+Math.round(bendNorm*bendRange()*100)+' cent';
+}
+function setBend(){bs.offset.setTargetAtTime(bendNorm*bendRange()*100,ac.currentTime,.005);mon()}
+function setBreath(v){breathVal=v;breathG.gain.setTargetAtTime(v,ac.currentTime,.015);mon()}
+function setNote(n){
+  noteHz=440*Math.pow(2,(n-69)/12);
+  $('pitch').value=1000*Math.log(noteHz/55)/Math.log(16);   // 範囲外は端に張り付く（表示のみ）
+}
+async function midiOn(n){
+  const i=held.indexOf(n);if(i>=0)held.splice(i,1);
+  held.push(n);setNote(n);
+  if(osc){                                  // レガート: エンベロープは再発音せず音程だけ変える
+    if(mode==='auto')lp.frequency.cancelScheduledValues(ac.currentTime);
+    applyAll();
+  }else if(!starting){
+    starting=true;
+    try{await startPlay()}finally{starting=false}
+    if(!held.length)stopPlay();             // 発音準備中にノートオフが来た場合
+  }
+  mon();
+}
+function midiOff(n){
+  const i=held.indexOf(n);if(i<0)return;
+  const wasTop=i===held.length-1;held.splice(i,1);
+  if(!held.length){stopPlay()}
+  else if(wasTop){setNote(held[held.length-1]);if(osc)applyAll()}   // 直前に押していた音へ戻る
+  mon();
+}
+function onMidi(e){
+  const sel=$('midiIn').value;if(sel&&e.target.id!==sel)return;
+  const d=e.data;if(!d||d.length<2)return;
+  const t=d[0]&0xf0,a=d[1],b=d.length>2?d[2]:0,src=$('breathSrc').value;
+  if(t===0x90&&b>0)midiOn(a);
+  else if(t===0x80||t===0x90)midiOff(a);
+  else if(t===0xB0){
+    if((a===2&&(src==='both'||src==='cc2'))||(a===11&&(src==='both'||src==='cc11')))setBreath(b/127);
+    else if(a===120||a===123){stopPlay();mon()}   // All Sound Off / All Notes Off
+  }
+  else if(t===0xD0){if(src==='at')setBreath(a/127)}
+  else if(t===0xE0){bendNorm=(((b<<7)|a)-8192)/8192;setBend()}
+}
+function refreshInputs(){
+  const sel=$('midiIn'),cur=sel.value;sel.length=1;let n=0;
+  midiAccess.inputs.forEach(inp=>{
+    inp.onmidimessage=onMidi;n++;
+    const o=document.createElement('option');o.value=inp.id;o.textContent=inp.name||inp.id;sel.appendChild(o);
+  });
+  sel.value=[...sel.options].some(o=>o.value===cur)?cur:'';
+  sel.disabled=false;
+  $('midiState').textContent=n?('入力 '+n+' 台'):'デバイス未検出';
+}
+async function enableMidi(){
+  await ac.resume();                        // タップ操作で音声を有効化（MIDIメッセージ自体はユーザー操作扱いにならない）
+  try{midiAccess=await navigator.requestMIDIAccess({sysex:false})}
+  catch(err){
+    const n=(err&&err.name)||'Error';
+    $('midiState').textContent='失敗: '+n;
+    $('midiNote').textContent=
+      !window.isSecureContext?'安全な接続（HTTPS）で開かれていません（現在: '+location.protocol+'）。HTTPSで配信したページをChromeで開いてください。'
+      :n==='SecurityError'?'埋め込み表示やアプリ内プレビューではMIDIが禁止されています。Chromeで直接このページのURLを開いてください。'
+      :n==='NotAllowedError'?'許可がブロックされています。Chromeのアドレスバー左の設定アイコン →「権限」でMIDIデバイスを許可し、ページを再読み込みしてください。'
+      :'原因: '+n+(err&&err.message?'（'+err.message+'）':'');
+    return}
+  midiAccess.onstatechange=refreshInputs;refreshInputs();
+  $('midiBtn').textContent='MIDI 有効 ✓';$('midiBtn').classList.add('sel');$('midiBtn').disabled=true;
+}
+if(!navigator.requestMIDIAccess){
+  $('midiState').textContent='非対応';$('midiBtn').disabled=true;
+  $('midiNote').textContent='このブラウザはWeb MIDIに対応していません（iOSのSafariなど）。Android版Chrome、またはWeb MIDI対応のブラウザアプリで開いてください。';
+}else $('midiBtn').onclick=enableMidi;
+$('bendRange').onchange=setBend;
+$('breathSrc').onchange=()=>setBreath(1);
+
+function redraw(){drawWave();drawResp();drawScope()}
+addEventListener('resize',redraw);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',redraw);
+preset('saw');applyAll();drawScope();
+</script>
+</body>
+</html>
