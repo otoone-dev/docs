@@ -8,7 +8,7 @@
 :root{--bg:#0e1116;--pn:#171c24;--ln:#2a3340;--tx:#d8dee9;--dm:#7f8b9d;--ac:#4fd1c5;--wr:#f6ad55}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--tx);font:12px/1.3 system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;touch-action:manipulation;overscroll-behavior:none}
-#app{height:100dvh;padding:max(6px,env(safe-area-inset-top)) 6px max(6px,env(safe-area-inset-bottom));display:grid;grid-template-rows:auto auto auto auto auto minmax(0,1.15fr) minmax(0,1fr) auto;gap:5px}
+#app{height:100dvh;padding:max(6px,env(safe-area-inset-top)) 6px max(6px,env(safe-area-inset-bottom));display:grid;grid-template-rows:auto auto auto auto auto auto minmax(0,1.15fr) minmax(0,1fr) auto;gap:5px}
 .row{display:flex;gap:6px;align-items:center}
 .row>label{width:44px;color:var(--dm);font-size:11px;flex:none}
 .btns{display:flex;gap:4px;flex:1}
@@ -22,8 +22,16 @@ select{flex:1;text-align:left;padding:0 6px}
 .cv{position:relative;min-height:0;background:var(--pn);border:1px solid var(--ln);border-radius:6px;overflow:hidden}
 .cv canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 #trio{display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:5px;min-height:0}
-#info{font:11px/1.45 ui-monospace,Menlo,Consolas,monospace;color:var(--tx);background:var(--pn);border:1px solid var(--ln);border-radius:6px;padding:4px 7px;white-space:pre;overflow:hidden}
+#info{font:11px/1.45 ui-monospace,Menlo,Consolas,monospace;color:var(--tx);background:var(--pn);border:1px solid var(--ln);border-radius:6px;padding:4px 7px;white-space:pre-wrap;word-break:break-all;overflow:hidden}
 #info b{color:var(--ac);font-weight:600}
+#mon{gap:5px}
+#lamp{flex:none;width:62px;height:24px;border-radius:12px;background:#222a35;border:1px solid var(--ln);color:var(--dm);font-size:11px;font-weight:700;line-height:22px;text-align:center}
+#lamp.on{background:#38a169;border-color:#68d391;color:#fff;box-shadow:0 0 10px #38a169}
+.bar{position:relative;flex:1;height:24px;background:var(--pn);border:1px solid var(--ln);border-radius:6px;overflow:hidden}
+.bar i{position:absolute;top:0;bottom:0;left:0;width:0;background:#2c7a73}
+.bar.bend i{background:#b7791f}
+.bar.bend::after{content:'';position:absolute;left:50%;top:0;bottom:0;width:1px;background:#7f8b9d}
+.bar em{position:absolute;left:6px;right:6px;top:0;line-height:22px;font-style:normal;font-size:10.5px;color:#fff;white-space:nowrap}
 #start{position:fixed;inset:0;background:rgba(8,10,14,.94);display:flex;flex-direction:column;gap:14px;align-items:center;justify-content:center;z-index:9;text-align:center;padding:24px}
 #start button{padding:16px 36px;font-size:17px;border-radius:12px;border:0;background:var(--ac);color:#06201d;font-weight:700}
 #start p{margin:0;color:var(--dm);max-width:300px}
@@ -36,6 +44,7 @@ select{flex:1;text-align:left;padding:0 6px}
   <div class="row"><label>ブレス</label><div class="btns" id="gBreath"></div></div>
   <div class="row"><label>波形</label><div class="btns" id="gWave"></div></div>
   <div id="pre"></div>
+  <div class="row" id="mon"><div id="lamp">OFF</div><div class="bar"><i id="bB"></i><em id="tB">ブレス 0%</em></div><div class="bar bend"><i id="bP"></i><em id="tP">ベンド 0</em></div></div>
   <div class="cv"><canvas id="cStaff"></canvas></div>
   <div id="trio">
     <div class="cv"><canvas id="cBase"></canvas></div>
@@ -97,7 +106,7 @@ registerProcessor('wind-synth',S);`;
 
 /* ---------- 定義 ---------- */
 const BEND=[['OFF',0],['±1',1],['±2',2],['±12',12]];
-const BREATH=[['自動','auto'],['CC2','cc2'],['CC11','cc11'],['AT','at']];
+const BREATH=[['自動','auto'],['CC2','cc2'],['CC11','cc11'],['AT','at'],['固定','fix']];  // 固定=ブレス100%固定(発音確認用)
 const WAVES=['ノコギリ','三角波','矩形 50%','矩形 20%'];
 /* lp: b=基準fc(@C4,ブレス0) o=ブレスによるオクターブ上昇量 t=音程追従(0..1) q
    pk: f=中心 t=音程追従 g0/g1=ブレス0/1でのゲインdB q */
@@ -138,7 +147,7 @@ function mapParams(L,f){
 function update(){
   const range=BEND[st.bi][1];
   const f=440*Math.pow(2,(st.note-69+st.bend*range)/12);
-  const L=st.breath,m=mapParams(L,f);
+  const L=BREATH[st.mi][1]==='fix'?1:st.breath,m=mapParams(L,f);
   const comp=1/(1+Math.max(0,m.lq-.7)*.12);
   const amp=st.gate?.5*Math.pow(L,1.6)*comp:0;
   cur.f=f;cur.L=L;cur.m=m;
@@ -147,7 +156,7 @@ function update(){
 }
 
 /* ---------- MIDI ---------- */
-let lastMsg='',autoSrc=null,stBase='未開始';
+let lastMsg='',autoSrc=null,stBase='未開始';const lastBy={};
 function setSt(t){stBase=t;dirty=true;}
 function setBreath(src,v){
   const m=BREATH[st.mi][1];
@@ -159,7 +168,9 @@ function onMidi(e){
   const d=e.data,s=d[0]&0xF0;
   if(d[0]>=0xF0)return;                                            // クロック/アクティブセンシング等は無視
   if(actx&&actx.state!=='running')actx.resume();
-  lastMsg=Array.from(d).map(x=>x.toString(16).toUpperCase().padStart(2,'0')).join(' ');dirty=true;
+  const hx=x=>x.toString(16).toUpperCase().padStart(2,'0');
+  lastMsg=Array.from(d).map(hx).join(' ');dirty=true;
+  lastBy[s===0xB0?'B0/'+hx(d[1]):hx(s)]=(s===0xB0?[d[2]]:Array.from(d).slice(1)).map(hx).join(' ');
   if(s===0x90&&d[2]>0){st.note=d[1];st.gate=true;}                 // 新ノートオン: 前の音を止めずに音程だけ移行(モノ・レガート)
   else if(s===0x80||s===0x90){if(d[1]===st.note){st.gate=false;autoSrc=null;}}   // 対になるノートのみ停止
   else if(s===0xE0){st.bend=Math.max(-1,Math.min(1,(((d[2]<<7)|d[1])-8192)/8192));}
@@ -299,11 +310,15 @@ function drawScope(){
 const hz=x=>x>=1000?(x/1000).toFixed(2)+'k':Math.round(x)+'';
 function drawInfo(){
   const m=cur.m,P=PRESETS[st.preset];
-  $('#st').textContent=stBase+(lastMsg?' ['+lastMsg+']':'');
+  $('#st').textContent=stBase;
+  const bs=st.bend*BEND[st.bi][1],bn=Math.max(-1,Math.min(1,st.bend));
+  $('#lamp').className=st.gate?'on':'';$('#lamp').textContent=st.gate?'ON '+noteName(st.note):'OFF';
+  $('#bB').style.width=Math.round(cur.L*100)+'%';$('#tB').textContent='ブレス '+Math.round(cur.L*100)+'%';
+  $('#bP').style.left=(bn<0?50+bn*50:50)+'%';$('#bP').style.width=Math.abs(bn)*50+'%';$('#tP').textContent='ベンド '+(bs>=0?'+':'')+bs.toFixed(2)+'st';
   $('#info').innerHTML=
    '<b>'+P.n+'</b> / '+WAVES[st.wave]+'   '+(st.gate?noteName(st.note):'--')+' '+cur.f.toFixed(1)+'Hz\n'+
    'LP <b>'+hz(m.lf)+'Hz</b> Q'+m.lq.toFixed(1)+'  PK <b>'+hz(m.pf)+'Hz</b> '+(m.pg>=0?'+':'')+m.pg.toFixed(1)+'dB Q'+m.pq.toFixed(1)+'\n'+
-   'ブレス <b>'+Math.round(cur.L*100)+'%</b>  ベンド <b>'+(st.bend*BEND[st.bi][1]>=0?'+':'')+(st.bend*BEND[st.bi][1]).toFixed(2)+'</b>st';
+   '受信 '+(Object.keys(lastBy).sort().map(k=>k+'='+lastBy[k]).join('  ')||'なし');
 }
 /* AudioWorkletが使えない環境(file://で開いた場合など)用: 同じDSPをScriptProcessorで動かす */
 function makeFallback(){
