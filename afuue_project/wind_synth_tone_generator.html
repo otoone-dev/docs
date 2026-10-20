@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Tone Generator for Wind Synthesizer</title>
+<style>
+:root{--bg:#0e1116;--pn:#171c24;--ln:#2a3340;--tx:#d8dee9;--dm:#7f8b9d;--ac:#4fd1c5;--wr:#f6ad55}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--tx);font:12px/1.3 system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;touch-action:manipulation;overscroll-behavior:none}
+#app{height:100dvh;padding:max(6px,env(safe-area-inset-top)) 6px max(6px,env(safe-area-inset-bottom));display:grid;grid-template-rows:auto auto auto auto auto minmax(0,1.15fr) minmax(0,1fr) auto;gap:5px}
+.row{display:flex;gap:6px;align-items:center}
+.row>label{width:44px;color:var(--dm);font-size:11px;flex:none}
+.btns{display:flex;gap:4px;flex:1}
+.btns button,select{flex:1;min-width:0;height:32px;border:1px solid var(--ln);background:var(--pn);color:var(--tx);border-radius:6px;font:inherit;font-size:12px;padding:0 2px}
+.btns button.on{background:var(--ac);color:#06201d;border-color:var(--ac);font-weight:600}
+#pre{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+#pre button{height:32px;border:1px solid var(--ln);background:var(--pn);color:var(--tx);border-radius:6px;font:inherit;font-size:11.5px;padding:0 1px}
+#pre button.on{background:var(--wr);color:#2a1700;border-color:var(--wr);font-weight:600}
+#st{color:var(--dm);font-size:11px;flex:none;max-width:42%;text-align:right}
+select{flex:1;text-align:left;padding:0 6px}
+.cv{position:relative;min-height:0;background:var(--pn);border:1px solid var(--ln);border-radius:6px;overflow:hidden}
+.cv canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#trio{display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:5px;min-height:0}
+#info{font:11px/1.45 ui-monospace,Menlo,Consolas,monospace;color:var(--tx);background:var(--pn);border:1px solid var(--ln);border-radius:6px;padding:4px 7px;white-space:pre;overflow:hidden}
+#info b{color:var(--ac);font-weight:600}
+#start{position:fixed;inset:0;background:rgba(8,10,14,.94);display:flex;flex-direction:column;gap:14px;align-items:center;justify-content:center;z-index:9;text-align:center;padding:24px}
+#start button{padding:16px 36px;font-size:17px;border-radius:12px;border:0;background:var(--ac);color:#06201d;font-weight:700}
+#start p{margin:0;color:var(--dm);max-width:300px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="row"><select id="dev"><option value="all">全入力</option></select><span id="st">未開始</span></div>
+  <div class="row"><label>ベンド</label><div class="btns" id="gBend"></div></div>
+  <div class="row"><label>ブレス</label><div class="btns" id="gBreath"></div></div>
+  <div class="row"><label>波形</label><div class="btns" id="gWave"></div></div>
+  <div id="pre"></div>
+  <div class="cv"><canvas id="cStaff"></canvas></div>
+  <div id="trio">
+    <div class="cv"><canvas id="cBase"></canvas></div>
+    <div class="cv"><canvas id="cResp"></canvas></div>
+    <div class="cv"><canvas id="cScope"></canvas></div>
+  </div>
+  <div id="info"></div>
+</div>
+<div id="start">
+  <button id="go">タップして開始</button>
+  <p>音声とWeb MIDIを有効にします。MIDIの許可ダイアログが出たら許可してください。</p>
+</div>
+
+<script>
+'use strict';
+/* ---------- biquad係数 (RBJ)。メイン/ワークレット共用 ---------- */
+function lpCoef(fc,q,sr){const w=2*Math.PI*fc/sr,c=Math.cos(w),a=Math.sin(w)/(2*q),a0=1+a;return[(1-c)/2/a0,(1-c)/a0,(1-c)/2/a0,-2*c/a0,(1-a)/a0];}
+function pkCoef(fc,q,db,sr){const A=Math.pow(10,db/40),w=2*Math.PI*fc/sr,c=Math.cos(w),a=Math.sin(w)/(2*q),a0=1+a/A;return[(1+a*A)/a0,-2*c/a0,(1-a*A)/a0,-2*c/a0,(1-a/A)/a0];}
+
+/* ---------- AudioWorklet (連続発振 + PolyBLEP + LP + Peak) ---------- */
+const WSRC=`
+${lpCoef.toString()}
+${pkCoef.toString()}
+function pb(t,dt){if(t<dt){t/=dt;return t+t-t*t-1}if(t>1-dt){t=(t-1)/dt;return t*t+t+t+1}return 0}
+class S extends AudioWorkletProcessor{
+ constructor(){super();
+  this.p={f:440,a:0,lf:2000,lq:.7,pf:1000,pq:1,pg:0,w:0};
+  this.s=Object.assign({},this.p);
+  this.ph=0;this.c=0;this.l=[1,0,0,0,0];this.k=[1,0,0,0,0];this.z=[0,0,0,0];
+  this.port.onmessage=e=>Object.assign(this.p,e.data);}
+ process(inp,outp){
+  const ch=outp[0],out=ch[0],p=this.p,s=this.s,n=out.length,sr=sampleRate,z=this.z;
+  const kf=1-Math.exp(-1/(sr*.004)),kc=1-Math.exp(-1/(sr*.01)),ka=1-Math.exp(-1/(sr*.006));
+  const lim=sr*.45;
+  for(let i=0;i<n;i++){
+   s.f+=(p.f-s.f)*kf;s.a+=(p.a-s.a)*ka;
+   s.lf+=(p.lf-s.lf)*kc;s.lq+=(p.lq-s.lq)*kc;
+   s.pf+=(p.pf-s.pf)*kc;s.pq+=(p.pq-s.pq)*kc;s.pg+=(p.pg-s.pg)*kc;
+   if((this.c++&15)===0){
+    this.l=lpCoef(Math.min(s.lf,lim),Math.max(.3,s.lq),sr);
+    this.k=pkCoef(Math.min(s.pf,lim),Math.max(.3,s.pq),s.pg,sr);
+   }
+   const dt=Math.min(s.f/sr,.45);
+   this.ph+=dt;if(this.ph>=1)this.ph-=1;
+   const t=this.ph;let v;
+   if(p.w===0)v=2*t-1-pb(t,dt);
+   else if(p.w===1)v=1-4*Math.abs(t-.5);
+   else{const d=p.w===2?.5:.2;v=(t<d?1:-1)+pb(t,dt)-pb((t-d+1)%1,dt)-(2*d-1);}
+   const l=this.l,k=this.k;
+   let y=l[0]*v+z[0];z[0]=l[1]*v-l[3]*y+z[1];z[1]=l[2]*v-l[4]*y;
+   const x=y;
+   y=k[0]*x+z[2];z[2]=k[1]*x-k[3]*y+z[3];z[3]=k[2]*x-k[4]*y;
+   out[i]=Math.tanh(y*s.a*1.6);
+  }
+  for(let c=1;c<ch.length;c++)ch[c].set(out);
+  return true;}
+}
+registerProcessor('wind-synth',S);`;
+
+/* ---------- 定義 ---------- */
+const BEND=[['OFF',0],['±1',1],['±2',2],['±12',12]];
+const BREATH=[['CC2+11','both'],['CC2','cc2'],['CC11','cc11'],['AT','at']];
+const WAVES=['ノコギリ','三角波','矩形 50%','矩形 20%'];
+/* lp: b=基準fc(@C4,ブレス0) o=ブレスによるオクターブ上昇量 t=音程追従(0..1) q
+   pk: f=中心 t=音程追従 g0/g1=ブレス0/1でのゲインdB q */
+const PRESETS=[
+ {n:'ブラス(A)',lp:{b:500,o:3.6,t:.8,q:1.4},pk:{f:1200,t:.3,g0:0,g1:4,q:1.2}},
+ {n:'リード(A)',lp:{b:900,o:2.5,t:1,q:6},pk:{f:2500,t:0,g0:0,g1:0,q:1}},
+ {n:'ワウ(A)',lp:{b:250,o:5,t:.4,q:9},pk:{f:800,t:0,g0:0,g1:3,q:2}},
+ {n:'トランペット',lp:{b:1100,o:3.3,t:.6,q:.9},pk:{f:1500,t:.2,g0:2,g1:9,q:2.2}},
+ {n:'サックス',lp:{b:1300,o:2.6,t:.5,q:.8},pk:{f:900,t:.2,g0:3,g1:6,q:1.6}},
+ {n:'フルート',lp:{b:2200,o:1.6,t:1,q:.6},pk:{f:3000,t:.6,g0:0,g1:3,q:1.2}},
+ {n:'オーボエ',lp:{b:2600,o:2.2,t:.4,q:1},pk:{f:1300,t:.15,g0:4,g1:10,q:3.2}},
+ {n:'無加工',bypass:true}
+];
+const NN=['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
+const noteName=n=>NN[n%12]+(Math.floor(n/12)-1);
+
+/* ---------- 状態 ---------- */
+const st={gate:false,note:60,bend:0,breath:0,bi:2,mi:0,wave:0,preset:3,dev:'all'};
+try{Object.assign(st,JSON.parse(localStorage.getItem('ws1')||'{}'),{gate:false,bend:0,breath:0});}catch(e){}
+const save=()=>{try{localStorage.setItem('ws1',JSON.stringify({bi:st.bi,mi:st.mi,wave:st.wave,preset:st.preset,dev:st.dev}));}catch(e){}};
+let actx=null,node=null,an=null,sr=48000,access=null,dirty=true;
+const cur={f:440,L:0,m:{lf:2000,lq:.7,pf:1000,pq:1,pg:0}};
+const $=s=>document.querySelector(s);
+
+/* ---------- 音色マッピング (音量=ブレス, 音程) ---------- */
+function mapParams(L,f){
+  const P=PRESETS[st.preset];
+  if(P.bypass)return{lf:16000,lq:.7,pf:1000,pq:1,pg:0};
+  const tr=f/261.63,cl=(x,a,b)=>Math.min(b,Math.max(a,x));
+  return{
+    lf:cl(P.lp.b*Math.pow(2,P.lp.o*L)*Math.pow(tr,P.lp.t),100,16000),
+    lq:P.lp.q,
+    pf:cl(P.pk.f*Math.pow(tr,P.pk.t),200,12000),
+    pq:P.pk.q,
+    pg:P.pk.g0+(P.pk.g1-P.pk.g0)*L
+  };
+}
+function update(){
+  const range=BEND[st.bi][1];
+  const f=440*Math.pow(2,(st.note-69+st.bend*range)/12);
+  const L=st.breath,m=mapParams(L,f);
+  const comp=1/(1+Math.max(0,m.lq-.7)*.12);
+  const amp=st.gate?.5*Math.pow(L,1.6)*comp:0;
+  cur.f=f;cur.L=L;cur.m=m;
+  if(node)node.port.postMessage({f,a:amp,lf:m.lf,lq:m.lq,pf:m.pf,pq:m.pq,pg:m.pg,w:st.wave});
+  dirty=true;
+}
+
+/* ---------- MIDI ---------- */
+function onMidi(e){
+  const d=e.data,s=d[0]&0xF0;
+  if(s===0x90&&d[2]>0){st.note=d[1];st.gate=true;}                 // 新ノートオン: 前の音を止めずに音程だけ移行(モノ・レガート)
+  else if(s===0x80||s===0x90){if(d[1]===st.note)st.gate=false;}    // 対になるノートのみ停止
+  else if(s===0xE0){st.bend=Math.max(-1,Math.min(1,(((d[2]<<7)|d[1])-8192)/8192));}
+  else if(s===0xB0){
+    const m=BREATH[st.mi][1];
+    if(d[1]===2&&(m==='both'||m==='cc2'))st.breath=d[2]/127;
+    else if(d[1]===11&&(m==='both'||m==='cc11'))st.breath=d[2]/127;
+    else if(d[1]===120||d[1]===123)st.gate=false;
+  }
+  else if(s===0xD0&&BREATH[st.mi][1]==='at')st.breath=d[1]/127;
+  else return;
+  update();
+}
+function bindInputs(){
+  let n=0;
+  for(const i of access.inputs.values()){
+    const on=st.dev==='all'||st.dev===i.id;
+    i.onmidimessage=on?onMidi:null;if(on)n++;
+  }
+  $('#st').textContent='MIDI入力 '+n+'台'+(access.inputs.size?'':'(未接続)');
+}
+function refreshDevs(){
+  const sel=$('#dev');sel.innerHTML='<option value="all">全入力</option>';
+  for(const i of access.inputs.values()){const o=document.createElement('option');o.value=i.id;o.textContent=i.name||i.id;sel.appendChild(o);}
+  if([...sel.options].some(o=>o.value===st.dev))sel.value=st.dev;else{st.dev='all';sel.value='all';}
+  bindInputs();
+}
+async function initMidi(){
+  if(!navigator.requestMIDIAccess){$('#st').textContent='Web MIDI非対応';return;}
+  try{access=await navigator.requestMIDIAccess({sysex:false});access.onstatechange=refreshDevs;refreshDevs();}
+  catch(e){$('#st').textContent='MIDI許可なし';}
+}
+$('#dev').onchange=e=>{st.dev=e.target.value;st.gate=false;if(access)bindInputs();save();update();};
+
+/* ---------- UI ---------- */
+function btns(el,list,get,set){
+  list.forEach((l,i)=>{const b=document.createElement('button');b.textContent=Array.isArray(l)?l[0]:(typeof l==='string'?l:l.n);
+    b.onclick=()=>{set(i);paint();save();update();};el.appendChild(b);});
+  function paint(){[...el.children].forEach((b,i)=>b.classList.toggle('on',i===get()));}
+  paint();
+}
+btns($('#gBend'),BEND,()=>st.bi,i=>st.bi=i);
+btns($('#gBreath'),BREATH,()=>st.mi,i=>st.mi=i);
+btns($('#gWave'),WAVES,()=>st.wave,i=>st.wave=i);
+btns($('#pre'),PRESETS,()=>st.preset,i=>st.preset=i);
+
+/* ---------- Canvas ---------- */
+const CV={};
+for(const k of['Staff','Base','Resp','Scope']){const c=$('#c'+k);CV[k]={c,g:c.getContext('2d'),w:0,h:0};}
+function fit(){
+  const d=window.devicePixelRatio||1;
+  for(const k in CV){const o=CV[k],r=o.c.getBoundingClientRect();o.w=r.width;o.h=r.height;o.c.width=Math.max(1,Math.round(r.width*d));o.c.height=Math.max(1,Math.round(r.height*d));o.g.setTransform(d,0,0,d,0,0);}
+  dirty=true;
+}
+addEventListener('resize',fit);
+if(window.ResizeObserver)new ResizeObserver(fit).observe($('#app'));
+const title=(g,t)=>{g.fillStyle='#7f8b9d';g.font='10px system-ui,sans-serif';g.textAlign='left';g.fillText(t,5,12);};
+
+function drawStaff(){
+  const{g,w,h}=CV.Staff;g.clearRect(0,0,w,h);
+  const u=h/11,yOf=d=>7.3*u-(d-30)*u/2;
+  g.strokeStyle='#8795a8';g.lineWidth=1;
+  for(let d=30;d<=38;d+=2){g.beginPath();g.moveTo(8,yOf(d));g.lineTo(w-8,yOf(d));g.stroke();}
+  // ト音記号(簡易描画)
+  const cx=8+1.7*u,bot=yOf(26),yG=yOf(32.3);
+  g.strokeStyle='#cfd8e3';g.lineWidth=Math.max(1.5,u*.13);g.lineCap='round';
+  g.beginPath();g.arc(cx-.5*u,bot,.5*u,0,Math.PI);g.moveTo(cx,bot);g.lineTo(cx,yOf(40.2));
+  g.bezierCurveTo(cx+.1*u,yOf(41.6),cx+1.1*u,yOf(41),cx+.9*u,yOf(38.6));
+  g.bezierCurveTo(cx+.7*u,yOf(36.6),cx-1.2*u,yOf(35.6),cx-1.1*u,yOf(31.4));
+  g.bezierCurveTo(cx-1*u,yOf(28.6),cx+1.2*u,yOf(28.6),cx+1.2*u,yOf(31.2));
+  g.bezierCurveTo(cx+1.2*u,yOf(33.4),cx-.7*u,yOf(33.6),cx-.5*u,yOf(31.6));
+  g.stroke();
+  title(g,'五線譜');
+  if(!st.gate){g.fillStyle='#4a5566';g.font='11px system-ui';g.textAlign='center';g.fillText('— 休止 —',w*.58,yOf(34));return;}
+  let n=st.note,oct='';
+  if(n<52){n+=12;oct='8vb';}else if(n>88){n-=12;oct='8va';}
+  const pc=n%12,sharp=NN[pc].length>1,base=sharp?pc-1:pc;
+  const step={0:0,2:1,4:2,5:3,7:4,9:5,11:6}[base];
+  const d=(Math.floor(n/12)-1)*7+step,y=yOf(d),x=w*.58;
+  g.strokeStyle='#8795a8';g.lineWidth=1;
+  if(d<30)for(let e=28;e>=d+(d%2);e-=2){g.beginPath();g.moveTo(x-1.1*u,yOf(e));g.lineTo(x+1.1*u,yOf(e));g.stroke();}
+  if(d>38)for(let e=40;e<=d;e+=2){g.beginPath();g.moveTo(x-1.1*u,yOf(e));g.lineTo(x+1.1*u,yOf(e));g.stroke();}
+  g.fillStyle='#4fd1c5';g.strokeStyle='#4fd1c5';g.lineWidth=1.5;
+  g.beginPath();g.ellipse(x,y,.68*u,.5*u,-.35,0,7);g.fill();
+  g.beginPath();
+  if(d<34){g.moveTo(x+.62*u,y-.1*u);g.lineTo(x+.62*u,y-3.4*u);}else{g.moveTo(x-.62*u,y+.1*u);g.lineTo(x-.62*u,y+3.4*u);}
+  g.stroke();
+  if(sharp){g.font=(2.2*u)+'px serif';g.textAlign='right';g.fillText('♯',x-.95*u,y+.75*u);}
+  if(oct){g.font='italic '+Math.max(10,u*.9)+'px serif';g.fillStyle='#f6ad55';g.textAlign='center';
+    g.fillText(oct,x,oct==='8va'?Math.min(y,yOf(40))-1.6*u:Math.max(y,yOf(28))+1.6*u);}
+  g.fillStyle='#d8dee9';g.font='600 '+Math.max(14,u*1.7)+'px system-ui';g.textAlign='right';
+  g.fillText(noteName(st.note),w-12,yOf(34)+u*.3);
+}
+
+function jsw(t,w){
+  if(w===0)return 2*t-1;
+  if(w===1)return 1-4*Math.abs(t-.5);
+  const d=w===2?.5:.2;return(t<d?1:-1)-(2*d-1);
+}
+function drawBase(){
+  const{g,w,h}=CV.Base;g.clearRect(0,0,w,h);title(g,'基準波形');
+  g.strokeStyle='#2a3340';g.beginPath();g.moveTo(0,h/2+5);g.lineTo(w,h/2+5);g.stroke();
+  const a=(h-26)/2/1.3;g.strokeStyle='#f6ad55';g.lineWidth=1.5;g.beginPath();
+  const N=Math.max(8,Math.floor(w)*2);
+  for(let i=0;i<=N;i++){const t=((i/N)*2)%1,v=(i===N)?jsw(.9999,st.wave):jsw(t,st.wave);const x=i/N*w,y=h/2+5-v*a;i?g.lineTo(x,y):g.moveTo(x,y);}
+  g.stroke();
+}
+function mag(c,w){
+  const cw=Math.cos(w),sw=Math.sin(w),c2=Math.cos(2*w),s2=Math.sin(2*w);
+  const nr=c[0]+c[1]*cw+c[2]*c2,ni=-(c[1]*sw+c[2]*s2),dr=1+c[3]*cw+c[4]*c2,di=-(c[3]*sw+c[4]*s2);
+  return Math.sqrt((nr*nr+ni*ni)/(dr*dr+di*di));
+}
+function drawResp(){
+  const{g,w,h}=CV.Resp;g.clearRect(0,0,w,h);title(g,'フィルタ特性 LP+PK');
+  const F0=40,F1=16000,yd=db=>(h-4)-(Math.max(-36,Math.min(24,db))+36)/60*(h-18),xf=f=>Math.log(f/F0)/Math.log(F1/F0)*w;
+  g.strokeStyle='#2a3340';g.lineWidth=1;g.beginPath();g.moveTo(0,yd(0));g.lineTo(w,yd(0));g.stroke();
+  const m=cur.m,lc=lpCoef(Math.min(m.lf,sr*.45),m.lq,sr),pc=pkCoef(Math.min(m.pf,sr*.45),m.pq,m.pg,sr);
+  const line=(fn,col,lw)=>{g.strokeStyle=col;g.lineWidth=lw;g.beginPath();for(let x=0;x<=w;x+=2){const f=F0*Math.pow(F1/F0,x/w),wv=2*Math.PI*f/sr;const db=20*Math.log10(fn(wv)+1e-9);x?g.lineTo(x,yd(db)):g.moveTo(x,yd(db));}g.stroke();};
+  line(wv=>mag(lc,wv),'#4a6b9a',1);line(wv=>mag(pc,wv),'#8a6a3a',1);
+  line(wv=>mag(lc,wv)*mag(pc,wv),'#4fd1c5',1.8);
+  g.setLineDash([3,3]);g.strokeStyle='#f6ad55';g.beginPath();const x0=xf(cur.f);g.moveTo(x0,16);g.lineTo(x0,h);g.stroke();g.setLineDash([]);
+}
+let sbuf=null;
+function drawScope(){
+  const{g,w,h}=CV.Scope;g.clearRect(0,0,w,h);title(g,'出力波形');
+  g.strokeStyle='#2a3340';g.beginPath();g.moveTo(0,h/2+5);g.lineTo(w,h/2+5);g.stroke();
+  if(!an)return;
+  if(!sbuf)sbuf=new Float32Array(an.fftSize);
+  an.getFloatTimeDomainData(sbuf);
+  let pk=0;for(let i=0;i<sbuf.length;i++){const a=Math.abs(sbuf[i]);if(a>pk)pk=a;}
+  let t=1;for(;t<sbuf.length-1;t++)if(sbuf[t-1]<0&&sbuf[t]>=0)break;
+  if(t>=sbuf.length-1)t=0;
+  const span=Math.max(64,Math.min(sbuf.length-t-1,Math.round(3*sr/cur.f))),sc=(h-26)/2/Math.max(.05,pk);
+  g.strokeStyle='#4fd1c5';g.lineWidth=1.3;g.beginPath();
+  for(let i=0;i<span;i++){const x=i/(span-1)*w,y=h/2+5-sbuf[t+i]*sc;i?g.lineTo(x,y):g.moveTo(x,y);}
+  g.stroke();
+}
+const hz=x=>x>=1000?(x/1000).toFixed(2)+'k':Math.round(x)+'';
+function drawInfo(){
+  const m=cur.m,P=PRESETS[st.preset];
+  $('#info').innerHTML=
+   '<b>'+P.n+'</b> / '+WAVES[st.wave]+'   '+(st.gate?noteName(st.note):'--')+' '+cur.f.toFixed(1)+'Hz\n'+
+   'LP <b>'+hz(m.lf)+'Hz</b> Q'+m.lq.toFixed(1)+'  PK <b>'+hz(m.pf)+'Hz</b> '+(m.pg>=0?'+':'')+m.pg.toFixed(1)+'dB Q'+m.pq.toFixed(1)+'\n'+
+   'ブレス <b>'+Math.round(cur.L*100)+'%</b>  ベンド <b>'+(st.bend*BEND[st.bi][1]>=0?'+':'')+(st.bend*BEND[st.bi][1]).toFixed(2)+'</b>st';
+}
+function frame(){
+  if(dirty){dirty=false;drawStaff();drawBase();drawResp();drawInfo();}
+  drawScope();
+  requestAnimationFrame(frame);
+}
+
+/* ---------- 起動 ---------- */
+$('#go').onclick=async()=>{
+  try{
+    actx=new(window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});
+    sr=actx.sampleRate;
+    const url=URL.createObjectURL(new Blob([WSRC],{type:'text/javascript'}));
+    await actx.audioWorklet.addModule(url);
+    node=new AudioWorkletNode(actx,'wind-synth',{numberOfInputs:0,outputChannelCount:[1]});
+    an=actx.createAnalyser();an.fftSize=2048;an.smoothingTimeConstant=0;
+    node.connect(an);an.connect(actx.destination);
+    await actx.resume();
+    $('#start').style.display='none';
+    update();initMidi();
+  }catch(e){$('#start p').textContent='音声の初期化に失敗: '+e.message;}
+};
+document.addEventListener('visibilitychange',()=>{if(actx&&!document.hidden)actx.resume();});
+fit();update();requestAnimationFrame(frame);
+</script>
+</body>
+</html>
