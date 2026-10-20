@@ -17,7 +17,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 #pre{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
 #pre button{height:32px;border:1px solid var(--ln);background:var(--pn);color:var(--tx);border-radius:6px;font:inherit;font-size:11.5px;padding:0 1px}
 #pre button.on{background:var(--wr);color:#2a1700;border-color:var(--wr);font-weight:600}
-#st{color:var(--dm);font-size:11px;flex:none;max-width:42%;text-align:right}
+#st{color:var(--dm);font-size:11px;flex:none;max-width:48%;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 select{flex:1;text-align:left;padding:0 6px}
 .cv{position:relative;min-height:0;background:var(--pn);border:1px solid var(--ln);border-radius:6px;overflow:hidden}
 .cv canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
@@ -97,7 +97,7 @@ registerProcessor('wind-synth',S);`;
 
 /* ---------- 定義 ---------- */
 const BEND=[['OFF',0],['±1',1],['±2',2],['±12',12]];
-const BREATH=[['CC2+11','both'],['CC2','cc2'],['CC11','cc11'],['AT','at']];
+const BREATH=[['自動','auto'],['CC2','cc2'],['CC11','cc11'],['AT','at']];
 const WAVES=['ノコギリ','三角波','矩形 50%','矩形 20%'];
 /* lp: b=基準fc(@C4,ブレス0) o=ブレスによるオクターブ上昇量 t=音程追従(0..1) q
    pk: f=中心 t=音程追従 g0/g1=ブレス0/1でのゲインdB q */
@@ -147,18 +147,28 @@ function update(){
 }
 
 /* ---------- MIDI ---------- */
+let lastMsg='',autoSrc=null,stBase='未開始';
+function setSt(t){stBase=t;dirty=true;}
+function setBreath(src,v){
+  const m=BREATH[st.mi][1];
+  if(m==='auto'){if(autoSrc===null&&v>0)autoSrc=src;if(src!==autoSrc)return false;}   // 自動: 最初に動いたCC2/CC11/ATに追従
+  else if(m!==src)return false;
+  st.breath=v/127;return true;
+}
 function onMidi(e){
   const d=e.data,s=d[0]&0xF0;
+  if(d[0]>=0xF0)return;                                            // クロック/アクティブセンシング等は無視
+  if(actx&&actx.state!=='running')actx.resume();
+  lastMsg=Array.from(d).map(x=>x.toString(16).toUpperCase().padStart(2,'0')).join(' ');dirty=true;
   if(s===0x90&&d[2]>0){st.note=d[1];st.gate=true;}                 // 新ノートオン: 前の音を止めずに音程だけ移行(モノ・レガート)
-  else if(s===0x80||s===0x90){if(d[1]===st.note)st.gate=false;}    // 対になるノートのみ停止
+  else if(s===0x80||s===0x90){if(d[1]===st.note){st.gate=false;autoSrc=null;}}   // 対になるノートのみ停止
   else if(s===0xE0){st.bend=Math.max(-1,Math.min(1,(((d[2]<<7)|d[1])-8192)/8192));}
   else if(s===0xB0){
-    const m=BREATH[st.mi][1];
-    if(d[1]===2&&(m==='both'||m==='cc2'))st.breath=d[2]/127;
-    else if(d[1]===11&&(m==='both'||m==='cc11'))st.breath=d[2]/127;
-    else if(d[1]===120||d[1]===123)st.gate=false;
+    if(d[1]===2)setBreath('cc2',d[2]);
+    else if(d[1]===11)setBreath('cc11',d[2]);
+    else if(d[1]===120||d[1]===123){st.gate=false;autoSrc=null;}
   }
-  else if(s===0xD0&&BREATH[st.mi][1]==='at')st.breath=d[1]/127;
+  else if(s===0xD0)setBreath('at',d[1]);
   else return;
   update();
 }
@@ -168,7 +178,7 @@ function bindInputs(){
     const on=st.dev==='all'||st.dev===i.id;
     i.onmidimessage=on?onMidi:null;if(on)n++;
   }
-  $('#st').textContent='MIDI入力 '+n+'台'+(access.inputs.size?'':'(未接続)');
+  setSt('MIDI '+n+'台'+(access.inputs.size?'':'(未接続)'));
 }
 function refreshDevs(){
   const sel=$('#dev');sel.innerHTML='<option value="all">全入力</option>';
@@ -177,11 +187,11 @@ function refreshDevs(){
   bindInputs();
 }
 async function initMidi(){
-  if(!navigator.requestMIDIAccess){$('#st').textContent='Web MIDI非対応';return;}
+  if(!navigator.requestMIDIAccess){setSt('Web MIDI非対応');return;}
   try{access=await navigator.requestMIDIAccess({sysex:false});access.onstatechange=refreshDevs;refreshDevs();}
-  catch(e){$('#st').textContent='MIDI許可なし';}
+  catch(e){setSt('MIDI許可なし');}
 }
-$('#dev').onchange=e=>{st.dev=e.target.value;st.gate=false;if(access)bindInputs();save();update();};
+$('#dev').onchange=e=>{st.dev=e.target.value;st.gate=false;autoSrc=null;if(access)bindInputs();save();update();};
 
 /* ---------- UI ---------- */
 function btns(el,list,get,set){
@@ -191,7 +201,7 @@ function btns(el,list,get,set){
   paint();
 }
 btns($('#gBend'),BEND,()=>st.bi,i=>st.bi=i);
-btns($('#gBreath'),BREATH,()=>st.mi,i=>st.mi=i);
+btns($('#gBreath'),BREATH,()=>st.mi,i=>{st.mi=i;autoSrc=null;});
 btns($('#gWave'),WAVES,()=>st.wave,i=>st.wave=i);
 btns($('#pre'),PRESETS,()=>st.preset,i=>st.preset=i);
 
@@ -289,10 +299,20 @@ function drawScope(){
 const hz=x=>x>=1000?(x/1000).toFixed(2)+'k':Math.round(x)+'';
 function drawInfo(){
   const m=cur.m,P=PRESETS[st.preset];
+  $('#st').textContent=stBase+(lastMsg?' ['+lastMsg+']':'');
   $('#info').innerHTML=
    '<b>'+P.n+'</b> / '+WAVES[st.wave]+'   '+(st.gate?noteName(st.note):'--')+' '+cur.f.toFixed(1)+'Hz\n'+
    'LP <b>'+hz(m.lf)+'Hz</b> Q'+m.lq.toFixed(1)+'  PK <b>'+hz(m.pf)+'Hz</b> '+(m.pg>=0?'+':'')+m.pg.toFixed(1)+'dB Q'+m.pq.toFixed(1)+'\n'+
    'ブレス <b>'+Math.round(cur.L*100)+'%</b>  ベンド <b>'+(st.bend*BEND[st.bi][1]>=0?'+':'')+(st.bend*BEND[st.bi][1]).toFixed(2)+'</b>st';
+}
+/* AudioWorkletが使えない環境(file://で開いた場合など)用: 同じDSPをScriptProcessorで動かす */
+function makeFallback(){
+  let Cls;
+  new Function('AudioWorkletProcessor','registerProcessor','sampleRate',WSRC)(class{constructor(){this.port={};}},(n,c)=>{Cls=c;},actx.sampleRate);
+  const inst=new Cls(),sp=actx.createScriptProcessor(512,0,1);
+  sp.onaudioprocess=e=>{inst.process([],[[e.outputBuffer.getChannelData(0)]]);};
+  sp.port={postMessage:d=>inst.port.onmessage({data:d})};
+  return sp;
 }
 function frame(){
   if(dirty){dirty=false;drawStaff();drawBase();drawResp();drawInfo();}
@@ -305,9 +325,12 @@ $('#go').onclick=async()=>{
   try{
     actx=new(window.AudioContext||window.webkitAudioContext)({latencyHint:'interactive'});
     sr=actx.sampleRate;
-    const url=URL.createObjectURL(new Blob([WSRC],{type:'text/javascript'}));
-    await actx.audioWorklet.addModule(url);
-    node=new AudioWorkletNode(actx,'wind-synth',{numberOfInputs:0,outputChannelCount:[1]});
+    try{
+      if(!actx.audioWorklet)throw new Error('no worklet');
+      const url=URL.createObjectURL(new Blob([WSRC],{type:'text/javascript'}));
+      await actx.audioWorklet.addModule(url);
+      node=new AudioWorkletNode(actx,'wind-synth',{numberOfInputs:0,outputChannelCount:[1]});
+    }catch(err){node=makeFallback();}
     an=actx.createAnalyser();an.fftSize=2048;an.smoothingTimeConstant=0;
     node.connect(an);an.connect(actx.destination);
     await actx.resume();
