@@ -8,7 +8,7 @@
 :root{--bg:#0e1116;--pn:#171c24;--ln:#2a3340;--tx:#d8dee9;--dm:#7f8b9d;--ac:#4fd1c5;--wr:#f6ad55}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--tx);font:12px/1.3 system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;touch-action:manipulation;overscroll-behavior:none}
-#app{height:100dvh;padding:max(6px,env(safe-area-inset-top)) 6px max(6px,env(safe-area-inset-bottom));display:grid;grid-template-rows:auto auto minmax(0,1fr) auto auto auto auto auto auto;gap:5px}
+#app{height:100dvh;padding:max(6px,env(safe-area-inset-top)) 6px max(6px,env(safe-area-inset-bottom));display:grid;grid-template-rows:auto auto auto auto auto minmax(0,1fr) auto auto auto auto;gap:5px}
 .row{display:flex;gap:6px;align-items:center}
 .row>label{width:44px;color:var(--dm);font-size:11px;flex:none}
 .btns{display:flex;gap:4px;flex:1}
@@ -42,15 +42,16 @@ select{flex:1;text-align:left;padding:0 6px}
 <div id="app">
   <div class="row"><select id="dev"><option value="all">全入力</option></select><span id="st">未開始</span></div>
   <div class="row" id="mon"><div id="lamp">OFF</div><div class="bar"><i id="bB"></i><em id="tB">ブレス 0%</em></div><div class="bar bend"><i id="bP"></i><em id="tP">ベンド 0</em></div></div>
+  <div class="row"><label>ベンド</label><div class="btns" id="gBend"></div></div>
+  <div class="row"><label>ブレス</label><div class="btns" id="gBreath"></div></div>
+  <div class="row"><label>カーブ</label><div class="btns" id="gCurve"></div></div>
   <div class="cv"><canvas id="cStaff"></canvas></div>
+  <div class="row"><label>波形</label><div class="btns" id="gWave"></div></div>
   <div id="trio">
     <div class="cv"><canvas id="cBase"></canvas></div>
     <div class="cv"><canvas id="cResp"></canvas></div>
     <div class="cv"><canvas id="cScope"></canvas></div>
   </div>
-  <div class="row"><label>ベンド</label><div class="btns" id="gBend"></div></div>
-  <div class="row"><label>ブレス</label><div class="btns" id="gBreath"></div></div>
-  <div class="row"><label>波形</label><div class="btns" id="gWave"></div></div>
   <div id="pre"></div>
   <div id="info"></div>
 </div>
@@ -78,7 +79,7 @@ class S extends AudioWorkletProcessor{
   this.port.onmessage=e=>Object.assign(this.p,e.data);}
  process(inp,outp){
   const ch=outp[0],out=ch[0],p=this.p,s=this.s,n=out.length,sr=sampleRate,z=this.z;
-  const kf=1-Math.exp(-1/(sr*.004)),kc=1-Math.exp(-1/(sr*.01)),ka=1-Math.exp(-1/(sr*.006));
+  const kf=1-Math.exp(-1/(sr*.004)),kc=1-Math.exp(-1/(sr*.006)),ka=1-Math.exp(-1/(sr*.003));
   const lim=sr*.45;
   for(let i=0;i<n;i++){
    s.f+=(p.f-s.f)*kf;s.a+=(p.a-s.a)*ka;
@@ -125,11 +126,13 @@ const NN=['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
 const noteName=n=>NN[n%12]+(Math.floor(n/12)-1);
 
 /* ---------- 状態 ---------- */
-const st={gate:false,note:60,bend:0,breath:0,bi:2,mi:0,wave:0,preset:3,dev:'all'};
+const CURVES=[['リニア',x=>x],['ソフト',x=>Math.pow(x,.65)],['強ソフト',x=>Math.pow(x,.4)],['ハード',x=>x*x],['S字',x=>x*x*(3-2*x)]];
+const OFF_GRACE=25;   // ms: ノートオン直前のノートオフで音が途切れないための猶予
+const st={gate:false,note:60,bend:0,breath:0,bi:2,mi:0,ci:1,wave:0,preset:3,dev:'all',trans:0};
 try{Object.assign(st,JSON.parse(localStorage.getItem('ws1')||'{}'),{gate:false,bend:0,breath:0});}catch(e){}
-const save=()=>{try{localStorage.setItem('ws1',JSON.stringify({bi:st.bi,mi:st.mi,wave:st.wave,preset:st.preset,dev:st.dev}));}catch(e){}};
+const save=()=>{try{localStorage.setItem('ws1',JSON.stringify({bi:st.bi,mi:st.mi,ci:st.ci,wave:st.wave,preset:st.preset,dev:st.dev}));}catch(e){}};
 let actx=null,node=null,an=null,sr=48000,access=null,dirty=true;
-const cur={f:440,L:0,m:{lf:2000,lq:.7,pf:1000,pq:1,pg:0}};
+const cur={f:440,L:0,raw:0,m:{lf:2000,lq:.7,pf:1000,pq:1,pg:0}};
 const $=s=>document.querySelector(s);
 
 /* ---------- 音色マッピング (音量=ブレス, 音程) ---------- */
@@ -138,7 +141,7 @@ function mapParams(L,f){
   if(P.bypass)return{lf:16000,lq:.7,pf:1000,pq:1,pg:0};
   const tr=f/261.63,cl=(x,a,b)=>Math.min(b,Math.max(a,x));
   return{
-    lf:cl(P.lp.b*Math.pow(2,P.lp.o*L)*Math.pow(tr,P.lp.t),100,16000),
+    lf:cl(P.lp.b*Math.pow(2,P.lp.o*L)*Math.pow(tr,P.lp.t)*(1-.4*st.trans),100,16000),
     lq:P.lp.q,
     pf:cl(P.pk.f*Math.pow(tr,P.pk.t),200,12000),
     pq:P.pk.q,
@@ -148,10 +151,10 @@ function mapParams(L,f){
 function update(){
   const range=BEND[st.bi][1];
   const f=440*Math.pow(2,(st.note-69+st.bend*range)/12);
-  const L=BREATH[st.mi][1]==='fix'?1:st.breath,m=mapParams(L,f);
+  const raw=BREATH[st.mi][1]==='fix'?1:st.breath,L=CURVES[st.ci][1](raw),m=mapParams(L,f);
   const comp=1/(1+Math.max(0,m.lq-.7)*.12);
-  const amp=st.gate?.5*Math.pow(L,1.6)*comp:0;
-  cur.f=f;cur.L=L;cur.m=m;
+  const amp=st.gate?.5*L*comp:0;
+  cur.f=f;cur.L=L;cur.raw=raw;cur.m=m;
   if(node)node.port.postMessage({f,a:amp,lf:m.lf,lq:m.lq,pf:m.pf,pq:m.pq,pg:m.pg,w:st.wave});
   dirty=true;
 }
@@ -165,6 +168,17 @@ function setBreath(src,v){
   else if(m!==src)return false;
   st.breath=v/127;return true;
 }
+let offTimer=null;
+function noteOn(n){
+  clearTimeout(offTimer);offTimer=null;
+  if(st.gate&&n!==st.note)st.trans=1;          // 吹きながら音程変更: 音は止めず、フィルターだけ一瞬変動
+  st.note=n;st.gate=true;
+}
+function noteOff(n){
+  if(n!==st.note)return;                       // 前のノートのオフは無視
+  clearTimeout(offTimer);
+  offTimer=setTimeout(()=>{offTimer=null;st.gate=false;update();},OFF_GRACE);   // 直後にノートオンが来れば取り消し
+}
 function onMidi(e){
   const d=e.data,s=d[0]&0xF0;
   if(d[0]>=0xF0)return;                                            // クロック/アクティブセンシング等は無視
@@ -172,13 +186,13 @@ function onMidi(e){
   const hx=x=>x.toString(16).toUpperCase().padStart(2,'0');
   lastMsg=Array.from(d).map(hx).join(' ');dirty=true;
   lastBy[s===0xB0?'B0/'+hx(d[1]):hx(s)]=(s===0xB0?[d[2]]:Array.from(d).slice(1)).map(hx).join(' ');
-  if(s===0x90&&d[2]>0){st.note=d[1];st.gate=true;}                 // 新ノートオン: 前の音を止めずに音程だけ移行(モノ・レガート)
-  else if(s===0x80||s===0x90){if(d[1]===st.note){st.gate=false;autoSrc=null;}}   // 対になるノートのみ停止
+  if(s===0x90&&d[2]>0)noteOn(d[1]);                               // ベロシティは無視
+  else if(s===0x80||s===0x90)noteOff(d[1]);                       // 対になるノートのみ停止
   else if(s===0xE0){st.bend=Math.max(-1,Math.min(1,(((d[2]<<7)|d[1])-8192)/8192));}
   else if(s===0xB0){
     if(d[1]===2)setBreath('cc2',d[2]);
     else if(d[1]===11)setBreath('cc11',d[2]);
-    else if(d[1]===120||d[1]===123){st.gate=false;autoSrc=null;}
+    else if(d[1]===120||d[1]===123){clearTimeout(offTimer);st.gate=false;}
   }
   else if(s===0xD0)setBreath('at',d[1]);
   else return;
@@ -214,6 +228,7 @@ function btns(el,list,get,set){
 }
 btns($('#gBend'),BEND,()=>st.bi,i=>st.bi=i);
 btns($('#gBreath'),BREATH,()=>st.mi,i=>{st.mi=i;autoSrc=null;});
+btns($('#gCurve'),CURVES,()=>st.ci,i=>st.ci=i);
 btns($('#gWave'),WAVES,()=>st.wave,i=>st.wave=i);
 btns($('#pre'),PRESETS,()=>st.preset,i=>st.preset=i);
 
@@ -240,10 +255,13 @@ function hasClefGlyph(){
 }
 const CLEF_FONT='"Noto Music","Noto Sans Symbols 2","Segoe UI Symbol","Apple Symbols","FreeSerif",serif';
 function drawClef(g,x0,u,yOf){
+  g.save();try{drawClef0(g,x0,u,yOf);}finally{g.restore();}
+}
+function drawClef0(g,x0,u,yOf){
   if(clefOK===null)clefOK=hasClefGlyph();
   g.fillStyle='#cfd8e3';g.strokeStyle='#cfd8e3';
   if(clefOK){
-    const ch='\u{1D11E}',ref=100;g.font=ref+'px '+CLEF_FONT;
+    const ch='\u{1D11E}',ref=100;g.textAlign='left';g.textBaseline='alphabetic';g.font=ref+'px '+CLEF_FONT;   // 測定前に配置基準を固定(前フレームの右揃え等を引き継がない)
     const m=g.measureText(ch),h=m.actualBoundingBoxAscent+m.actualBoundingBoxDescent;
     if(h>0){
       const want=7.4*u,k=want/h;g.font=(ref*k)+'px '+CLEF_FONT;g.textAlign='left';g.textBaseline='alphabetic';
@@ -262,7 +280,7 @@ function drawClef(g,x0,u,yOf){
   g.stroke();
 }
 function drawStaff(){
-  const{g,w,h}=CV.Staff;g.clearRect(0,0,w,h);
+  const{g,w,h}=CV.Staff;g.clearRect(0,0,w,h);g.textAlign='left';g.textBaseline='alphabetic';
   const u=Math.min(h/11,w/16),yOf=d=>(h/2+2*u+2)-(d-30)*u/2;   // 五線の中央を縦中央に
   g.strokeStyle='#8795a8';g.lineWidth=1;
   for(let d=30;d<=38;d+=2){g.beginPath();g.moveTo(8,yOf(d));g.lineTo(w-8,yOf(d));g.stroke();}
@@ -338,7 +356,7 @@ function drawInfo(){
   $('#st').textContent=stBase;
   const bs=st.bend*BEND[st.bi][1],bn=Math.max(-1,Math.min(1,st.bend));
   $('#lamp').className=st.gate?'on':'';$('#lamp').textContent=st.gate?'ON '+noteName(st.note):'OFF';
-  $('#bB').style.width=Math.round(cur.L*100)+'%';$('#tB').textContent='ブレス '+Math.round(cur.L*100)+'%';
+  $('#bB').style.width=Math.round(cur.raw*100)+'%';$('#tB').textContent='ブレス '+Math.round(cur.raw*100)+'% → 音量 '+Math.round(cur.L*100)+'%';
   $('#bP').style.left=(bn<0?50+bn*50:50)+'%';$('#bP').style.width=Math.abs(bn)*50+'%';$('#tP').textContent='ベンド '+(bs>=0?'+':'')+bs.toFixed(2)+'st';
   $('#info').innerHTML=
    '<b>'+P.n+'</b> / '+WAVES[st.wave]+'   '+(st.gate?noteName(st.note):'--')+' '+cur.f.toFixed(1)+'Hz\n'+
@@ -355,6 +373,8 @@ function makeFallback(){
   return sp;
 }
 function frame(){
+  const now=performance.now(),dt=Math.min(.1,(now-(frame.t||now))/1000);frame.t=now;
+  if(st.trans>0){st.trans=Math.max(0,st.trans-dt/.12);update();}
   if(dirty){dirty=false;drawStaff();drawBase();drawResp();drawInfo();}
   drawScope();
   requestAnimationFrame(frame);
