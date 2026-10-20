@@ -8,7 +8,7 @@
 :root{--bg:#0e1116;--pn:#171c24;--ln:#2a3340;--tx:#d8dee9;--dm:#7f8b9d;--ac:#4fd1c5;--wr:#f6ad55}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--tx);font:12px/1.3 system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;touch-action:manipulation;overscroll-behavior:none}
-#app{height:100dvh;padding:max(6px,env(safe-area-inset-top)) 6px max(6px,env(safe-area-inset-bottom));display:grid;grid-template-rows:auto auto auto auto auto auto minmax(0,1.15fr) minmax(0,1fr) auto;gap:5px}
+#app{height:100dvh;padding:max(6px,env(safe-area-inset-top)) 6px max(6px,env(safe-area-inset-bottom));display:grid;grid-template-rows:auto auto minmax(0,1fr) auto auto auto auto auto auto;gap:5px}
 .row{display:flex;gap:6px;align-items:center}
 .row>label{width:44px;color:var(--dm);font-size:11px;flex:none}
 .btns{display:flex;gap:4px;flex:1}
@@ -21,7 +21,8 @@ html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--
 select{flex:1;text-align:left;padding:0 6px}
 .cv{position:relative;min-height:0;background:var(--pn);border:1px solid var(--ln);border-radius:6px;overflow:hidden}
 .cv canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
-#trio{display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:5px;min-height:0}
+#trio{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+#trio .cv{aspect-ratio:1/1}
 #info{font:11px/1.45 ui-monospace,Menlo,Consolas,monospace;color:var(--tx);background:var(--pn);border:1px solid var(--ln);border-radius:6px;padding:4px 7px;white-space:pre-wrap;word-break:break-all;overflow:hidden}
 #info b{color:var(--ac);font-weight:600}
 #mon{gap:5px}
@@ -40,10 +41,6 @@ select{flex:1;text-align:left;padding:0 6px}
 <body>
 <div id="app">
   <div class="row"><select id="dev"><option value="all">全入力</option></select><span id="st">未開始</span></div>
-  <div class="row"><label>ベンド</label><div class="btns" id="gBend"></div></div>
-  <div class="row"><label>ブレス</label><div class="btns" id="gBreath"></div></div>
-  <div class="row"><label>波形</label><div class="btns" id="gWave"></div></div>
-  <div id="pre"></div>
   <div class="row" id="mon"><div id="lamp">OFF</div><div class="bar"><i id="bB"></i><em id="tB">ブレス 0%</em></div><div class="bar bend"><i id="bP"></i><em id="tP">ベンド 0</em></div></div>
   <div class="cv"><canvas id="cStaff"></canvas></div>
   <div id="trio">
@@ -51,6 +48,10 @@ select{flex:1;text-align:left;padding:0 6px}
     <div class="cv"><canvas id="cResp"></canvas></div>
     <div class="cv"><canvas id="cScope"></canvas></div>
   </div>
+  <div class="row"><label>ベンド</label><div class="btns" id="gBend"></div></div>
+  <div class="row"><label>ブレス</label><div class="btns" id="gBreath"></div></div>
+  <div class="row"><label>波形</label><div class="btns" id="gWave"></div></div>
+  <div id="pre"></div>
   <div id="info"></div>
 </div>
 <div id="start">
@@ -228,20 +229,44 @@ addEventListener('resize',fit);
 if(window.ResizeObserver)new ResizeObserver(fit).observe($('#app'));
 const title=(g,t)=>{g.fillStyle='#7f8b9d';g.font='10px system-ui,sans-serif';g.textAlign='left';g.fillText(t,5,12);};
 
-function drawStaff(){
-  const{g,w,h}=CV.Staff;g.clearRect(0,0,w,h);
-  const u=h/11,yOf=d=>7.3*u-(d-30)*u/2;
-  g.strokeStyle='#8795a8';g.lineWidth=1;
-  for(let d=30;d<=38;d+=2){g.beginPath();g.moveTo(8,yOf(d));g.lineTo(w-8,yOf(d));g.stroke();}
-  // ト音記号(簡易描画)
-  const cx=8+1.7*u,bot=yOf(26),yG=yOf(32.3);
-  g.strokeStyle='#cfd8e3';g.lineWidth=Math.max(1.5,u*.13);g.lineCap='round';
+/* ト音記号: Unicode 𝄞(U+1D11E)を実測サイズに合わせて描画。フォントに字形が無い端末では手描きにフォールバック */
+let clefOK=null;
+function hasClefGlyph(){
+  const c=document.createElement('canvas');c.width=c.height=48;const g=c.getContext('2d');
+  const px=ch=>{g.clearRect(0,0,48,48);g.font='36px "Noto Music","Noto Sans Symbols 2","Segoe UI Symbol","Apple Symbols","FreeSerif",serif';g.fillStyle='#000';g.fillText(ch,4,36);return g.getImageData(0,0,48,48).data;};
+  const a=px('\u{1D11E}'),b=px('\u{10FFFD}'),e=px('');
+  let da=0,db=0;for(let i=3;i<a.length;i+=4){if(a[i]!==e[i])da++;if(a[i]!==b[i])db++;}
+  return da>20&&db>20;   // 字形が描かれ、かつ「豆腐」(未定義文字)と同一でない
+}
+const CLEF_FONT='"Noto Music","Noto Sans Symbols 2","Segoe UI Symbol","Apple Symbols","FreeSerif",serif';
+function drawClef(g,x0,u,yOf){
+  if(clefOK===null)clefOK=hasClefGlyph();
+  g.fillStyle='#cfd8e3';g.strokeStyle='#cfd8e3';
+  if(clefOK){
+    const ch='\u{1D11E}',ref=100;g.font=ref+'px '+CLEF_FONT;
+    const m=g.measureText(ch),h=m.actualBoundingBoxAscent+m.actualBoundingBoxDescent;
+    if(h>0){
+      const want=7.4*u,k=want/h;g.font=(ref*k)+'px '+CLEF_FONT;g.textAlign='left';g.textBaseline='alphabetic';
+      const top=yOf(38)-1.9*u;                      // 実際の記号は上線の約1.9間上から始まる
+      g.fillText(ch,x0+m.actualBoundingBoxLeft*k,top+m.actualBoundingBoxAscent*k);
+      return;
+    }
+  }
+  // 手描きフォールバック
+  const cx=x0+1.7*u,bot=yOf(26);g.lineWidth=Math.max(1.5,u*.13);g.lineCap='round';
   g.beginPath();g.arc(cx-.5*u,bot,.5*u,0,Math.PI);g.moveTo(cx,bot);g.lineTo(cx,yOf(40.2));
   g.bezierCurveTo(cx+.1*u,yOf(41.6),cx+1.1*u,yOf(41),cx+.9*u,yOf(38.6));
   g.bezierCurveTo(cx+.7*u,yOf(36.6),cx-1.2*u,yOf(35.6),cx-1.1*u,yOf(31.4));
   g.bezierCurveTo(cx-1*u,yOf(28.6),cx+1.2*u,yOf(28.6),cx+1.2*u,yOf(31.2));
   g.bezierCurveTo(cx+1.2*u,yOf(33.4),cx-.7*u,yOf(33.6),cx-.5*u,yOf(31.6));
   g.stroke();
+}
+function drawStaff(){
+  const{g,w,h}=CV.Staff;g.clearRect(0,0,w,h);
+  const u=Math.min(h/11,w/16),yOf=d=>(h/2+2*u+2)-(d-30)*u/2;   // 五線の中央を縦中央に
+  g.strokeStyle='#8795a8';g.lineWidth=1;
+  for(let d=30;d<=38;d+=2){g.beginPath();g.moveTo(8,yOf(d));g.lineTo(w-8,yOf(d));g.stroke();}
+  drawClef(g,8,u,yOf);
   title(g,'五線譜');
   if(!st.gate){g.fillStyle='#4a5566';g.font='11px system-ui';g.textAlign='center';g.fillText('— 休止 —',w*.58,yOf(34));return;}
   let n=st.note,oct='';
