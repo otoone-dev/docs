@@ -8,7 +8,15 @@
 :root{--bg:#0e1116;--pn:#171c24;--ln:#2a3340;--tx:#d8dee9;--dm:#7f8b9d;--ac:#4fd1c5;--wr:#f6ad55}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--tx);font:12px/1.3 system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;touch-action:manipulation;overscroll-behavior:none}
-#app{height:100dvh;padding:max(6px,env(safe-area-inset-top)) 6px max(6px,env(safe-area-inset-bottom));display:grid;grid-template-rows:auto auto auto auto auto minmax(0,1fr) auto auto auto auto;gap:5px}
+#app{height:100dvh;padding:max(6px,env(safe-area-inset-top)) 6px max(6px,env(safe-area-inset-bottom));display:grid;grid-template-rows:minmax(0,1fr) auto;gap:5px}
+#pL{display:grid;grid-template-rows:auto auto auto auto auto minmax(0,1fr);gap:5px;min-height:0}
+#pR{display:grid;grid-template-rows:auto auto auto auto auto;gap:5px;min-height:0}
+@media (min-aspect-ratio:11/10){   /* 横長: 五線譜まで(左) と 波形ボタン以降(右) を並べる */
+  #app{grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr);gap:8px}
+  #pR{grid-template-rows:auto minmax(0,1fr) auto auto auto}
+  #trio{min-height:0}
+  #trio .cv{aspect-ratio:auto}
+}
 .row{display:flex;gap:6px;align-items:center}
 .row>label{width:44px;color:var(--dm);font-size:11px;flex:none}
 .btns{display:flex;gap:4px;flex:1}
@@ -40,12 +48,15 @@ select{flex:1;text-align:left;padding:0 6px}
 </head>
 <body>
 <div id="app">
+ <div id="pL">
   <div class="row"><select id="dev"><option value="all">全入力</option></select><span id="st">未開始</span></div>
   <div class="row" id="mon"><div id="lamp">OFF</div><div class="bar"><i id="bB"></i><em id="tB">ブレス 0%</em></div><div class="bar bend"><i id="bP"></i><em id="tP">ベンド 0</em></div></div>
   <div class="row"><label>ベンド</label><div class="btns" id="gBend"></div></div>
   <div class="row"><label>ブレス</label><div class="btns" id="gBreath"></div></div>
   <div class="row"><label>カーブ</label><div class="btns" id="gCurve"></div></div>
   <div class="cv"><canvas id="cStaff"></canvas></div>
+ </div>
+ <div id="pR">
   <div class="row"><label>波形</label><div class="btns" id="gWave"></div></div>
   <div id="trio">
     <div class="cv"><canvas id="cBase"></canvas></div>
@@ -53,7 +64,9 @@ select{flex:1;text-align:left;padding:0 6px}
     <div class="cv"><canvas id="cScope"></canvas></div>
   </div>
   <div id="pre"></div>
+  <div class="row"><label>FX</label><div class="btns" id="gFx"></div></div>
   <div id="info"></div>
+ </div>
 </div>
 <div id="start">
   <button id="go">タップして開始</button>
@@ -108,6 +121,7 @@ registerProcessor('wind-synth',S);`;
 
 /* ---------- 定義 ---------- */
 const BEND=[['OFF',0],['±1',1],['±2',2],['±12',12]];
+const FX=[['OFF'],['ディレイ'],['ルーム'],['ホール']];
 const BREATH=[['自動','auto'],['CC2','cc2'],['CC11','cc11'],['CC74','cc74'],['AT','at']];
 const WAVES=['ノコギリ','三角波','矩形 50%','矩形 20%'];
 /* lp: b=基準fc(@C4,ブレス0) o=ブレスによるオクターブ上昇量 t=音程追従(0..1) q
@@ -128,10 +142,10 @@ const noteName=n=>NN[n%12]+(Math.floor(n/12)-1);
 /* ---------- 状態 ---------- */
 const CURVES=[['リニア',x=>x],['ソフト',x=>1-Math.pow(1-x,1.7)],['強ソフト',x=>1-Math.pow(1-x,3)],['ハード',x=>x*x],['S字',x=>x*x*(3-2*x)]];
 const OFF_GRACE=25;   // ms: ノートオン直前のノートオフで音が途切れないための猶予
-const st={gate:false,note:60,bend:0,breath:0,bi:2,mi:0,ci:1,wave:0,preset:3,dev:'all',trans:0};
+const st={gate:false,note:60,bend:0,breath:0,bi:2,mi:0,ci:1,wave:0,preset:3,dev:'all',trans:0,fx:0};
 try{Object.assign(st,JSON.parse(localStorage.getItem('ws1')||'{}'),{gate:false,bend:0,breath:0});}catch(e){}
 st.mi=Math.max(0,BREATH.findIndex(b=>b[1]===st.mk));   // 旧保存データ(mk無し)は「自動」
-const save=()=>{try{localStorage.setItem('ws1',JSON.stringify({bi:st.bi,mk:BREATH[st.mi][1],ci:st.ci,wave:st.wave,preset:st.preset,dev:st.dev}));}catch(e){}};
+const save=()=>{try{localStorage.setItem('ws1',JSON.stringify({bi:st.bi,mk:BREATH[st.mi][1],ci:st.ci,fx:st.fx,wave:st.wave,preset:st.preset,dev:st.dev}));}catch(e){}};
 let actx=null,node=null,an=null,sr=48000,access=null,forceAll=true;
 const cur={f:440,L:0,raw:0,m:{lf:2000,lq:.7,pf:1000,pq:1,pg:0}};
 const $=s=>document.querySelector(s);
@@ -238,6 +252,7 @@ btns($('#gBreath'),BREATH,()=>st.mi,i=>{st.mi=i;autoSrc=null;});
 btns($('#gCurve'),CURVES,()=>st.ci,i=>st.ci=i);
 btns($('#gWave'),WAVES,()=>st.wave,i=>st.wave=i);
 btns($('#pre'),PRESETS,()=>st.preset,i=>st.preset=i);
+btns($('#gFx'),FX,()=>st.fx,i=>{st.fx=i;applyFx();});
 
 /* ---------- Canvas ---------- */
 const CV={};
@@ -389,6 +404,46 @@ function drawInfo(){
    '受信中: '+recvList();
   const inf=$('#info');if(inf._h!==h){inf._h=h;inf.innerHTML=h;}
 }
+/* ---------- エフェクト (ディレイ / ルーム / ホール) ---------- */
+const fx={};let fxTimer=null,convOn=false;
+function makeIR(sec,damp){   // 指数減衰ノイズ+高域ほど早く減衰するインパルス応答
+  const n=Math.floor(sr*sec),b=actx.createBuffer(2,n,sr),pre=Math.floor(sr*.012);
+  for(let c=0;c<2;c++){const d=b.getChannelData(c);let y=0;
+    for(let i=pre;i<n;i++){const t=(i-pre)/sr,env=Math.exp(-6.9*t/sec),a=Math.max(.06,damp*Math.exp(-t*2.4));
+      y+=((Math.random()*2-1)-y)*a;d[i]=y*env;}}
+  return b;
+}
+function buildFx(){
+  fx.master=actx.createGain();fx.master.gain.value=.9;fx.master.connect(actx.destination);
+  an.connect(fx.master);                                                   // ドライ
+  fx.dly=actx.createDelay(1);fx.dly.delayTime.value=.32;
+  fx.fb=actx.createGain();fx.fb.gain.value=.38;
+  fx.lp=actx.createBiquadFilter();fx.lp.type='lowpass';fx.lp.frequency.value=2800;
+  fx.dWet=actx.createGain();fx.dWet.gain.value=0;
+  an.connect(fx.dly);fx.dly.connect(fx.lp);fx.lp.connect(fx.fb);fx.fb.connect(fx.dly);
+  fx.lp.connect(fx.dWet);fx.dWet.connect(fx.master);
+  fx.conv=actx.createConvolver();fx.rWet=actx.createGain();fx.rWet.gain.value=0;
+  fx.conv.connect(fx.rWet);fx.rWet.connect(fx.master);
+  fx.irs=[];
+  applyFx();
+}
+function applyFx(){
+  if(!fx.master)return;
+  const i=st.fx,t=actx.currentTime;
+  fx.dWet.gain.setTargetAtTime(i===1?.4:0,t,.02);
+  fx.rWet.gain.setTargetAtTime(0,t,.02);
+  clearTimeout(fxTimer);
+  if(i>=2){
+    fxTimer=setTimeout(()=>{                                                // いったん0に絞ってからIRを差し替え(プチノイズ防止)
+      if(!fx.irs[i])fx.irs[i]=makeIR(i===2?1.0:2.6,i===2?.7:.6);
+      if(fx.conv.buffer!==fx.irs[i])fx.conv.buffer=fx.irs[i];
+      if(!convOn){an.connect(fx.conv);convOn=true;}
+      fx.rWet.gain.setTargetAtTime(i===2?.5:.55,actx.currentTime,.03);
+    },90);
+  }else{
+    fxTimer=setTimeout(()=>{if(convOn){an.disconnect(fx.conv);convOn=false;}},300);   // 使わない間はコンボルバーを止めてCPUを節約
+  }
+}
 /* AudioWorkletが使えない環境(file://で開いた場合など)用: 同じDSPをScriptProcessorで動かす */
 function makeFallback(){
   let Cls;
@@ -426,7 +481,7 @@ $('#go').onclick=async()=>{
       node=new AudioWorkletNode(actx,'wind-synth',{numberOfInputs:0,outputChannelCount:[1]});
     }catch(err){node=makeFallback();}
     an=actx.createAnalyser();an.fftSize=2048;an.smoothingTimeConstant=0;
-    node.connect(an);an.connect(actx.destination);
+    node.connect(an);buildFx();
     await actx.resume();
     $('#start').style.display='none';
     update();initMidi();
