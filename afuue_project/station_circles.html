@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>駅からの距離で場所を絞り込む</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font-family: -apple-system, "Hiragino Sans", "Meiryo", sans-serif; display: flex; flex-direction: column; height: 100dvh; background: #f7f7f9; }
+  #map { flex: 0 0 42%; min-height: 220px; width: 100%; }
+  #panel { flex: 1; overflow-y: auto; padding: 10px 10px calc(16px + env(safe-area-inset-bottom)); -webkit-overflow-scrolling: touch; }
+  h1 { font-size: 15px; margin: 0 0 6px; }
+  .hint { font-size: 12px; color: #666; margin-bottom: 8px; line-height: 1.5; }
+  .row { background: #fff; border: 1px solid #ddd; border-left-width: 6px; border-radius: 8px; padding: 8px; margin-bottom: 8px; }
+  .row input[type=text], .row input[type=number], .row select { padding: 8px; border: 1px solid #bbb; border-radius: 6px; font-size: 16px; }
+  .line { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
+  .line input[type=text] { flex: 1; min-width: 0; }
+  .line input[type=number] { flex: 1; min-width: 0; }
+  button { padding: 8px 10px; border: 1px solid #888; background: #fff; border-radius: 6px; cursor: pointer; font-size: 14px; white-space: nowrap; }
+  button.primary { background: #2a6; color: #fff; border-color: #2a6; }
+  button.del { color: #c33; border-color: #c33; }
+  .results { font-size: 13px; margin: 2px 0 4px; }
+  .results div { padding: 8px 4px; border-bottom: 1px solid #eee; }
+  .results div:active { background: #ffe; }
+  .status { font-size: 11px; color: #888; }
+  #summary { margin-top: 10px; padding: 10px; background: #fff; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; line-height: 1.6; }
+  .toolbar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .picking #map { outline: 3px solid #f80; outline-offset: -3px; }
+  #banner { display: none; position: absolute; z-index: 1000; left: 8px; right: 8px; top: 8px; background: #f80; color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 13px; text-align: center; }
+  .picking #banner { display: block; }
+  #mapwrap { position: relative; flex: 0 0 42%; min-height: 220px; }
+  #mapwrap #map { height: 100%; }
+</style>
+</head>
+<body>
+<div id="mapwrap">
+  <div id="map"></div>
+  <div id="banner">地図をタップして位置を決めてください</div>
+</div>
+<div id="panel">
+  <h1>駅からの距離で場所を絞り込む</h1>
+  <div class="hint">
+    駅名を検索して距離を入力すると円が描かれます。2つ以上入れると、重なった範囲（赤）が候補エリアです。
+  </div>
+  <div id="rows"></div>
+  <div class="toolbar">
+    <button class="primary" id="add">＋ 駅を追加</button>
+    <button id="fit">全体表示</button>
+    <span style="font-size:12px;">徒歩1分=</span>
+    <input type="number" id="walkSpeed" value="80" style="width:64px;padding:6px;font-size:16px;border:1px solid #bbb;border-radius:6px;"><span style="font-size:12px;">m</span>
+  </div>
+  <div id="summary">駅を追加してください。</div>
+</div>
+
+<script>
+const COLORS = ["#e6194b", "#3cb44b", "#4363d8", "#f58231", "#911eb4", "#008080", "#9a6324", "#800000"];
+const map = L.map("map").setView([35.681, 139.767], 12);
+L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png", {
+  maxZoom: 18,
+  attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank">地理院タイル</a>'
+}).addTo(map);
+
+const overlay = L.layerGroup().addTo(map);
+const interLayer = L.layerGroup().addTo(map);
+let stations = [];
+let nextId = 1;
+let pickingId = null;
+
+function addStation() {
+  const id = nextId++;
+  stations.push({ id, color: COLORS[(id - 1) % COLORS.length], name: "", lat: null, lng: null, dist: "", unit: "min" });
+  renderRows();
+}
+
+function radiusMeters(s) {
+  const v = parseFloat(s.dist);
+  if (!isFinite(v) || v <= 0) return null;
+  if (s.unit === "km") return v * 1000;
+  if (s.unit === "min") return v * (parseFloat(document.getElementById("walkSpeed").value) || 80);
+  return v;
+}
+
+// 徒歩の場合は「(n-1)分〜n分」の範囲にするため、内側の円の半径を返す
+function innerRadius(s) {
+  if (s.unit !== "min") return null;
+  const v = parseFloat(s.dist);
+  if (!isFinite(v) || v <= 1) return null;
+  return (v - 1) * (parseFloat(document.getElementById("walkSpeed").value) || 80);
+}
+function updateConv(s, d) {
+  const el = d.querySelector("[data-conv]");
+  if (!el) return;
+  const r = radiusMeters(s);
+  if (r == null) { el.textContent = ""; return; }
+  const ri = innerRadius(s);
+  const f = x => x >= 1000 ? (x / 1000).toFixed(2) + "km" : Math.round(x) + "m";
+  el.textContent = ri != null ? "≈ " + f(ri) + "〜" + f(r) : "≈ " + f(r);
+}
+function esc(t) { return String(t).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
+
+function renderRows() {
+  const wrap = document.getElementById("rows");
+  wrap.innerHTML = "";
+  stations.forEach(s => {
+    const d = document.createElement("div");
+    d.className = "row";
+    d.style.borderLeftColor = s.color;
+    d.innerHTML = `
+      <div class="line">
+        <input type="text" placeholder="駅名（例: 新宿駅）" value="${esc(s.name)}" data-f="name">
+        <button data-a="search">検索</button>
+      </div>
+      <div class="line">
+        <input type="number" inputmode="decimal" min="0" step="any" placeholder="数値" value="${esc(s.dist)}" data-f="dist">
+        <select data-f="unit">
+          <option value="min"${s.unit === "min" ? " selected" : ""}>徒歩（分）</option>
+          <option value="m"${s.unit === "m" ? " selected" : ""}>距離（m）</option>
+          <option value="km"${s.unit === "km" ? " selected" : ""}>距離（km）</option>
+        </select>
+        <span class="status" data-conv style="min-width:56px;"></span>
+      </div>
+      <div class="line">
+        <button data-a="pick">地図で指定</button>
+        <button class="del" data-a="del">削除</button>
+        <span class="status">${s.lat != null ? `${s.lat.toFixed(4)}, ${s.lng.toFixed(4)}` : "位置未設定"}</span>
+      </div>
+      <div class="results"></div>`;
+    d.querySelectorAll("[data-f]").forEach(el => {
+      el.addEventListener("input", () => {
+        s[el.dataset.f] = el.value;
+        if (el.dataset.f !== "name") { updateConv(s, d); redraw(); }
+      });
+      if (el.dataset.f === "name") el.addEventListener("keydown", e => { if (e.key === "Enter") search(s, d); });
+    });
+    d.querySelector('[data-a="search"]').onclick = () => search(s, d);
+    d.querySelector('[data-a="pick"]').onclick = () => startPick(s.id);
+    d.querySelector('[data-a="del"]').onclick = () => { stations = stations.filter(x => x.id !== s.id); renderRows(); };
+    wrap.appendChild(d);
+    updateConv(s, d);
+  });
+  redraw();
+}
+
+async function geocodeGSI(q) {
+  const res = await fetch("https://msearch.gsi.go.jp/address-search/AddressSearch?q=" + encodeURIComponent(q));
+  if (!res.ok) throw new Error("GSI " + res.status);
+  const data = await res.json();
+  return data.map(f => ({ label: f.properties.title, lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] }));
+}
+
+async function geocodeOSM(q) {
+  const url = "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&accept-language=ja&countrycodes=jp&q=" + encodeURIComponent(q);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("OSM " + res.status);
+  const data = await res.json();
+  return data.map(r => ({ label: r.display_name, lat: parseFloat(r.lat), lng: parseFloat(r.lon) }));
+}
+
+async function search(s, rowEl) {
+  const q = s.name.trim();
+  const box = rowEl.querySelector(".results");
+  if (!q) return;
+  const m = q.match(/^(-?\d+(?:\.\d+)?)\s*[,，\s]\s*(-?\d+(?:\.\d+)?)$/);
+  if (m) {
+    s.lat = parseFloat(m[1]); s.lng = parseFloat(m[2]);
+    s.name = "地点" + s.id;
+    renderRows();
+    map.setView([s.lat, s.lng], Math.max(map.getZoom(), 14));
+    return;
+  }
+  box.textContent = "検索中…";
+  const query = /駅$/.test(q) ? q : q + "駅";
+  let list = [], errs = [];
+  try { list = await geocodeGSI(query); } catch (e) { errs.push("国土地理院: " + e.message); }
+  if (!list.length) {
+    try { list = await geocodeOSM(query); } catch (e) { errs.push("OSM: " + e.message); }
+  }
+  box.innerHTML = "";
+  if (!list.length) {
+    box.textContent = errs.length ? "検索に失敗しました（" + errs.join(" / ") + "）。「地図で指定」もお使いください。" : "見つかりませんでした。「地図で指定」もお使いください。";
+    return;
+  }
+  list.slice(0, 8).forEach(r => {
+    const el = document.createElement("div");
+    el.textContent = r.label;
+    el.onclick = () => {
+      s.lat = r.lat; s.lng = r.lng;
+      renderRows();
+      map.setView([s.lat, s.lng], Math.max(map.getZoom(), 14));
+      window.scrollTo(0, 0);
+    };
+    box.appendChild(el);
+  });
+}
+
+function startPick(id) {
+  pickingId = id;
+  document.body.classList.add("picking");
+  document.getElementById("mapwrap").scrollIntoView({ behavior: "smooth" });
+}
+map.on("click", e => {
+  if (pickingId == null) return;
+  const s = stations.find(x => x.id === pickingId);
+  pickingId = null;
+  document.body.classList.remove("picking");
+  if (!s) return;
+  s.lat = e.latlng.lat; s.lng = e.latlng.lng;
+  if (!s.name) s.name = "地点" + s.id;
+  renderRows();
+});
+
+function redraw() {
+  overlay.clearLayers();
+  interLayer.clearLayers();
+  const polys = [], active = [];
+  stations.forEach(s => {
+    if (s.lat == null) return;
+    L.circleMarker([s.lat, s.lng], { radius: 6, color: "#fff", weight: 2, fillColor: s.color, fillOpacity: 1 })
+      .bindTooltip(s.name || "地点", { permanent: true, direction: "top", offset: [0, -6] })
+      .addTo(overlay);
+    const r = radiusMeters(s);
+    if (r == null) return;
+    L.circle([s.lat, s.lng], { radius: r, color: s.color, weight: 2, fillColor: s.color, fillOpacity: 0.08 }).addTo(overlay);
+    let poly = turf.circle([s.lng, s.lat], r / 1000, { steps: 180, units: "kilometers" });
+    const ri = innerRadius(s);
+    if (ri != null) {
+      L.circle([s.lat, s.lng], { radius: ri, color: s.color, weight: 2, dashArray: "6 6", fillOpacity: 0 }).addTo(overlay);
+      const inner = turf.circle([s.lng, s.lat], ri / 1000, { steps: 180, units: "kilometers" });
+      poly = turf.difference(poly, inner) || poly;
+    }
+    polys.push(poly);
+    active.push(s);
+  });
+
+  const sum = document.getElementById("summary");
+  if (active.length === 0) { sum.textContent = "駅の位置と距離を入力してください。"; return; }
+  if (active.length === 1) { sum.textContent = "もう1つ駅を追加すると重なりが表示されます。"; return; }
+
+  let inter = polys[0];
+  for (let i = 1; i < polys.length && inter; i++) inter = turf.intersect(inter, polys[i]);
+  if (!inter) {
+    sum.innerHTML = "<b>重なる範囲がありません。</b><br>距離や駅の位置を見直してください。";
+    return;
+  }
+  L.geoJSON(inter, { style: { color: "#d00", weight: 2, fillColor: "#f00", fillOpacity: 0.35 } }).addTo(interLayer);
+  const c = turf.centroid(inter).geometry.coordinates;
+  const area = turf.area(inter);
+  const b = turf.bbox(inter);
+  const my = (b[1] + b[3]) / 2, mx = (b[0] + b[2]) / 2;
+  const w = turf.distance([b[0], my], [b[2], my], { units: "meters" });
+  const h = turf.distance([mx, b[1]], [mx, b[3]], { units: "meters" });
+  L.marker([c[1], c[0]]).bindPopup("重なりの中心").addTo(interLayer);
+  const areaTxt = area >= 1e6 ? (area / 1e6).toFixed(2) + " km²" : Math.round(area).toLocaleString() + " m²";
+  sum.innerHTML = `<b>重なり範囲</b>（${active.length}駅）<br>
+    面積: 約 ${areaTxt}<br>
+    大きさ: 東西 ${Math.round(w)}m × 南北 ${Math.round(h)}m<br>
+    中心: <a href="https://www.google.com/maps?q=${c[1].toFixed(6)},${c[0].toFixed(6)}" target="_blank">${c[1].toFixed(5)}, ${c[0].toFixed(5)}</a>`;
+}
+
+document.getElementById("add").onclick = addStation;
+document.getElementById("walkSpeed").addEventListener("input", renderRows);
+document.getElementById("fit").onclick = () => {
+  let bounds = null;
+  overlay.eachLayer(l => {
+    const b = l.getBounds ? l.getBounds() : (l.getLatLng ? L.latLngBounds([l.getLatLng()]) : null);
+    if (b) bounds = bounds ? bounds.extend(b) : L.latLngBounds(b.getSouthWest(), b.getNorthEast());
+  });
+  if (bounds) map.fitBounds(bounds, { padding: [20, 20] });
+  window.scrollTo(0, 0);
+};
+
+addStation(); addStation();
+</script>
+</body>
+</html>
