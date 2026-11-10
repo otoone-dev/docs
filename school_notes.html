@@ -38,7 +38,7 @@ button.sm{padding:5px 8px;font-size:13px}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:7px 8px;margin-bottom:6px;transition:background .3s}
 .card.flash{background:var(--hl)}
 .badge{width:26px;height:26px;border-radius:50%;background:var(--ac);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700}
-.badge.none{background:var(--sub)}
+.badge.none{opacity:.45}
 .sum input{width:100%;padding:6px 4px}
 .sum input.nm{padding:6px 8px;font-weight:600}
 .sum input.num{text-align:center}
@@ -55,7 +55,7 @@ button.sm{padding:5px 8px;font-size:13px}
 .stars button{border:0;background:none;padding:2px 4px;font-size:24px;line-height:1;color:var(--bd)}
 .stars button.on{color:#f5a623}
 textarea{width:100%;min-height:72px;resize:vertical}
-.pin{width:26px;height:26px;border-radius:50%;background:#2563eb;color:#fff;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);display:grid;place-items:center;font-size:12px;font-weight:700}
+.pin{width:26px;height:26px;border-radius:50%;background:#6b7280;color:#fff;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);display:grid;place-items:center;font-size:12px;font-weight:700}
 #sheet,#xmlSheet{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.45);display:flex;align-items:flex-end}
 #sheet[hidden],#xmlSheet[hidden],.row[hidden]{display:none}
 #sheetBox,#xmlBox{background:var(--card);width:100%;max-height:75dvh;border-radius:16px 16px 0 0;padding:14px 14px calc(14px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:8px}
@@ -163,7 +163,18 @@ L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',{
 var layer=L.layerGroup().addTo(map);
 window.addEventListener('resize',function(){map.invalidateSize()});
 
-function pinIcon(txt){return L.divIcon({className:'',html:'<div class="pin">'+txt+'</div>',iconSize:[26,26],iconAnchor:[13,13]})}
+var PAL={home:['#e11d48','#fff'],pref:['#2563eb','#fff'],city:['#16a34a','#fff'],priv:['#facc15','#1d2129'],other:['#6b7280','#fff']};
+function colorOf(name){
+  var n=(name||'').trim();
+  if(n==='自宅')return PAL.home;
+  var m=/^[(（]\s*(県|市|私)\s*[)）]/.exec(n);
+  if(m)return m[1]==='県'?PAL.pref:m[1]==='市'?PAL.city:PAL.priv;
+  return PAL.other;
+}
+function pinIcon(txt,name){
+  var c=colorOf(name);
+  return L.divIcon({className:'',html:'<div class="pin" style="background:'+c[0]+';color:'+c[1]+'">'+txt+'</div>',iconSize:[26,26],iconAnchor:[13,13]});
+}
 function hasLoc(it){return typeof it.lat==='number'&&typeof it.lng==='number'}
 
 function fitAll(){
@@ -216,7 +227,7 @@ function updateMarkers(arr){
   layer.clearLayers();
   (arr||sortedItems()).forEach(function(it,i){
     if(!hasLoc(it))return;
-    var m=L.marker([it.lat,it.lng],{icon:pinIcon(i+1),title:it.name||''}).addTo(layer);
+    var m=L.marker([it.lat,it.lng],{icon:pinIcon(i+1,it.name),title:it.name||''}).addTo(layer);
     m.bindTooltip(it.name||'(名称未入力)');
     m.on('click',function(){focusCard(it.id)});
   });
@@ -231,9 +242,11 @@ function focusCard(id){
 
 function buildCard(it,no){
   var badge=h('div',{class:'badge'+(hasLoc(it)?'':' none'),text:String(no)});
+  function paintBadge(){var c=colorOf(it.name);badge.style.background=c[0];badge.style.color=c[1]}
+  paintBadge();
 
   var name=h('input',{class:'nm',value:it.name||'',placeholder:'学校名','aria-label':'学校名',
-    oninput:function(e){it.name=e.target.value;save()},
+    oninput:function(e){it.name=e.target.value;save();paintBadge()},
     onchange:function(){if(state.sortKey==='name')render();else updateMarkers()}});
 
   function numInput(k,step,label){
