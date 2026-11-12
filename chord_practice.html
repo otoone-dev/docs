@@ -7,12 +7,12 @@
 <style>
 :root{
   --bg:#f4f1ea;--card:#fffdf8;--ink:#23211d;--muted:#7a756b;--line:#d9d3c5;
-  --accent:#d9480f;--accent2:#2b6c8f;--avail:#4a6f8a;--avoid:#c0392b;--chip:#ece7da;--chipOn:#23211d;--chipOnInk:#fffdf8;
+  --accent:#d9480f;--accent2:#2b6c8f;--avail:#4a6f8a;--avoid:#c0392b;--ct:#2fa356;--chip:#ece7da;--chipOn:#23211d;--chipOnInk:#fffdf8;
   --shadow:0 1px 2px rgba(0,0,0,.06),0 8px 24px rgba(40,30,10,.07);
 }
 @media (prefers-color-scheme:dark){
   :root{--bg:#121316;--card:#1b1d22;--ink:#ece8df;--muted:#9a968c;--line:#34373e;
-  --accent:#ff8a4c;--accent2:#6bb3d9;--avail:#8fb4cf;--avoid:#ff8a7a;--chip:#262930;--chipOn:#ece8df;--chipOnInk:#16171a;--shadow:none}
+  --accent:#ff8a4c;--accent2:#6bb3d9;--avail:#8fb4cf;--avoid:#ff8a7a;--ct:#5ad17e;--chip:#262930;--chipOn:#ece8df;--chipOnInk:#16171a;--shadow:none}
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink)}
@@ -22,22 +22,24 @@ body{font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic UI","Yu Gothic",syste
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
 
 /* ---- stage (staff) ---- */
-.stage{padding:12px 14px 12px}
+.stage{padding:12px 14px 12px;--cf:clamp(34px,8vw,58px)}
 @media (min-height:700px){.stage{position:sticky;top:6px;z-index:5}}
-.stage-head{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 22px}
-.now{display:flex;align-items:baseline;gap:10px;min-width:0}
+.stage-head{display:flex;flex-wrap:wrap;align-items:center;gap:6px 22px}
+.now{display:flex;flex-direction:column;align-items:flex-start;gap:0;flex:none;width:calc(var(--cf)*4.6);height:calc(var(--cf)*1.1 + 18px);overflow:hidden}
 .lbl{font-size:11px;letter-spacing:.14em;color:var(--muted);font-weight:700}
-.chord{font-family:"Iowan Old Style","Palatino Linotype",Georgia,"Times New Roman",serif;font-size:clamp(34px,8vw,58px);line-height:1.05;font-weight:700;letter-spacing:-.01em;min-width:2.2em}
+.chord{font-family:"Iowan Old Style","Palatino Linotype",Georgia,"Times New Roman",serif;font-size:var(--cf);line-height:calc(var(--cf)*1.1);font-weight:700;letter-spacing:-.01em;white-space:nowrap;display:block;max-width:100%}
+.chord.long{font-size:calc(var(--cf)*.82)}
 .meta{display:grid;gap:1px;font-size:13px;color:var(--muted);flex:1 1 220px;min-width:0}
+.meta>div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .meta b{color:var(--ink);font-weight:600}
-.beats{display:flex;gap:7px;align-items:center;margin-left:auto;padding-bottom:6px}
+.beats{display:flex;gap:7px;align-items:center;margin-left:auto}
 .beats i{width:12px;height:12px;border-radius:50%;background:var(--chip);border:1px solid var(--line);transition:background .06s,transform .06s}
 .beats i.on{background:var(--ink);transform:scale(1.18)}
 .beats i.on.first{background:var(--accent)}
 #staffWrap{margin:6px -4px 0;overflow:hidden}
 #staff{display:block;width:100%;height:auto;color:var(--ink)}
 .readout{display:flex;flex-wrap:wrap;gap:4px 18px;font-size:13px;color:var(--muted);margin-top:2px}
-.readout b{color:var(--accent);font-size:15px}
+.readout b{color:var(--accent);font-size:15px;display:inline-block;min-width:3em}
 .chips{display:flex;gap:6px;margin-top:10px;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}
 .chip{flex:1 1 0;min-width:58px;text-align:center;padding:6px 6px;border-radius:9px;background:var(--chip);font-family:Georgia,"Times New Roman",serif;font-weight:700;font-size:15px;border:1px solid transparent;white-space:nowrap}
 .chip.half{flex:.55 1 0;min-width:46px}
@@ -64,6 +66,7 @@ select:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid 
 #btnReset{font:inherit;font-size:15px;font-weight:600;padding:11px 22px;border-radius:999px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
 #btnReset:active{transform:translateY(1px)}
 .readout .avdkey{color:var(--avoid)}
+.readout .ctkey{color:var(--ct);font-weight:600}
 </style>
 </head>
 <body>
@@ -83,7 +86,7 @@ select:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid 
   <div id="staffWrap"><svg id="staff" role="img" aria-label="現在のコードとアドリブの五線譜"></svg></div>
   <div class="readout">
     <span>アドリブ音　<b id="adlibName">—</b></span>
-    <span id="legend">黒＝コード　橙＝アドリブ　青の薄い音＝アベイラブルノート（濃い＝コードトーン）　<span class="avdkey">赤の点線＝アヴォイドノート</span></span>
+    <span id="legend">黒＝コード　橙＝アドリブ（橙の丸＝演奏中の音）　青の薄い音＝アベイラブルノート　<span class="ctkey">緑＝コードトーン</span>　<span class="avdkey">赤の点線＝アヴォイドノート</span></span>
   </div>
   <div id="chips" class="chips"></div>
 </section>
@@ -307,7 +310,7 @@ function sigMapFor(key){
   for(let i=0;i<n;i++)m[order[i]]=key.sig>0?'#':'b';
   return m;
 }
-const SVG_STYLE='<style>.ink{fill:currentColor}.inkS{stroke:currentColor;fill:none}.ad{fill:var(--accent)}.adS{stroke:var(--accent);fill:none}.avd{fill:var(--avoid)}.avdS{stroke:var(--avoid);fill:none}'
+const SVG_STYLE='<style>.ink{fill:currentColor}.inkS{stroke:currentColor;fill:none}.ad{fill:var(--accent)}.adS{stroke:var(--accent);fill:none}.avd{fill:var(--avoid)}.avdS{stroke:var(--avoid);fill:none}.ct{fill:var(--ct)}.ctS{stroke:var(--ct);fill:none}'
  +'.av{fill:var(--avail)}.avS{stroke:var(--avail);fill:none}.mut{fill:currentColor;opacity:.5}'
  +'text{font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic UI",system-ui,sans-serif}.acc{font-family:"Segoe UI Symbol","Apple Symbols","Noto Sans Symbols 2","Noto Music",Georgia,serif}</style>';
 
@@ -405,14 +408,14 @@ function renderStaff(st,opt){
     const sp=Math.min(40,zone/list.length);
     list.forEach((n,i)=>{
       const cx=availX+(i+0.5)*sp, cur=st.adlib&&n.midi===st.adlib.midi;
-      const isAv=!!n.avoid, cls=isAv?'avd':'av';
-      const op=isAv?0.75:n.chordTone?0.62:0.26;
-      h+=`<g opacity="${cur?1:op}">`+ledgers(n.step,cx,isAv?'avdS':'avS')
+      const isAv=!!n.avoid, isCT=!isAv&&n.chordTone, cls=isAv?'avd':isCT?'ct':'av';
+      const op=isAv?0.75:isCT?0.7:0.26;
+      h+=`<g opacity="${op}">`+ledgers(n.step,cx,isAv?'avdS':isCT?'ctS':'avS')
         +(isAv?`<ellipse cx="${cx}" cy="${yOf(n.step)}" rx="6.2" ry="4.5" transform="rotate(-20 ${cx} ${yOf(n.step)})" class="avdS" stroke-width="1.8" stroke-dasharray="2.6 2"/>`:head(cx,n.step,'fill',cls));
       if(n.acc!==(sigMap[n.L]||''))h+=accText(cx-11,n.step,n.acc,cls,19);
       h+='</g>';
-      if(cur)h+=`<circle cx="${cx}" cy="${yOf(n.step)}" r="10.5" class="adS" stroke-width="2"/>`;
-      if(opt.showNames)h+=`<text x="${cx}" y="${H-10}" font-size="12" text-anchor="middle" class="${n.avoid?'avd':n.chordTone?'av':'mut'}" font-weight="${n.chordTone?700:400}" opacity="${n.chordTone?0.85:1}">${pretty(n.L,n.acc)}</text>`;
+      if(cur)h+=`<circle cx="${cx}" cy="${yOf(n.step)}" r="10.5" class="adS" stroke-width="2.6"/>`;
+      if(opt.showNames)h+=`<text x="${cx}" y="${H-10}" font-size="12" text-anchor="middle" class="${n.avoid?'avd':n.chordTone?'ct':'mut'}" font-weight="${n.chordTone?700:400}" opacity="${n.chordTone?0.85:1}">${pretty(n.L,n.acc)}</text>`;
     });
   }
 
@@ -661,6 +664,7 @@ function setChordUI(i,live){
   ST.key=P.key;ST.chord=ch;ST.voicing=P.voicings[i];ST.avail=P.avails[i];
   ST.adlib=null;ST.rest=live&&$('selPat').value!=='none';
   $('chordName').textContent=ch.name;
+  $('chordName').classList.toggle('long',ch.name.length>=7);
   $('chordTones').textContent=ch.tones.map(t=>pretty(t.L,t.acc)).join('  ');
   $('scaleName').textContent=ch.scaleName;
   $('avoidTones').textContent=ch.scale.filter(t=>t.avoid).map(t=>pretty(t.L,t.acc)).join('  ')||'なし';
