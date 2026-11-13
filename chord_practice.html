@@ -49,7 +49,7 @@ body{font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic UI","Yu Gothic",syste
 .controls{padding:14px 14px 16px;display:grid;gap:14px}
 .controls h1{font-size:15px;margin:0;letter-spacing:.02em}
 .controls h1 small{font-weight:400;color:var(--muted);margin-left:8px;font-size:12px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px 14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px 14px}
 label.f{display:grid;gap:4px;font-size:12px;color:var(--muted);font-weight:600}
 select{font:inherit;font-size:15px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:9px 10px;width:100%;min-height:42px}
 select:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
@@ -106,11 +106,16 @@ select:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid 
     <label class="f">アドリブ（フルート）
       <select id="selPat"></select>
     </label>
+    <label class="f">ドラム
+      <select id="selDrum"></select>
+    </label>
   </div>
   <div class="row">
     <label class="vol">ピアノ <input type="range" id="volPiano" min="0" max="100" value="80"></label>
     <label class="vol">フルート <input type="range" id="volFlute" min="0" max="100" value="80"></label>
+    <label class="vol">ドラム <input type="range" id="volDrum" min="0" max="100" value="70"></label>
     <label class="chk"><input type="checkbox" id="chkClick">メトロノーム</label>
+    <label class="chk"><input type="checkbox" id="chkFill" checked>フィル（4小節ごと）</label>
     <label class="chk"><input type="checkbox" id="chkCount" checked>カウントイン</label>
     <label class="chk"><input type="checkbox" id="chkAvail" checked>アベイラブルノート表示</label>
     <label class="chk"><input type="checkbox" id="chkNames" checked>音名表示</label>
@@ -450,22 +455,23 @@ function initAudio(){
   Object.assign(A,{ctx,master,conv,noise:nb});
 }
 function newSession(){
-  const ctx=A.ctx,pb=ctx.createGain(),fb=ctx.createGain(),cb=ctx.createGain();
+  const ctx=A.ctx,pb=ctx.createGain(),fb=ctx.createGain(),cb=ctx.createGain(),db=ctx.createGain(),dsend=ctx.createGain();
   pb.connect(A.master);pb.connect(A.conv);
   fb.connect(A.master);fb.connect(A.conv);
   cb.connect(A.master);cb.gain.value=0.3;
-  A.sess={pb,fb,cb};applyVolumes();
+  db.connect(A.master);db.connect(dsend);dsend.gain.value=0.22;dsend.connect(A.conv);
+  A.sess={pb,fb,cb,db};applyVolumes();
 }
 function applyVolumes(){
   if(!A.sess)return;
   const v=id=>Math.pow(+document.getElementById(id).value/100,1.5);
-  A.sess.pb.gain.value=v('volPiano');A.sess.fb.gain.value=v('volFlute');
+  A.sess.pb.gain.value=v('volPiano');A.sess.fb.gain.value=v('volFlute');A.sess.db.gain.value=v('volDrum');
 }
 function endSession(){
   const s=A.sess;if(!s)return;A.sess=null;
   const now=A.ctx.currentTime;
-  [s.pb,s.fb,s.cb].forEach(g=>{g.gain.cancelScheduledValues(now);g.gain.setTargetAtTime(0,now,0.03);});
-  setTimeout(()=>[s.pb,s.fb,s.cb].forEach(g=>{try{g.disconnect();}catch(e){}}),600);
+  [s.pb,s.fb,s.cb,s.db].forEach(g=>{g.gain.cancelScheduledValues(now);g.gain.setTargetAtTime(0,now,0.03);});
+  setTimeout(()=>[s.pb,s.fb,s.cb,s.db].forEach(g=>{try{g.disconnect();}catch(e){}}),600);
 }
 const mtof=m=>440*Math.pow(2,(m-69)/12);
 
@@ -531,6 +537,88 @@ function clickSound(t,accent){
   g.gain.setValueAtTime(0.0001,t);g.gain.linearRampToValueAtTime(accent?0.9:0.6,t+0.002);
   g.gain.exponentialRampToValueAtTime(0.0001,t+0.05);
   o.connect(g);g.connect(A.sess.cb);o.start(t);o.stop(t+0.07);
+}
+
+
+/* ================= ドラム ================= */
+function dNoise(t,type,freq,q,peak,decay){
+  const ctx=A.ctx,s=ctx.createBufferSource();s.buffer=A.noise;s.loop=true;
+  const f=ctx.createBiquadFilter();f.type=type;f.frequency.value=freq;f.Q.value=q;
+  const g=ctx.createGain();g.gain.setValueAtTime(peak,t);g.gain.exponentialRampToValueAtTime(0.0001,t+decay);
+  s.connect(f);f.connect(g);g.connect(A.sess.db);s.start(t,Math.random()*0.5);s.stop(t+decay+0.05);
+}
+function dTone(t,type,f0,f1,peak,decay,fall){
+  const ctx=A.ctx,o=ctx.createOscillator(),g=ctx.createGain();
+  o.type=type;o.frequency.setValueAtTime(f0,t);
+  if(fall>0)o.frequency.exponentialRampToValueAtTime(f1,t+fall);
+  g.gain.setValueAtTime(peak,t);g.gain.exponentialRampToValueAtTime(0.0001,t+decay);
+  o.connect(g);g.connect(A.sess.db);o.start(t);o.stop(t+decay+0.05);
+}
+const DR={
+  kick:(t,v)=>{dTone(t,'sine',150,45,0.95*v,0.4,0.12);dTone(t,'triangle',900,200,0.22*v,0.025,0.02);},
+  snare:(t,v)=>{dNoise(t,'bandpass',2200,0.8,0.55*v,0.2);dNoise(t,'highpass',1200,0.7,0.22*v,0.16);dTone(t,'triangle',200,150,0.42*v,0.12,0.08);},
+  rim:(t,v)=>{dTone(t,'triangle',1700,1500,0.3*v,0.03,0.02);dNoise(t,'bandpass',3200,1.2,0.35*v,0.04);},
+  hat:(t,v)=>dNoise(t,'highpass',7500,0.7,0.26*v,0.045),
+  hatO:(t,v)=>dNoise(t,'highpass',7000,0.7,0.24*v,0.28),
+  pedal:(t,v)=>dNoise(t,'highpass',6500,0.7,0.18*v,0.05),
+  ride:(t,v)=>{dNoise(t,'highpass',6000,0.6,0.2*v,0.5);dNoise(t,'bandpass',9500,2,0.14*v,0.35);dTone(t,'sine',5300,5300,0.05*v,0.15,0);},
+  clap:(t,v)=>{[0,0.011,0.023].forEach(d=>dNoise(t+d,'bandpass',1300,1,0.45*v,0.03));dNoise(t+0.03,'bandpass',1300,0.9,0.4*v,0.14);},
+  tomH:(t,v)=>{dTone(t,'sine',260,170,0.7*v,0.28,0.2);dNoise(t,'bandpass',1800,1,0.1*v,0.04);},
+  tomM:(t,v)=>{dTone(t,'sine',190,120,0.75*v,0.32,0.2);dNoise(t,'bandpass',1500,1,0.1*v,0.04);},
+  tomL:(t,v)=>{dTone(t,'sine',140,85,0.8*v,0.38,0.22);dNoise(t,'bandpass',1200,1,0.1*v,0.04);},
+  crash:(t,v)=>{dNoise(t,'highpass',4500,0.6,0.28*v,1.4);dNoise(t,'bandpass',8000,1.5,0.14*v,1.0);},
+};
+/* パターン: bars = 1小節(16ステップ)ごとのイベント配列 [ステップ, 楽器, ベロシティ]。複数小節ならループ */
+const SWG=8/3;
+const rg=(a,b,k)=>{const r=[];for(let i=a;i<b;i+=k)r.push(i);return r;};
+const H8=v=>rg(0,16,2).map(s=>[s,'hat',s%4===0?v:v*0.65]);
+const H16=v=>rg(0,16,1).map(s=>[s,'hat',s%4===0?v:s%2===0?v*0.7:v*0.45]);
+const swingBar=extra=>[[0,'ride',.55],[4,'ride',.5],[4+SWG,'ride',.35],[8,'ride',.55],[12,'ride',.5],[12+SWG,'ride',.35],
+  [4,'pedal',.7],[12,'pedal',.7],[0,'kick',.2],[4,'kick',.18],[8,'kick',.2],[12,'kick',.18],...extra];
+const bossaK=[[0,'kick',.8],[6,'kick',.55],[8,'kick',.8],[14,'kick',.55]];
+const bossaP=rg(0,16,2).map(s=>[s,'pedal',.5]);
+const DRUMS=[
+ {id:'none',name:'ドラムなし',bars:[[]]},
+ {id:'rock8',name:'8ビート（ロック）',bars:[[...H8(.55),[0,'kick',1],[8,'kick',.9],[10,'kick',.7],[4,'snare',.95],[12,'snare',1]]]},
+ {id:'rock8h',name:'8ビート（ハーフタイム）',bars:[[...H8(.5),[0,'kick',1],[10,'kick',.7],[8,'snare',1]]]},
+ {id:'rock16',name:'16ビート',bars:[[...H16(.5),[0,'kick',1],[7,'kick',.6],[10,'kick',.85],[4,'snare',.95],[12,'snare',1]]]},
+ {id:'four',name:'4つ打ち（ハウス／ディスコ）',bars:[[[0,'kick',1],[4,'kick',.95],[8,'kick',.95],[12,'kick',.95],[2,'hatO',.5],[6,'hatO',.5],[10,'hatO',.5],[14,'hatO',.5],[4,'clap',.8],[12,'clap',.85]]]},
+ {id:'ballad',name:'バラード（サイドスティック）',bars:[[...H8(.3),[0,'kick',.9],[10,'kick',.6],[4,'rim',.8],[12,'rim',.85]]]},
+ {id:'bossa',name:'ボサノバ',nofill:true,bars:[[...bossaP,...bossaK,[0,'rim',.6],[6,'rim',.6],[12,'rim',.6]],[...bossaP,...bossaK,[4,'rim',.6],[10,'rim',.6]]]},
+ {id:'swing',name:'ジャズ・スウィング（ライド）',nofill:true,swing:true,bars:[swingBar([]),swingBar([[10+SWG,'snare',.22]])]},
+ {id:'shuffle',name:'シャッフル（ブルース）',swing:true,bars:[[[0,'hat',.55],[SWG,'hat',.35],[4,'hat',.55],[4+SWG,'hat',.35],[8,'hat',.55],[8+SWG,'hat',.35],[12,'hat',.55],[12+SWG,'hat',.35],[0,'kick',1],[8,'kick',.9],[4,'snare',.95],[12,'snare',1]]]},
+ {id:'funk',name:'ファンク',bars:[[...H16(.45),[0,'kick',1],[6,'kick',.7],[10,'kick',.9],[4,'snare',1],[12,'snare',1],[7,'snare',.25],[9,'snare',.22],[15,'snare',.25]],
+   [...H16(.45),[0,'kick',1],[3,'kick',.6],[10,'kick',.9],[14,'kick',.6],[4,'snare',1],[12,'snare',1],[7,'snare',.25],[15,'snare',.25]]]},
+];
+const DRUM_BY_ID={};DRUMS.forEach(d=>DRUM_BY_ID[d.id]=d);
+const FILLS=[
+ [[12,'snare',.55],[13,'snare',.6],[14,'snare',.75],[15,'snare',.9]],
+ [[12,'tomH',.8],[13,'tomH',.7],[14,'tomM',.85],[15,'tomL',.95]],
+ [[12,'snare',.8],[14,'tomM',.8],[15,'tomL',.9]],
+];
+/* チェイン先頭からの通し拍(P.gbeat)で小節位置を決める。コードの拍数に依らず4拍ごとに小節が進む */
+function scheduleDrums(t,spb,beats){
+  const pat=DRUM_BY_ID[$('selDrum').value];
+  if(!pat||pat.id==='none'){P.gbeat+=beats;return;}
+  const fillOn=$('chkFill').checked&&!pat.nofill;
+  for(let b=0;b<beats;b++){
+    const gb=P.gbeat+b,bar=Math.floor(gb/4),bib=gb%4;
+    let ev=pat.bars[bar%pat.bars.length];
+    if(fillOn){
+      if(bar%4===3){
+        ev=ev.filter(e=>e[0]<12);
+        if(P.fills[bar]===undefined)P.fills[bar]=pick(FILLS);
+        ev=ev.concat(P.fills[bar]);
+      }else if(bar%4===0&&bar>0)ev=ev.concat([[0,'crash',.75]]);
+    }
+    const t0=t+b*spb;
+    ev.forEach(e=>{
+      if(e[0]<bib*4||e[0]>=bib*4+4)return;
+      const jit=pat.swing?0:(Math.random()-0.5)*0.006;
+      DR[e[1]](Math.max(A.ctx.currentTime,t0+(e[0]-bib*4)*spb/4+jit),Math.max(0.05,e[2]*(0.93+Math.random()*0.14)));
+    });
+  }
+  P.gbeat+=beats;
 }
 
 /* ================= アドリブ生成 ================= */
@@ -699,6 +787,7 @@ function scheduleChord(){
     if(click)clickSound(t+b*spb,b===0);
     evs.push({t:t+b*spb,fn:()=>setBeatUI(b%4)});
   }
+  scheduleDrums(t,spb,ch.beats);
   /* フルート */
   const ad=genAdlib(ch,nx,pat,P.prevAd,ch.beats);
   ad.forEach(e=>{
@@ -731,7 +820,7 @@ function setPlayButton(){
 function startPlay(){
   initAudio();A.ctx.resume();
   rebuild();newSession();
-  P.playing=true;P.paused=false;P.events=[];
+  P.playing=true;P.paused=false;P.events=[];P.gbeat=0;P.fills={};
   const spb=60/(+$('selTempo').value);
   let t=A.ctx.currentTime+0.15;
   if($('chkCount').checked){
@@ -778,6 +867,8 @@ function init(){
   $('selTempo').value='80';
   PATTERNS.forEach(([v,l])=>{const o=document.createElement('option');o.value=v;o.textContent=l;$('selPat').appendChild(o);});
   $('selPat').value='half';
+  DRUMS.forEach(d=>{const o=document.createElement('option');o.value=d.id;o.textContent=d.name;$('selDrum').appendChild(o);});
+  $('selDrum').value='rock8';
   $('beats').firstElementChild.classList.add('first');
 
   $('btnPlay').addEventListener('click',togglePlay);
@@ -785,7 +876,7 @@ function init(){
   $('selProg').addEventListener('change',restartIfPlaying);
   $('selKey').addEventListener('change',restartIfPlaying);
   $('selPat').addEventListener('change',()=>{ST.rest=false;});
-  ['volPiano','volFlute'].forEach(id=>$(id).addEventListener('input',applyVolumes));
+  ['volPiano','volFlute','volDrum'].forEach(id=>$(id).addEventListener('input',applyVolumes));
   ['chkAvail','chkNames'].forEach(id=>$(id).addEventListener('change',drawStaff));
   document.addEventListener('keydown',e=>{
     if(e.code==='Space'&&!/^(SELECT|INPUT|BUTTON|TEXTAREA)$/.test(e.target.tagName)){e.preventDefault();togglePlay();}
